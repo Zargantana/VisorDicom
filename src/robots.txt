@@ -1,0 +1,8 @@
+User-agent: *
+Allow: /reader
+Allow: /file-loader
+Allow: /dir-loader
+Allow: /assets/ReleaseNotes.txt
+Disallow /*
+Crawl-delay: 2
+Sitemap: https://visordicom.es/sitemap.xml

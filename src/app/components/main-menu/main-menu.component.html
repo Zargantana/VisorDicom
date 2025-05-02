@@ -1,0 +1,40 @@
+<ul class="list-unstyled w-100 mx-3 user-select-none">
+    <li [class.d-none]="expanded" 
+        [class.border-dark]="!isDark()" [class.border-light]="isDark()"  
+        [class.bg-dark]="isDark()" [class.bg-white]="!isDark()" 
+        class="border rounded mx-2 mb-3 px-2 py-3 bg-white" (click)="OnHomeClick()">
+        <div class="d-flex justify-content-center m-0 p-0 flex-row slab-flex-1" data-toggle="collapse" aria-expanded="false">
+            <i class="fas fa-home px-2 fa-2x mx-0"></i>
+        </div>                
+    </li>    
+    <li [class.expanded]="expanded" [class.rounded]="!expanded" 
+        [class.border-dark]="!isDark()" [class.border-light]="isDark()" 
+        [class.bg-dark]="isDark()" [class.bg-white]="!isDark()" 
+        class="text-center border mx-2 my-3 px-2 py-3 bg-white" (click)="OnMenuEntryClick(false)" routerLink="/reader">
+        <div class="d-flex justify-content-center m-0 p-0 flex-row slab-flex-1">
+            <i class="fas fa-search px-2 col-auto mx-0" [class.fa-2x]="!expanded" [class.fa-3x]="expanded"></i>
+            <strong [class.d-none]="!expanded" class="col-9 align-self-center reducto">Encontrar imágenes</strong>
+            <br [class.d-none]="!expanded" class="col"/>
+        </div>
+    </li> 
+    <li [class.expanded]="expanded" [class.rounded]="!expanded" 
+        [class.border-dark]="!isDark()" [class.border-light]="isDark()" 
+        [class.bg-dark]="isDark()" [class.bg-white]="!isDark()" 
+        class="text-center border mx-2 my-3 px-2 py-3 bg-white" (click)="OnMenuEntryClick(true)" routerLink="/stored">
+        <div class="d-flex justify-content-center m-0 p-0 flex-row slab-flex-1">
+            <i class="fas fa-database px-2 col-auto mx-0" [class.fa-2x]="!expanded" [class.fa-3x]="expanded"></i>
+            <strong [class.d-none]="!expanded" class="col-9 align-self-center reducto">Mis imágenes</strong>
+            <br [class.d-none]="!expanded" class="col"/>
+        </div>
+    </li>
+    <li [class.expanded]="expanded" [class.rounded]="!expanded" 
+        [class.border-dark]="!isDark()" [class.border-light]="isDark()" 
+        [class.bg-dark]="isDark()" [class.bg-white]="!isDark()" 
+        class="text-center border mx-2 my-3 px-2 py-3 bg-white" (click)="OnMenuEntryClick(true)" routerLink="/request">
+        <div class="d-flex justify-content-center m-0 p-0 flex-row slab-flex-1">
+            <i class="fas fa-envelope px-2 col-auto mx-0"  [class.fa-2x]="!expanded" [class.fa-3x]="expanded"></i>
+            <strong [class.d-none]="!expanded" class="col-9 align-self-center reducto">Solicitar imágenes</strong>
+            <br [class.d-none]="!expanded" class="col"/>
+        </div>                
+    </li>
+</ul>

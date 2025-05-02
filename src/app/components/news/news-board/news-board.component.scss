@@ -1,0 +1,50 @@
+.dot {
+  height: 15px;
+  width: 15px;
+  background-color: rgb(223, 80, 80);
+  border-radius: 50%;
+  display: inline-block;
+  border-width: 1px;
+  // border-color: rgb(219, 97, 97);
+  border-color: black;
+  border-style: solid;
+}
+
+.dot:hover {
+  background-color: rgb(236, 122, 122);
+  border-color: rgb(126, 33, 33);
+}
+
+  .orangedot {
+    height: 15px;
+    width: 15px;
+    background-color: rgb(228, 149, 32);
+    border-radius: 50%;
+    display: inline-block;
+    border-width: 1px;
+    // border-color: rgb(219, 97, 97);
+    border-color: black;
+    border-style: solid;
+  }
+
+  .orangedot:hover {
+    background-color:  rgb(228, 186, 124);
+    border-color:  rgb(179, 110, 7);
+  }
+  
+
+  .decreasingFont {
+    font-size: 1.2vw;
+  }
+  
+  @media (max-width: 900px) {
+    .decreasingFont {
+      font-size: 1.4vw;
+    }
+  }
+
+  @media (min-width: 1400px) {
+    .decreasingFont {
+      font-size: 0.9vw;
+    }
+  }

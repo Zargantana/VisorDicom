@@ -1,0 +1,25 @@
+<span class="text-danger" *ngIf="errorMessage != ''">{{errorMessage}}</span>
+<form [formGroup]="form" (ngSubmit)="login()">
+    <fieldset>
+        <legend class="mt-2">¿Quien eres?</legend>
+        <div class="d-flex flex-row m-0 p-0">
+            <div class="d-flex flex-column m-0 p-2 user-select-none">
+                <label class="field-label mt-2">Email:</label>
+                <label class="field-label my-1">Password:</label>
+            </div>
+            <div class="d-flex flex-column m-0 p-0">
+                <input name="email" (keypress)="onEmailKeyPress($event)" #email class="field px-2 mt-1" [class.dakened]="isDark()" formControlName="email" type="text" autofocus>
+                <input name="password"(keypress)="onPassKeyPress($event)"  #password class="field px-2 my-1" [class.dakened]="isDark()" formControlName="password" type="password">
+            </div>
+        </div>
+    </fieldset>
+    <div class="d-flex justify-content-between form-buttons text-center mt-2 p-0">
+        <!-- <span>&nbsp;</span> -->
+        <button class="d-flex w-100 btn btn-primary mx-0 my-2 text-center justify-content-center" #submitButton type="submit" (click)="login()"><p class="m-0 p-0" [class.d-none]="loggingIn">Login</p><p class="m-0 p-0 blink_me" [class.d-none]="!loggingIn">Comprobando...</p></button>
+        <!-- <span>&nbsp;</span> -->
+    </div>
+    <div class="d-flex flex-row justify-content-between mt-4 p-0 field-label">
+        <a class="clickable text-primary px-0 pb-2 pt-0 m-0" (click)="Remember()">¿Usuario? ¿Contraseña?</a>
+        <a class="clickable text-primary px-0 pb-2 pt-0 m-0" (click)="Register()">Registrarse</a>
+    </div>
+</form>

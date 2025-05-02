@@ -1,0 +1,88 @@
+<div class="d-flex slab-flex-1 p-0 m-0">
+    <div class="d-flex flex-column p-0 m-0 reducto" (wheel)="onScrollF($event)" [style.max-height.px]="maxIconListHeight()" [class.d-none]="isResizing">
+        <div class="container p-0 m-0">
+            <div *ngFor="let patient of classifier?.studySplit" class="row p-0 m-0">            
+                <div class="col p-0 m-0">
+                    <div class="row p-0 m-1 border" [class.border-dark]="!isDark()" [class.border-light]="isDark()">
+                        <small class="m-0 p-0" [class.bg-dark]="!isDark()" [class.bg-white]="isDark()" [class.text-light]="!isDark()"  [class.text-dark]="isDark()">Patient Id:</small> <small>{{patient[0][0][0][0].PatientId}}</small>
+                    </div>
+                    <div *ngFor="let study of patient" class="row p-0 m-0">
+                        <div class="col p-0 m-0">
+                            <div class="row p-0 m-1 border" [class.border-dark]="!isDark()" [class.border-light]="isDark()">
+                                <small class="m-0 p-0" [class.bg-dark]="!isDark()" [class.bg-white]="isDark()" [class.text-light]="!isDark()"  [class.text-dark]="isDark()">Study Date:</small> <small>{{study[0][0][0].StudyDate}}</small>
+                            </div>
+                            <div *ngFor="let modality of study" class="row p-0 m-0">
+                                <div class="col p-0 m-0">
+                                    <div class="row p-0 m-1 border" [class.border-dark]="!isDark()" [class.border-light]="isDark()">
+                                        <small class="m-0 p-0" [class.bg-dark]="!isDark()" [class.bg-white]="isDark()" [class.text-light]="!isDark()"  [class.text-dark]="isDark()">Modality:</small> <small>{{modality[0][0].Modality}}</small>
+                                    </div>
+                                    <div *ngFor="let serie of modality" class="row p-0 m-0">
+                                        <div class="col p-0 m-0">
+                                            <div class="row p-0 m-1 border" [class.border-dark]="!isDark()" [class.border-light]="isDark()">
+                                                <small class="m-0 p-0" [class.bg-dark]="!isDark()" [class.bg-white]="isDark()" [class.text-light]="!isDark()"  [class.text-dark]="isDark()">Series Number:</small> <small>{{serie[0].SeriesNumber}}</small>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>                                            
+        <div class="d-flex flex-column p-0 m-0" style="margin-top: -100px !important;">
+            <div class="d-flex flex-column p-0 mx-4" style="margin-bottom: -35px">
+                <div class="p-0 ex2">
+                    <div class="p-0 subcube2">
+                        <img class="p-0 m-0 bg-black second opacity-50" #imageIconDisplaySub2 style="width: 125px"/>
+                    </div>
+                </div>
+                <div class="p-0 ex2">
+                    <div class="p-0 subcube1">
+                        <img class="p-0 m-0 bg-black first opacity-75" #imageIconDisplaySub1 style="width: 125px"/>
+                    </div>
+                </div>
+            </div>
+            <div class="d-flex flex-column-reverse p-0 mx-4">
+                <div class="p-0 ex2">
+                    <div class="p-0 cube">
+                        <img class="p-0 m-0 bg-black first opacity-75" #imageIconDisplay style="width: 125px"/>
+                    </div>
+                </div>
+                <div class="p-0 ex2">
+                    <div class="p-0 cube2">
+                        <img class="p-0 m-0 bg-black second" #imageIconDisplay2 style="width: 125px"/>
+                    </div>
+                </div>
+                <div class="p-0 ex2">
+                    <div class="p-0 cube3">
+                        <img class="p-0 m-0 bg-black third" #imageIconDisplay3 style="width: 125px"/>
+                    </div>
+                </div>
+                <div class="p-0 ex2">
+                    <div class="p-0 cube4">
+                        <img class="p-0 m-0 bg-black fourth" #imageIconDisplay4 style="width: 125px"/>
+                    </div>
+                </div>
+                <div class="p-0 ex2">
+                    <div class="p-0 cube5">
+                        <img class="p-0 m-0 bg-black fifth border border-primary" #imageIconDisplay5 style="width: 125px"/>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="d-flex slab-flex-1 p-0 m-0">
+        <basic-image-viewer class="d-flex slab-flex-1 p-0 m-0"
+            [iconListVisible]="true"
+            [pointerControls]="true"
+            [currentElementPointer]="mainImagePointer + 1"
+            [numberOfElements]="classifier?.numberOfImages??0"
+            [reader]="reader"
+            [currentImage]="currentImage"
+            (beforeClick)="ImageBeforeClick()"
+            (nextClick)="NextImageClick()" 
+            (imageClick)="ImageClicked()"
+            (imageWheel)="onScroll($event)" #display></basic-image-viewer>
+    </div>
+</div>

@@ -1,0 +1,19 @@
+li
+{
+    box-shadow: 7px 7px 15px #592A08;
+}
+
+li.expanded
+{
+    margin: 5% 25% 0 25% !important;
+}
+
+li:hover {
+    cursor: pointer;
+}
+
+@media (max-width: 800px) {
+    .reducto {
+        display: none !important;
+    }
+}

@@ -1,0 +1,63 @@
+<h1>file-loader</h1>
+<div class="input-group mb-3">
+    <label  class="input-group-text" for="file">Choose file</label>
+    <input type="file" id="file" name="file" class="form-control" multiple (change)="onFileSelected($event)" #fileUpload/>
+</div>
+<div class="input-group mb-3">
+    <label  class="input-group-text" for="file">Choose directory to search</label>
+    <input type="file" id="dirPicker" name="dirPicker" class="form-control" (change)="onDirectorySelected($event)" #dirUpload webkitDirectory multiple/>
+</div> 
+
+<div>
+    <button (click)="OnClick()">Read DICOM data</button>
+</div>
+<div>
+    <button (click)="OnClickRLE()">Decode RLE frames</button>
+</div>
+<div>
+    <button (click)="OnClickJPEG()">Decode JPEG Lossless frames</button>
+</div>
+<div>
+    <button (click)="OnClickUncompressed()">View uncompressed frames</button>
+</div>
+<div>
+  <input type="text" #toXorr />
+  <button (click)="OnClickDeXorr()">Read DICOM data</button>
+</div>
+<div class="row" style="overflow: auto;">
+    <div class="col-auto p-0 m-0 bg-black" [style.height.px]="reader?.Rows" [style.width.px]="reader?.Columns">
+        <img class="p-0 m-0 bg-black" [style.height.px]="reader?.Rows" [style.width.px]="reader?.Columns" #imageDisplay />
+    </div>
+    <div *ngIf="reader" class="col">
+        <div class="row card border border-dark rounded px-2" style="width: 18rem;">
+            <div class="card-body">
+                <h5 class="card-title">IMAGE DATA</h5>
+                <p class="card-text p-0 m-0"><strong>Rows: </strong>{{reader.Rows}}</p>
+                <p class="card-text p-0 m-0"><strong>Cols: </strong>{{reader.Columns}}</p>
+                <p class="card-text p-0 m-0"><strong>BitsAllocated: </strong>{{reader.BitsAllocated}}</p>
+                <p class="card-text p-0 m-0"><strong>BitsStored: </strong>{{reader.BitsStored}}</p>
+                <p class="card-text p-0 m-0"><strong>Frames: </strong>{{reader.Frames}}</p>
+                <p class="card-text p-0 m-0"><strong>Plannar: </strong>{{reader.PlannarConfiguration}}</p>
+                <p class="card-text p-0 m-0"><strong>Photometric Interpretation: </strong>{{reader.PhotometricInterpretation}}</p>
+                <p class="card-text p-0 m-0"><strong>Samples: </strong>{{reader.SamplesPerPixel}}</p>
+                <p class="card-text p-0 m-0"><strong>Modality: </strong>{{reader.Modality}}</p>
+                <p class="card-text p-0 m-0"><strong>TX: </strong>{{reader.TransferSyntax}}</p>
+                <p class="card-text p-0 m-0"><strong>TX Name: </strong>{{reader.TransferSyntaxName}}</p>
+            </div>
+        </div>
+        <div *ngFor="let readedTag of UIReadedTags"
+            [style.background-color]="readedTag.WarningFlag?'red':''"class="row card border rounded px-2 py-2" style="width: 18rem;">
+            <div class="card-body">
+                <h5 class="card-title">{{'('}} {{readedTag.TagHigh?.toString(16)?.padStart(4,'0')}}  {{','}} {{readedTag.TagLow?.toString(16)?.padStart(4,'0')}} {{')'}}</h5>
+                <p class="card-text p-0 m-0"><strong>name: </strong>{{(readedTag.TagHigh && readedTag.TagLow)?readedTag.getName(readedTag.TagHigh, readedTag.TagLow):'Group'}}</p>
+                <p class="card-text p-0 m-0"><strong>pos: </strong>{{readedTag.position}} <strong>d-offset: </strong>{{readedTag.dataOffset}}</p>
+                <p class="card-text p-0 m-0"><strong>VR: </strong>{{readedTag.VR}}</p>
+                <p class="card-text p-0 m-0"><strong>VL: </strong>{{readedTag.VL}}</p>
+                <p class="card-text p-0 m-0"><strong>Value: </strong>{{readedTag.Value}}</p>
+            </div>
+        </div>    
+    </div>
+
+    
+
+</div>

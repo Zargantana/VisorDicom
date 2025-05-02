@@ -1,0 +1,9 @@
+div.clickable:hover {
+    cursor: pointer;
+}
+
+@media (max-width: 1200px) {
+    .reducto {
+        display: none !important;
+    }
+}

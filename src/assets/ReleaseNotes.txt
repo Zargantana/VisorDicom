@@ -1,0 +1,140 @@
+*********************
+*   30/04/2025 v14  *
+*********************
+
+- Versión del visor web open source.
+
+*********************
+*   14/10/2024 v13  *
+*********************
+
+- Backend detenido.
+
+*********************
+*   14/10/2024 v12  *
+*********************
+
+- Desarrollo detenido.
+
+*********************
+*   20/04/2024 v11  *
+*********************
+- Los listados de imágenes incluyen el tag DICOM StudyDescription.
+
+*********************
+*   29/07/2023 v10  *
+*********************
+- Seccion para trazar los uploads en curso.
+- Trakers adaptativos al numero de uploads en el formulario de uploads.
+- Distintos mensajes para el formulario de uploads segun estado.
+- Bugs corregidos: [B0014, B0015, B0016].
+
+*********************
+*   25/05/2023 v9   *
+*********************
+- 'Mis imagenes' para pacientes.
+- Pacientes pueden compartir con doctores.
+- Doctores pueden visualizar imagenes compartidas por pacientes.
+
+*********************
+*   08/05/2023 v8   *
+*********************
+- Capacidad de visualizar imágenes guardadas.
+- Bugs corregidos: [B0006].
+
+*********************
+*   25/03/2023 v7   *
+*********************
+- Protección CSRF/XSRF - Cross Site Request Forgery.
+- Protección DoS.
+- Bugs corregidos: [B0011, B0012].
+- Capacidad de upload de fichero individual y de colección seleccionada.
+
+*********************
+*   02/02/2023 v6   *
+*********************
+- Iluminar los selectables de la tabla de estudios encontrados.
+- En el componente Top, que las lineas de texto no cambien de row y mantengan el tamaño. Si han de pasar debajo, que pasen debajo.
+- Visualizando un estudio con varias series, y findings table plegado, se hace el hoover y parece que cliques, pero despliega la tabla. Quizá mejor que seleccione de todas maneras.
+- Login con JWT.
+- Bugs corregidos: [B0005, B0007, B0009].
+
+*********************
+*   15/01/2023 v5   *
+*********************
+- Adaptaciones para mejorar  la experiencia  con el navegador Chrome en Mac.
+- Mejoras en el panel de novedades.
+- Release notes descargables.
+- Adaptaciones para resoluciones pequeñas.
+- Ajuste del visro al espacio disponible.
+- Bugs corregidos: [B0003].
+
+*********************
+*   11/01/2023 v4   *
+*********************
+- Lectura de imágenes en JPEG Baseline 1.
+- Aceptado Big Endian.
+- Botón para mailTo al desarrollador.
+- Descartados los DICOMDIR.
+
+*********************
+*   05/01/2023 v3   *
+*********************
+- Buena cobertura de la lectura de imágenes en JPEG2000 y JPEG-LS.
+- Grid de resultados encontrados plegable.
+- Más dinamismo mientras se siguen cargando ficheros.
+- Mejorada la respuesta del visor de estudios con muchas imágenes.
+
+*********************
+*   03/01/2023 v2   *
+*********************
+- Nuevo visor con rueda del ratón para estudios con muchas imágenes.
+- Versión prematura en lectura de imágenes comprimidas JPEG Baseline 1, 2000 y LS.
+            
+*********************
+*   26/12/2022 v1   *
+*********************
+- Tratamiento de Photometric Interpretation MONOCHROME1.
+- Visualización mejorada con las transformaciónes de la VOI LUT (Values of interest look up table).
+- Ajuste de visualización de imagen acorde al tamaño de pantalla (optimizado para 1920 x 1080).
+
+*********************
+*   20/12/2022 v0   *
+*********************
+- Primera versión apta para demo.
+
+
+KNOWN BUGS:
+- B0001: 
+    Se sigue viendo la cifra del numero de imagen de la anterior serie visualizado al cambiar
+    la serie en el viewer. 
+    Ejemplo: < 128/67 > en lugar de volver a < 1/67 >
+- B0002: 
+    En Firefox va lento.
+- B0008: 
+	La barra de scroll del list-viewer no vuelve a la posición 0 si cambias de estudio.
+- B0010: 
+	 Al hacer click en una modalidad de findings-table con mas de una serie, selecciona a veces una serie que no es la primera de la lista.
+- B0013: 
+    Si falla la carga de ficheros como por ejemplo por superar la memoria máxima, se queda la UI bastante poco responsive, y el navegador a veces ya deja de funcionar correctamente con casos normales.
+
+SOLVED BUGS:
+- B0003: 
+    A veces hace una mala redireccion que lleva a main (blank) cuando haces click a buscar imágenes.
+- B0005: 
+    El news board no se le puede poner fondo opaco y no responde a algunos estilos.
+- B0006: 
+    Las release notes se bajan con una codificación inadecuada al verse los acentos como varios carácteres raros.
+- B0009: 
+  	Al primer click de visualizar el scroll view pierde la lista de iconos.
+- B0011: 
+    Fondo negro ocupa mucho.
+- B0012: 
+    El login no caduca correctamente.
+- B0014: 
+    Si falla el upload, se queda pajarito. El boton de cierre activa y desactiva otro formulario, no el que vemos.
+- B0015:
+    El upload form crece seun el traker. Deberia no ser así.
+- B0016: 
+    Algo pasa con el upload de algunas imágenes cuando son muchas de golpe. Puede que DB no pueda con tanta conexión o concurrencia de SQLs.
+
