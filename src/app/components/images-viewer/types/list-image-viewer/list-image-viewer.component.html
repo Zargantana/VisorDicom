@@ -1,0 +1,62 @@
+<div class="d-flex flex-row slab-flex-1 p-0 m-0">    
+    <div [id]="isDark()?'style-14':'style-8'" class="d-flex p-0 m-0 overflow-auto" [style.max-height.px]="maxIconListHeight()" [class.d-none]="isResizing || ((classifier?.numberOfImages??0) <= 1)">
+        <div class="d-flex flex-column p-0 m-0">
+            <div class="container p-0 m-0">
+                <div *ngFor="let patient of classifier?.studySplit" class="row p-0 m-0">            
+                    <div class="col p-0 m-0">
+                        <div class="row p-0 m-1 border" [class.border-dark]="!isDark()" [class.border-light]="isDark()">
+                            <small class="m-0 p-0" [class.bg-dark]="!isDark()" [class.bg-white]="isDark()" [class.text-light]="!isDark()"  [class.text-dark]="isDark()">Patient Id:</small> <small>{{patient[0][0][0][0].PatientId}}</small>
+                        </div>
+                        <div *ngFor="let study of patient" class="row p-0 m-0">
+                            <div class="col p-0 m-0">
+                                <div class="row p-0 m-1 border" [class.border-dark]="!isDark()" [class.border-light]="isDark()">
+                                    <small class="m-0 p-0" [class.bg-dark]="!isDark()" [class.bg-white]="isDark()" [class.text-light]="!isDark()"  [class.text-dark]="isDark()">Study Date:</small> <small>{{study[0][0][0].StudyDate}}</small>
+                                </div>
+                                <div *ngFor="let modality of study" class="row p-0 m-0">
+                                    <div class="col p-0 m-0">
+                                        <div class="row p-0 m-1 border" [class.border-dark]="!isDark()" [class.border-light]="isDark()">
+                                            <small class="m-0 p-0" [class.bg-dark]="!isDark()" [class.bg-white]="isDark()" [class.text-light]="!isDark()"  [class.text-dark]="isDark()">Modality:</small> <small>{{modality[0][0].Modality}}</small>
+                                        </div>
+                                        <div *ngFor="let serie of modality" class="row p-0 m-0">
+                                            <div class="col p-0 m-0">
+                                                <div class="row p-0 m-1 border" [class.border-dark]="!isDark()" [class.border-light]="isDark()">
+                                                    <small class="m-0 p-0" [class.bg-dark]="!isDark()" [class.bg-white]="isDark()" [class.text-light]="!isDark()"  [class.text-dark]="isDark()">Series Number:</small> <small>{{serie[0].SeriesNumber}}</small>
+                                                </div>
+                                                <div *ngFor="let image of serie" class="row p-0 m-0 user-select-none" style="width: 125px">
+                                                    <div class="col p-0 m-1">
+                                                        <div class="row p-0 m-0">
+                                                            <image-icon class="p-0 m-0 clickable" [aReadedDICOMFile]="image" (click)="ViewImage(image.SOPInstanceUID)"></image-icon>
+                                                        </div>
+                                                        <div class="row justify-content-center text-center p-0 m-0">
+                                                            #{{image.InstanceNumber}}
+                                                        </div>
+                                                    </div>
+                                                </div>        
+                                            </div>
+                                        </div>        
+                                    </div>
+                                </div>
+                            </div>
+                        </div>        
+                    </div>
+                </div>  
+            </div>  
+        </div> 
+    </div>
+    <div class="d-flex slab-flex-1 p-0 m-0">
+        <basic-image-viewer class="d-flex slab-flex-1 p-0 m-0"
+            [iconListVisible]="true"
+            [pointerControls]="((reader?.Frames??0) > 1)"
+            [playpauseControl]="((reader?.Frames??0) > 1)"
+            [playpauseControlState]="stoppedPlaying"
+            [wheelScrolls]="true"
+            [currentElementPointer]="currentImage?currentImage.currentFrame + 1:0"
+            [numberOfElements]="currentImage?currentImage.frames:0"
+            [reader]="reader"
+            [currentImage]="currentImage"
+            (beforeClick)="FrameBeforeClick()"
+            (nextClick)="NextFrameClick()" 
+            (imageClick)="ImageClicked()"
+            (playpauseClick)="PlayPause()" #display></basic-image-viewer>
+    </div>
+</div>

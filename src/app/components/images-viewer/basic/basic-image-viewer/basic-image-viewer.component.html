@@ -1,0 +1,61 @@
+<div class="d-flex slab-flex-1 p-0 m-0" #componentDiv (window:resize)="onResize()">
+    <div class="d-flex flex-row slab-flex-1 p-0 m-0">
+        <div class="d-flex flex-column slab-flex-1 p-0 m-0 bg-black">
+            <div class="d-flex flex-row justify-content-between m-0 p-0">
+                <div class="d-flex m-0 p-0 user-select-none">
+                    <div [class.d-none]="!pointerControls" class="d-flex flex-row text-center p-0 m-0">
+                        <button (click)="BeforeClick()">
+                            <i class="fa-solid fa-backward-step fa-1x"></i>
+                        </button>
+                        <span class="m-0 p-0 text-center" style="width: 107px;">
+                            <small class="m-0 p-1 text-light">( {{currentElementPointer}} / {{numberOfElements}} )</small>
+                        </span>
+                        <button (click)="NextClick()">
+                            <i class="fa-solid fa-forward-step fa-1x"></i>
+                        </button>
+                        <button *ngIf="playpauseControl" (click)="PlayPauseClick()">
+                            <i *ngIf="playpauseControlState" class="fa-solid fa-play fa-1x"></i>
+                            <i *ngIf="!playpauseControlState" class="fa-solid fa-pause fa-1x"></i>
+                        </button>
+                    </div>
+                </div>
+                <div class="d-flex flex-row text-center p-0 m-0"> <small class="m-0 p-1 text-light">Patient Id: {{reader?.PatientId}} Date: {{reader?.StudyDate}} Series: #{{reader?.SeriesNumber}} Image: #{{reader?.InstanceNumber}}</small></div>
+                <div class="d-flex flex-row justify-content-end text-center p-0 m-0" style="width: 165px;">                    
+                    <button (click)="infoClick()">
+                        <i class="fa-solid fa-info-circle fa-1x"></i>
+                    </button>
+                    <button (click)="MaxMin()">
+                        <i *ngIf="!fitScreen" class="fa-solid fa-compress fa-1x"></i>
+                        <i *ngIf="fitScreen" class="fa-solid fa-expand fa-1x"></i>
+                    </button>
+                </div>
+
+            </div>
+            <div class="d-flex slab-flex-1 justify-content-center p-0 m-0 bg-black clickable overflow-auto" (wheel)="ImageWheel($event)" #imgContainer (click)="ImageClicked()">
+                <!-- [class.slab-flex-1]="fitScreen" -->
+                <img class="d-flex p-0 m-0 bg-black border border-light" [style.height.px]="styleHeightPixels()" [style.width.px]="styleWidthPixels()" #imageDisplay [class.d-none]="isResizing" />
+            </div>
+        </div>
+        <div *ngIf="reader && imageInfo" class="d-flex flex-column p-0 m-0">
+            <div *ngIf="reader" class="d-flex p-0 m-0">
+                <div class="card border rounded px-2" style="width: 18rem;" 
+                    [class.border-dark]="!isDark()" [class.border-light]="isDark()" #infoContainer>
+                    <div class="card-body" [class.bg-dark]="isDark()" [class.bg-white]="!isDark()">
+                        <h5 class="card-title">IMAGE DATA</h5>
+                        <p class="card-text p-0 m-0"><strong>Rows: </strong>{{reader.Rows}}</p>
+                        <p class="card-text p-0 m-0"><strong>Cols: </strong>{{reader.Columns}}</p>
+                        <p class="card-text p-0 m-0"><strong>BitsAllocated: </strong>{{reader.BitsAllocated}}</p>
+                        <p class="card-text p-0 m-0"><strong>BitsStored: </strong>{{reader.BitsStored}}</p>
+                        <p class="card-text p-0 m-0"><strong>Frames: </strong>{{reader.Frames}}</p>
+                        <p class="card-text p-0 m-0"><strong>Plannar: </strong>{{reader.PlannarConfiguration}}</p>
+                        <p class="card-text p-0 m-0"><strong>Photometric Interpretation: </strong>{{reader.PhotometricInterpretation}}</p>
+                        <p class="card-text p-0 m-0"><strong>Samples: </strong>{{reader.SamplesPerPixel}}</p>
+                        <p class="card-text p-0 m-0"><strong>Modality: </strong>{{reader.Modality}}</p>
+                        <p class="card-text p-0 m-0"><strong>TX: </strong>{{reader.TransferSyntax}}</p>
+                        <p class="card-text p-0 m-0"><strong>TX Name: </strong>{{reader.TransferSyntaxName}}</p>
+                    </div>
+                </div>           
+            </div>
+        </div>
+    </div>
+</div>

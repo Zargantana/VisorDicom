@@ -1,0 +1,9 @@
+<div class="d-flex slab-flex-1 flex-row m-0 p-0">
+    <div [class.slab-flex-1]="menuExpanded" class="d-flex my-4">
+        <main-menu class="d-flex slab-flex-1 justify-content-center" [(expanded)]="menuExpanded"></main-menu>
+    </div>
+    <div [class.d-none]="menuExpanded" [class.slab-flex-1]="!menuExpanded" 
+        [class.bg-dark]="isDark()" [class.bg-white]="!isDark()" class="d-flex slab-flex-1 flex-column">
+        <router-outlet></router-outlet>
+    </div>
+</div>

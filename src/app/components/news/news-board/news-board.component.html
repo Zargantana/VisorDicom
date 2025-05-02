@@ -1,0 +1,75 @@
+<div class="d-flex flex-column fixed-top justify-content-center align-items-center p-0 m-0 overflow-auto" [class.bg-dark-transparent]="isDark()" [class.bg-light-transparent]="!isDark()" style="height: 100vh; max-height: 100vh;" (click)="changeBannerVisibility()">
+    <div class="d-flex flex-column border rounded-top p-0 m-0"  [class.border-dark]="!isDark()" [class.border-light]="isDark()" [class.bg-dark]="isDark()" [class.bg-light]="!isDark()" onclick="event.stopPropagation();">
+        <div class="d-flex slab-flex-1 flex-row bg-infoPlata border-bottom text-center p-0 m-0 user-select-none"  [class.border-dark]="!isDark()" [class.border-light]="isDark()">
+            <div class="d-flex flex-column justify-content-center px-1 m-0 clickable" (click)="changeBannerVisibility()">
+                <span class="dot m-1 p-1"></span>
+            </div>
+            <div class="d-flex flex-column justify-content-center px-1 m-0 clickable" (click)="menosClick()" [class.d-none]="!elfua">
+                <span class="orangedot m-1 p-1"></span>
+            </div>  
+            <div class="d-flex slab-flex-1 flex-row justify-content-center text-center p-0 m-0">
+                <span class="p-0 m-0">&nbsp;</span>
+            </div>       
+        </div>
+        <div class="d-flex flex-column p-4 decreasingFont">
+            <div class="d-flex slab-flex-1 flex-row justify-content-center text-center p-0 m-0">
+                <h3 class="p-0 m-0">Proyecto Open Source.</h3>
+            </div>
+            <b>30/04/2025</b>
+            <ul class="pb-0 mb-0">
+              <li>Ha nacido un nuevo VisorDicom nativo open source.</li>
+              <li>Cualquier empresa/privado interesado, contactar mediante el icono de mensaje de la barra superior.</li>
+            </ul>
+            <a class="clickable text-primary px-0 pb-2 pt-0 m-0" (click)="masClick()" [class.d-none]="elfua">Últimos desarrollos...</a>
+            <div class="d-flex flex-column p-0 m-0" [class.d-none]="!elfua">
+                <b>14/10/2024</b>
+                <ul class="pb-0 mb-0">
+                    <li>Detenido backend.</li>
+                    <li>Continúa activa la funcionalidad de visualizador DICOM.</li>
+                </ul>
+                <b>20/04/2024</b>
+                <ul class="pb-0 mb-0">
+                    <li>Incluido StudyDescription en los listados.</li>
+                </ul>
+                <b>29/07/2023</b>
+                <ul class="pb-0 mb-0">
+                    <li>Trazabilidad de las subidas de archivos en curso en la barra de título.</li>
+                </ul>            
+                <b>25/05/2023</b>
+                <ul class="pb-0 mb-0">
+                    <li>Mis imágenes para pacientes.</li>
+                    <li>Los pacientes pueden compartir estudios de imagen con los doctores.</li>
+                </ul>
+                <b>08/05/2023</b>
+                <ul class="pb-0 mb-0">
+                    <li>Primera versión con plena capacidad para ver las imágenes guardadas.</li>
+                </ul>
+                <b>15/01/2023</b>
+                <ul class="pb-0 mb-0">
+                    <li>Adaptaciones para mejorar la experiencia con el navegador <b>Chrome en Mac</b>.</li>
+                    <li>Release notes descargables.</li>
+                    <li>Descartados los DICOMDIR.</li>
+                </ul>
+                <b>11/01/2023</b>
+                <ul class="pb-0 mb-0">
+                    <li>Lectura de imágenes en JPEG Baseline 1.</li>
+                    <li>...</li>
+                </ul>
+                <div class="d-flex flex-row-reverse px-0 py-2 m-0"><a class="clickable align-self-right text-primary" (click)="menosClick()" [class.d-none]="!elfua">...menos</a></div>               
+            </div>
+            <b>Desarrollos pendientes...</b>    
+            <ul>
+                <li>Revisión de la lectura de imagen comprimidas en RLE Lossless de 16 bits.</li>                
+                <li>Revisión de imágenes de casos de prueba IHE MESA.</li>                
+                <li>Visor descargable.</li>
+                <li>Versión para móvil.</li>                
+                <li class="color-secondary">...</li>
+            </ul>
+            <div class="d-flex p-0 m-0">
+                <a class="clickable text-primary p-0 m-0" href="assets/ReleaseNotes.txt">Notas de la versión</a>
+                , &nbsp;
+                <a class="clickable text-primary p-0 m-0" href="assets/ConformanceStatement.pdf">Conformance statement.</a>
+            </div>            
+        </div>
+    </div>
+</div>

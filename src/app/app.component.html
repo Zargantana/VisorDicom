@@ -1,0 +1,8 @@
+<div [style.background-image]="isDark()?'url(\'/assets/Background_monoBlack.jpg\')':'url(\'/assets/Background_mono.gif\')'" 
+  style="height: 100%; margin: 0; width:100%; background-repeat: no-repeat; background-attachment: fixed; background-size: cover;" 
+  [class.text-light]="isDark()" class="d-flex slab-flex-1 flex-column">
+  <top-display-bar id="topbar" class="d-flex overflow-hidden"></top-display-bar>
+  <news-board [class.d-none]="hideNewsBanner()"></news-board>
+  <login-floater [class.d-none]="hideLogin()"></login-floater>
+  <main-display class="d-flex slab-flex-1 mt-4 overflow-hidden"></main-display>
+</div>

@@ -1,0 +1,66 @@
+<div class="container p-0 m-0" >
+    <div class="row p-0 m-0" [class.bg-dark]="!isDark()" [class.bg-white]="isDark()" [class.text-light]="!isDark()"  [class.text-dark]="isDark()">
+        <div class="col p-0 m-0 border decreasingFont" [class.border-dark]="!isDark()" [class.border-light]="isDark()">
+            Patient<img src="listImages.jpg" alt="" style="visibility: hidden;"> 
+        </div>
+        <div class="col-10 p-0 m-0">
+            <div class="row p-0 m-0" [class.bg-dark]="!isDark()" [class.bg-white]="isDark()">
+                <div class="col-2 p-0 m-0 border decreasingFont" [class.border-dark]="!isDark()" [class.border-light]="isDark()">
+                    Date
+                </div>
+                <div class="col-5 p-0 m-0 border decreasingFont" [class.border-dark]="!isDark()" [class.border-light]="isDark()">
+                    Description
+                </div>
+                <div class="col-5 p-0 m-0">
+                    <div class="row p-0 m-0" [class.bg-dark]="!isDark()" [class.bg-white]="isDark()">
+                        <div class="col p-0 m-0 border decreasingFont" [class.border-dark]="!isDark()" [class.border-light]="isDark()">
+                            Modality
+                        </div>
+                        <div class="col-8 p-0 m-0">
+                            <div class="row p-0 m-0" [class.bg-dark]="!isDark()" [class.bg-white]="isDark()">
+                                <div class="col p-0 m-0 border decreasingFont" [class.border-dark]="!isDark()" [class.border-light]="isDark()">
+                                    Serie 
+                                </div>
+                                <div class="col p-0 m-0 border decreasingFont" [class.border-dark]="!isDark()" [class.border-light]="isDark()">
+                                    #Images
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div *ngFor="let patient of classifier?.studySplit" class="row p-0 m-0 clickable" [class.bg-dark]="isDark()" [class.bg-white]="!isDark()">
+        <div class="col p-0 m-0 border decreasingFont selectable" [class.border-dark]="!isDark()" [class.border-light]="isDark()" (click)="ReViewPatient($event, patient[0][0][0][0].SOPInstanceUID)">
+            Id: {{patient[0][0][0][0].PatientId}}
+        </div>
+        <div class="col-10 p-0 m-0">
+            <div *ngFor="let study of patient" class="row p-0 m-0 clickable" [class.bg-dark]="isDark()" [class.bg-white]="!isDark()">
+                <div class="col-2 p-0 m-0 border decreasingFont selectable" [class.border-dark]="!isDark()" [class.border-light]="isDark()" (click)="ReViewStudy($event, study[0][0][0].SOPInstanceUID)">
+                    {{study[0][0][0].StudyDate}}
+                </div>
+                <div class="col-5 p-0 m-0 border decreasingFontLittle selectable" [class.border-dark]="!isDark()" [class.border-light]="isDark()" (click)="ReViewStudy($event, study[0][0][0].SOPInstanceUID)">
+                    {{ (study[0][0][0].StudyDescription.length>42)? (study[0][0][0].StudyDescription | slice:0:42)+'...':(study[0][0][0].StudyDescription) }}
+                </div>
+                <div class="col-5 p-0 m-0">
+                    <div *ngFor="let modality of study" class="row p-0 m-0 clickable" [class.bg-dark]="isDark()" [class.bg-white]="!isDark()">
+                        <div class="col p-0 m-0 border decreasingFont selectable" [class.border-dark]="!isDark()" [class.border-light]="isDark()" (click)="ReViewModality($event, modality[0][0].SOPInstanceUID)">
+                            {{modality[0][0].Modality}}
+                        </div>
+                        <div class="col-8 p-0 m-0">
+                            <div *ngFor="let serie of modality" class="row p-0 m-0 clickable selectable" [class.bg-dark]="isDark()" [class.bg-white]="!isDark()">
+                                <div class="col p-0 m-0 border decreasingFont" [class.border-dark]="!isDark()" [class.border-light]="isDark()" (click)="ReViewImage($event, serie[0].SOPInstanceUID)">
+                                    {{serie[0].SeriesNumber}}
+                                </div>
+                                <div class="col p-0 m-0 border decreasingFont" [class.border-dark]="!isDark()" [class.border-light]="isDark()" (click)="ReViewImage($event, serie[0].SOPInstanceUID)">
+                                    {{serie.length}}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>

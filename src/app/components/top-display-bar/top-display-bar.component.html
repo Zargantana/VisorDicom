@@ -1,0 +1,36 @@
+<div class="container-fluid m-0 p-0">
+    <div class="row m-0 p-0">
+        <div class="col-auto px-2 py-2 mx-2 clickable user-select-none">
+            <img style="max-height: 40px; max-width: 370px;" 
+                [src]="isDark()?'/assets/VisorDICOMLogo_Black.png':'/assets/VisorDICOMLogo_White.png'" 
+                alt="image" routerLink="/reader"/>
+        </div>
+        <div class="col d-flex flex-column px-2 py-0">
+            <small class="text-muted reducto">NOT FOR DIAGNOSTICS (optimizado para Chrome y Edge)</small>
+            <div class="col align-self-end d-flex justify-content-right px-2 py-0 reducto">
+                <news-banner></news-banner>
+            </div>
+        </div>
+        <div class="col-auto m-0 p-0">
+            <product-information class="col-auto user-select-none"></product-information>
+            <mail-sender  class="col-auto user-select-none"></mail-sender>
+            <theme-switcher class="col-auto user-select-none"></theme-switcher>
+        </div>
+        <img class="col-auto" src="topdisplay.jpg" alt="" style="visibility: hidden;">
+        <div class="col-auto border rounded px-2 py-2 mx-2 my-2 clickable user-select-none"
+            [class.border-dark]="!isDark()" [class.border-light]="isDark()">
+            <div class="row m-0 p-0 clickable" (click)="visualizeLogin()">
+                <div class="col-auto align-self-center">
+                    <i class="fa-solid fa-user-doctor fa-2x" *ngIf="isLoggedIn"></i>
+                    <i class="fa-solid fa-user fa-2x" *ngIf="!isLoggedIn"></i>
+                </div>
+                <div class="col align-self-center">
+                    {{userDisplayName}} 
+                </div>
+                <div class="col-auto align-self-center mx-1">
+                    <i class="fa-solid fa-caret-down fa-1x"></i>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>

@@ -1,0 +1,36 @@
+<div class="d-flex slab-flex-1 flex-column m-0 p-0" #mainDiv>
+    
+    <div class="d-flex flex-row m-0 p-0" [class.d-none]="(classifier.numberOfSeries <= 1) && readEnded">
+        <div class="d-flex my-2 p-2 clickable" [class.d-none]="classifier.numberOfSeries <= 1" (click)="colapseClick()">
+            <div>
+                <i class="fa-solid fa-3x border rounded px-2"
+                    [class.border-dark]="!isDark()" [class.border-light]="isDark()"
+                    [class.fa-caret-up]="!colapsed" [class.fa-caret-down]="colapsed"></i>
+            </div>
+        </div>
+        <findings-table [class.d-none]="!colapsed" class="d-flex flex-row m-2 p-2 clickable" *ngIf="selectedClassifier" 
+            [classifier]="selectedClassifier" (click)="colapseClick()"
+            (reviewImageClick)="ReViewImage($event)"
+            (reviewModalityClick)="ReViewModality($event)"
+            (reviewPatientClick)="ReViewPatient($event)"
+            (reviewStudyClick)="ReViewStudy($event)">
+        </findings-table>        
+        <findings-table [class.d-none]="colapsed" class="d-flex flex-row m-2 p-2 overflow-auto" [style.max-height]="'300px'" *ngIf="classifier" 
+            [classifier]="classifier" 
+            (reviewImageClick)="ReViewImage($event)"
+            (reviewModalityClick)="ReViewModality($event)"
+            (reviewPatientClick)="ReViewPatient($event)"
+            (reviewStudyClick)="ReViewStudy($event)">            
+        </findings-table>        
+        <div class="d-flex my-2 p-2 clickable" [class.d-none]="classifier.numberOfSeries <= 1" (click)="colapseClick()">
+            <div>
+                <i class="fa-solid fa-3x border rounded px-2"
+                    [class.border-dark]="!isDark()" [class.border-light]="isDark()"
+                    [class.fa-caret-up]="!colapsed" [class.fa-caret-down]="colapsed"></i>
+            </div>
+        </div>        
+        <div class="d-flex flex-row m-2 p-2 blink_me" [class.d-none]="readEnded"><i class="fa-solid fa-3x fa-truck-loading"></i> <h2>Loading...</h2></div>
+    </div>
+    <list-image-viewer *ngIf="selectedClassifier && listviewerSelected()" class="d-flex flex-row slab-flex-1 m-0 p-0" #listviewer [classifier]="selectedClassifier"></list-image-viewer>
+    <scroll-image-viewer *ngIf="selectedClassifier && scrollviewerSelected()" class="d-flex flex-row slab-flex-1 m-0 p-0" #scrollviewer [classifier]="selectedClassifier"></scroll-image-viewer>
+</div>

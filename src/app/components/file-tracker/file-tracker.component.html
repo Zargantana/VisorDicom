@@ -1,0 +1,16 @@
+<div class="d-flex flex-column overflow-auto m-0 p-0"> <!--[class.bg-danger]="FileState == FILESTATUS.FILE_READ_FAIL" [class.bg-success]="FileState == FILESTATUS.DCMFILE_READED"-->
+    <div class="d-flex flex-row">
+        <div  class="w-75"><small>{{theDICOMFile?.file?.name}}</small></div>
+        <div class="w-25"><small>({{readed}} / {{theDICOMFile?.file?.size}})</small></div>
+    </div>
+    <div class="progress">
+        <div 
+          class="progress-bar"
+          role="progressbar"
+          [style.width]="(theDICOMFile && theDICOMFile.file)?readedpct + '%':'0'"
+          aria-valuenow="75"
+          aria-valuemin="0"
+          aria-valuemax="100"
+        ></div>
+    </div>
+</div>

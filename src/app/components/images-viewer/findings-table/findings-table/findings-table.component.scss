@@ -1,0 +1,22 @@
+.selectable:hover {
+  //border: 1px solid rgb(75, 75, 190);
+  color: darkgreen;
+  text-shadow: 1px 1px 2px #592A08;
+}
+
+
+.decreasingFont {
+    font-size: 1.2vw;
+  }
+.decreasingFontLittle {
+    font-size: 1.1vw;
+  }
+  
+  @media (min-width: 1200px) {
+    .decreasingFont {
+      font-size: 0.9vw;
+    }
+    .decreasingFontLittle {
+      font-size: 0.7vw;
+    }
+  }

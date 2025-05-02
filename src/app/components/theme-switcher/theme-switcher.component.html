@@ -1,0 +1,8 @@
+<button class="border rounded px-2 py-2 mx-2 my-2 clickable" 
+    [class.border-dark]="!isDark()" [class.border-light]="isDark()"  
+    [class.bg-dark]="!isDark()" [class.bg-white]="isDark()"
+    [class.text-light]="!isDark()"
+    style="width:55px;" (click)="switchTheme()">
+    <i [class.d-none]="!isDark()" class="fa-solid fa-sun fa-2x"></i>
+    <i [class.d-none]="isDark()" class="fa-solid fa-moon fa-2x"></i>
+</button>

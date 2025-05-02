@@ -1,0 +1,25 @@
+@media (max-width: 729px) {
+    #Testo {
+        visibility: hidden;
+    }
+}
+
+@media (max-height: 700px) {
+    #Spasio {
+        display: none;
+    }
+}
+
+@media (max-width: 1235px) {
+    #Lateral {
+        display: none;
+    }
+}
+
+#Icons div:hover {
+    cursor: pointer;
+}
+
+#Testo h2:hover {
+    cursor: pointer;
+}
