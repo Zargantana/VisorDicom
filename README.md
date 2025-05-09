@@ -19,7 +19,7 @@ Este proyecto está licenciado bajo la licencia [Apache 2.0](https://www.apache.
 
 ## Documentación Adicional
 
-- **Conformance Statement**: Este proyecto incluye un [Conformance Statement](docs/ConformanceStatement.tex y src/assets/ConformanceStatement.pdf) que detalla las capacidades y limitaciones del visor.
+- **Conformance Statement**: Este proyecto incluye un [Conformance Statement](src/assets/ConformanceStatement.pdf) que detalla las capacidades y limitaciones del visor.
 - **Release Notes**: Puedes consultar las [Notas de la Versión](src/assets/ReleaseNotes.txt) para obtener información sobre el desarrollo previo a este repositorio.
 
 ## Desarrollo
