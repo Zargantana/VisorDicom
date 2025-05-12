@@ -1,8 +1,14 @@
 User-agent: *
+Disallow: /
+Allow: /index.html
 Allow: /reader
+Allow: /reader/
 Allow: /file-loader
+Allow: /file-loader/
 Allow: /dir-loader
+Allow: /dir-loader/
+Allow: /assets/
 Allow: /assets/ReleaseNotes.txt
-Disallow /*
-Crawl-delay: 2
+Allow: /assets/ConformanceStatement.pdf
+
 Sitemap: https://visordicom.es/sitemap.xml
