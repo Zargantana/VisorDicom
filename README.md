@@ -1,3 +1,5 @@
+[English version](docs/README_ENG.md)
+
 # VisorDicom
 
 VisorDicom es un visor web de imágenes DICOM desarrollado en Angular 18. Este proyecto es completamente open source y está diseñado para visualizar imágenes DICOM directamente desde un navegador web. Actualmente, el proyecto está funcionando en producción en [https://visordicom.es](https://visordicom.es), alojado en el cloud de AWS.
