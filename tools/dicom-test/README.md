@@ -54,19 +54,4 @@ python3 tools/dicom-test/check_render.py      # → PASS/FAIL por caso + out/ren
 2. Si pydicom no sabe decodificarlo, añade la verdad a mano en `expected_frames()` de `check_render.py`.
 3. Ejecuta los tres comandos. Si el visor falla, arréglalo y vuelve a ejecutar.
 
-## Prueba DICOM ↔ S3 en navegador (`s3-body/`)
-
-> Solo en ReadyDoctor: prueba servicios del portal. `tools/sync-to-visordicom.ps1` no la copia a VisorDicom.
-
-`run_s3_body_test.mjs`:
-1. Empaqueta con esbuild los servicios **reales** `UploadS3Service`/`DownloadS3Service` + `aws-sdk` (build de navegador).
-2. Los ejecuta en Chromium con S3 **simulado** mediante `page.route` (PUT, GET y multipart). No toca AWS.
-3. Comprueba que el objeto guardado es **idéntico byte a byte** al fichero original (incluido un fichero de más de 6 MiB, que va por multipart) y que el `Content-Type` es `application/dicom`.
-4. Comprueba que la descarga devuelve el mismo *binary string* y que los objetos **antiguos en base64** se siguen leyendo.
-
-```bash
-python3 tools/dicom-test/gen_test_dicoms.py
-# Playwright: en la raíz, o indicar dónde está instalado con PLAYWRIGHT_MODULE=<ruta a su package.json>
-node tools/dicom-test/s3-body/run_s3_body_test.mjs
-```
 
