@@ -1,4 +1,4 @@
-import { AfterViewInit, Component, ElementRef, EventEmitter, Inject, Input, Optional, Output, ViewChild } from '@angular/core';
+import { AfterViewInit, Component, DoCheck, ElementRef, EventEmitter, Inject, Input, Optional, Output, ViewChild } from '@angular/core';
 import { DCMFileReader } from 'src/app/clases/DCM/DCM-file-reader.class';
 import { classifierDCM } from 'src/app/clases/Images/classifier-DCM.class';
 import { ImageDCM, VOIWindowOption } from 'src/app/clases/Images/image-DCM.class';
@@ -11,7 +11,7 @@ import { VIEWER_UPLOAD_HANDLER, ViewerUploadHandler } from '../../viewer-upload-
     styleUrls: ['./basic-image-viewer.component.scss'],
     standalone: false
 })
-export class BasicImageViewerComponent implements AfterViewInit{
+export class BasicImageViewerComponent implements AfterViewInit, DoCheck {
   
   @ViewChild('componentDiv')
   private componentDiv: ElementRef<HTMLImageElement> | undefined;
@@ -89,9 +89,13 @@ export class BasicImageViewerComponent implements AfterViewInit{
   constructor(@Optional() @Inject(VIEWER_UPLOAD_HANDLER) private uploadHandler: ViewerUploadHandler | null) { }
 
   ngAfterViewInit(): void {
-    console.log('After View Init.')
     //this.sizesInitialization();
-    if (this.componentDiv) BasicImageViewerComponent.viewerMaxHeight = this.componentDiv.nativeElement.clientHeight;
+    // Los visores de lista y pila (componentes padre) leen viewerMaxHeight en su plantilla. Si se asigna aquí,
+    // cambia dentro del mismo ciclo de detección y Angular lanza NG0100 en desarrollo. Con setTimeout se asigna
+    // al terminar el ciclo y zone.js dispara otro que ya pinta la altura buena.
+    setTimeout(() => {
+      if (this.componentDiv) BasicImageViewerComponent.viewerMaxHeight = this.componentDiv.nativeElement.clientHeight;
+    });
   }
 /*
   private sizesInitialization(): void {
@@ -257,14 +261,20 @@ export class BasicImageViewerComponent implements AfterViewInit{
     this.playpauseClick.emit();      
   }
 
-  public styleHeightPixels(): number {
-    this.RecalculateRatio();    
-    return (this.reader?.Rows??0) * this.ratio;
+  /**
+   * La escala se recalcula una vez por ciclo de detección, ANTES de evaluar la plantilla. Antes se hacía
+   * dentro de styleHeightPixels()/styleWidthPixels(): la plantilla cambiaba estado al pintarse y Angular
+   * lanzaba NG0100 en desarrollo. El resultado en pantalla es el mismo.
+   */
+  ngDoCheck(): void {
+    this.RecalculateRatio();
+  }
 
+  public styleHeightPixels(): number {
+    return (this.reader?.Rows??0) * this.ratio;
   }
 
   public styleWidthPixels(): number {
-    this.RecalculateRatio();
     return (this.reader?.Columns??0) * this.ratio;
   }
 
