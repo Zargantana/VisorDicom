@@ -63,6 +63,8 @@ export abstract class Functions {
 
       return result;
     }
+    
+
 
     public static uncomplement(val: number, bitWidth: number): number {
         const isNegative = val & (1 << (bitWidth - 1));
@@ -75,6 +77,10 @@ export abstract class Functions {
 
     public static getValueAs2ByteNumber(value: string, LE: boolean): number {
         return value.charCodeAt(LE?1:0) * 256 + value.charCodeAt(LE?0:1);
+    }
+
+    public static isBefore(date: number): boolean {
+        return ((date - Math.trunc(Date.now()/1000))  > 0);
     }
 
     public static MyHash(toHash: string): string {

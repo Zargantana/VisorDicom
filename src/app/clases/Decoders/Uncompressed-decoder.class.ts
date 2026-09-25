@@ -1,26 +1,50 @@
 import { BaseDecoder } from "./base-decoder-class";
 
-declare var jpeg: any;
-
+/**
+ * Transfer Syntax nativas: Implicit VR LE, Explicit VR LE, Explicit VR BE (retirada) y Deflated Explicit VR LE
+ * (ya inflado por DCMFile.inflateIfDeflated). Devuelve un ArrayBuffer little endian, entrelazado, por frame.
+ */
 export class UncompressedDecoder extends BaseDecoder {
     public Decode(): any[] {
-        let decodedPixelData: any[] = [];
-        let pixelData = this.interpret.getFramesData();
-        if (pixelData.length > 1) {
-            for(let i = 1; i < pixelData.length; i++) {
-                let buffer = new Uint8Array(pixelData[i].length);
-                for (let j = 0; j < pixelData[i].length; j++) {
-                    buffer[j] = pixelData[i].charCodeAt(j);
+        // Nativo: getFramesData ya trocea por FrameSize; TODOS los frames son imagen (no hay BOT que saltar).
+        return this.interpret.getFramesData().map(frame => this.normalize(BaseDecoder.toBytes(frame)).buffer);
+    }
+
+    /** Deja el frame como lo esperan las clases de color: little endian, 1 muestra por byte si 1 bit, RGB entrelazado. */
+    protected normalize(bytes: Uint8Array): Uint8Array {
+        const bitsAllocated = this.reader.BitsAllocated;
+        // Explicit VR Big Endian: palabras de 16/32 bits en orden inverso.
+        if (!this.reader.isLittleEndian && bitsAllocated > 8) {
+            const size = bitsAllocated > 16 ? 4 : 2;
+            for (let i = 0; i + size <= bytes.length; i += size) {
+                for (let a = i, b = i + size - 1; a < b; a++, b--) {
+                    const t = bytes[a]; bytes[a] = bytes[b]; bytes[b] = t;
                 }
-                decodedPixelData.push(buffer.buffer);
             }
-        } else {
-            let buffer = new Uint8Array(pixelData[0].length);
-            for (let j = 0; j < pixelData[0].length; j++) {
-                buffer[j] = pixelData[0].charCodeAt(j);
-            }
-            decodedPixelData.push(buffer.buffer);
         }
-        return decodedPixelData;
+        // 1 bit por pixel (PS3.5 8.1.1: el primer pixel en el bit menos significativo).
+        if (bitsAllocated == 1) {
+            const pixels = this.reader.Rows * this.reader.Columns * (this.reader.SamplesPerPixel || 1);
+            const unpacked = new Uint8Array(pixels);
+            for (let p = 0; p < pixels; p++) {
+                unpacked[p] = (bytes[p >> 3] >> (p & 7)) & 1;
+            }
+            return unpacked;
+        }
+        // Planar Configuration 1 (RRR..GGG..BBB) -> entrelazado (RGBRGB..).
+        if (this.reader.SamplesPerPixel == 3 && this.reader.PlannarConfiguration == 1) {
+            const bytesPerSample = Math.max(1, bitsAllocated >> 3);
+            const plane = this.reader.Rows * this.reader.Columns * bytesPerSample;
+            const interleaved = new Uint8Array(plane * 3);
+            for (let p = 0, o = 0; p < plane; p += bytesPerSample) {
+                for (let s = 0; s < 3; s++) {
+                    for (let b = 0; b < bytesPerSample; b++) {
+                        interleaved[o++] = bytes[s * plane + p + b];
+                    }
+                }
+            }
+            return interleaved;
+        }
+        return bytes;
     }
 }

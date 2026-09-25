@@ -1,9 +1,10 @@
-import { Component, ElementRef, Input, OnInit, ViewChild } from '@angular/core';
+import { Component, ElementRef, Inject, Input, OnInit, Optional, ViewChild } from '@angular/core';
 import { DCMFileReader } from 'src/app/clases/DCM/DCM-file-reader.class';
 import { classifierDCM } from 'src/app/clases/Images/classifier-DCM.class';
 import { ImageDCM } from 'src/app/clases/Images/image-DCM.class';
 import { ThemeService } from 'src/app/services/theme.service';
 import { BasicImageViewerComponent } from '../../basic/basic-image-viewer/basic-image-viewer.component';
+import { VIEWER_UPLOAD_HANDLER, ViewerUploadHandler } from '../../viewer-upload-handler';
 
 @Component({
   selector: 'scroll-image-viewer',
@@ -53,6 +54,15 @@ export class ScrollImageViewerComponent implements OnInit {
     return this.getImageFromList(this.mainImagePointer);
   }
 
+  /** "Guardar" solo aparece si la aplicación registra un VIEWER_UPLOAD_HANDLER y queda algo sin subir. */
+  public get NotAllUploaded(): boolean {
+    let result: boolean = false;
+    if (this.uploadHandler && this.classifier) {
+      this.classifier.getArray().forEach((e) => { if (!e.uploaded) result = true });
+    }
+    return result;
+  }
+
   public mainImagePointer: number = 0;
 
   public imageInfo = false;
@@ -65,7 +75,7 @@ export class ScrollImageViewerComponent implements OnInit {
   private deltasAccumulatorTS = Date.now();
   private deltasAccumulatorDelay = 50;
 
-  constructor() { 
+  constructor(@Optional() @Inject(VIEWER_UPLOAD_HANDLER) private uploadHandler: ViewerUploadHandler | null) {
   }
 
   ngOnInit(): void {
@@ -188,5 +198,11 @@ export class ScrollImageViewerComponent implements OnInit {
 
   public ImageClicked() {
     this.display?.MaxMin();
+  }
+
+  public uploadClick() {
+    if (this.classifier && this.uploadHandler) {
+      this.uploadHandler.prepareUpload(this.classifier);
+    }
   }
 }

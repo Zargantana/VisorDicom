@@ -3,6 +3,7 @@ import { Observable } from "rxjs";
 export const DICOM_LABEL = "DICM";
 export const VR_UL = "UL";
 export const LITTLE_ENDIANT_FIRST_KNOWN_TAG_BYTE = 2; //BE = 0
+export const DEFLATED_EXPLICIT_VR_LITTLE_ENDIAN = '1.2.840.10008.1.2.1.99';
 
 export enum FILEREAD_STATUS {
     NONE = 0,
@@ -38,6 +39,8 @@ export class DCMFile {
         subscriber.next(0);
     });
     public isDCM: boolean | null = null;
+    /** true si el dataset venia en Deflated Explicit VR LE y ya se ha inflado en rawData. */
+    public inflated: boolean = false;
     public isDCM$: Observable<boolean | null> = new Observable<boolean | null>((subscriber) =>  {
         this.isDCMSubscriber = subscriber;
         subscriber.next(this.isDCM);
@@ -114,9 +117,13 @@ export class DCMFile {
             this.lengthSubscriber?.next(this.length);
             if (this.isDCM) {
                 // DCMFile.HIGH_PRIOR--;
-                this.readStatus = FILEREAD_STATUS.SUCCESS;
-                this.readStatusSubscriber?.next(this.readStatus);
-                this.readStatusTrkSubscriber?.next(this.readStatus);
+                this.inflateIfDeflated()
+                    .catch((error) => console.warn('No se pudo inflar ' + this.file.name + ': ' + error))
+                    .then(() => {
+                        this.readStatus = FILEREAD_STATUS.SUCCESS;
+                        this.readStatusSubscriber?.next(this.readStatus);
+                        this.readStatusTrkSubscriber?.next(this.readStatus);
+                    });
             } else {
                 this.isDCM = this.isDICOMFile();
                 if (this.isDCM) {
@@ -145,5 +152,63 @@ export class DCMFile {
         let firstKnownTagByte = this.rawData.charCodeAt(132);
         //console.log('Little Endian: ' + (firstKnownTagByte == LITTLE_ENDIANT_FIRST_KNOWN_TAG_BYTE));
         return (firstKnownTagByte == LITTLE_ENDIANT_FIRST_KNOWN_TAG_BYTE);
+    }
+
+    /**
+     * Deflated Explicit VR Little Endian (1.2.840.10008.1.2.1.99, PS3.5 A.5): el File Meta Information (grupo 0002)
+     * va en claro y TODO lo que sigue es un stream "deflate" crudo (RFC 1951, sin cabecera zlib).
+     * Se infla con DecompressionStream('deflate-raw') del navegador (Chrome 103+, Safari 16.4+, Firefox 113+)
+     * y rawData queda como un Explicit VR Little Endian normal (el TS del meta header no se toca).
+     */
+    public async inflateIfDeflated(): Promise<void> {
+        if (this.inflated || this.rawData.length <= 132) {
+            return;
+        }
+        const meta = DCMFile.scanFileMetaInformation(this.rawData);
+        if (!meta || meta.transferSyntax !== DEFLATED_EXPLICIT_VR_LITTLE_ENDIAN) {
+            return;
+        }
+        const Decompression = (globalThis as any).DecompressionStream;
+        if (!Decompression) {
+            console.warn('Este navegador no soporta DecompressionStream: no se puede leer Deflated Explicit VR LE.');
+            return;
+        }
+        const compressed = new Uint8Array(this.rawData.length - meta.end);
+        for (let i = 0; i < compressed.length; i++) {
+            compressed[i] = this.rawData.charCodeAt(meta.end + i);
+        }
+        const stream = new Blob([compressed]).stream().pipeThrough(new Decompression('deflate-raw'));
+        const inflated = new Uint8Array(await new Response(stream as any).arrayBuffer());
+        this.rawData = this.rawData.substring(0, meta.end) + DCMFile.bytesToBinaryString(inflated);
+        this.length = this.rawData.length;
+        this.inflated = true;
+    }
+
+    /** Recorre el grupo 0002 (siempre Explicit VR LE) y devuelve el TS y el offset donde empieza el dataset. */
+    public static scanFileMetaInformation(raw: string): { transferSyntax: string, end: number } | null {
+        const u16 = (at: number) => raw.charCodeAt(at) | (raw.charCodeAt(at + 1) << 8);
+        const u32 = (at: number) => (u16(at) + u16(at + 2) * 65536);
+        let pos = 132;
+        let transferSyntax = '';
+        while (pos + 8 <= raw.length && u16(pos) == 0x0002) {
+            const element = u16(pos + 2);
+            const vr = raw.substring(pos + 4, pos + 6);
+            const long = ['OB', 'OW', 'OF', 'SQ', 'UT', 'UN', 'UC', 'UR', 'OD', 'OL', 'OV', 'SV', 'UV'].includes(vr);
+            const vl = long ? u32(pos + 8) : u16(pos + 6);
+            const header = long ? 12 : 8;
+            if (element == 0x0010) {
+                transferSyntax = raw.substring(pos + header, pos + header + vl).replace(/\0/g, '').trim();
+            }
+            pos += header + vl;
+        }
+        return (pos > 132) ? { transferSyntax, end: pos } : null;
+    }
+
+    public static bytesToBinaryString(bytes: Uint8Array): string {
+        let result = '';
+        for (let i = 0; i < bytes.length; i += 0x8000) {
+            result += String.fromCharCode.apply(null, bytes.subarray(i, i + 0x8000) as any);
+        }
+        return result;
     }
 }

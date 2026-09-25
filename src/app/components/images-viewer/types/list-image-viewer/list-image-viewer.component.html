@@ -2,6 +2,11 @@
     <div [id]="isDark()?'style-14':'style-8'" class="d-flex p-0 m-0 overflow-auto" [style.max-height.px]="maxIconListHeight()" [class.d-none]="isResizing || ((classifier?.numberOfImages??0) <= 1)">
         <div class="d-flex flex-column p-0 m-0">
             <div class="container p-0 m-0">
+                <div *ngIf="NotAllUploaded" class="row p-0 m-0">
+                  <button class="col btn mx-2 mb-2 btn-primary rounded" (click)="uploadClick()">
+                    <small>Guardar</small>
+                  </button>
+                </div>
                 <div *ngFor="let patient of classifier?.studySplit" class="row p-0 m-0">            
                     <div class="col p-0 m-0">
                         <div class="row p-0 m-1 border" [class.border-dark]="!isDark()" [class.border-light]="isDark()">

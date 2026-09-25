@@ -1,0 +1,15 @@
+.window-selector {
+    flex-shrink: 0;
+}
+
+.window-range {
+    width: 100px;
+}
+
+// Ancho fijo: al mover el slider la barra no "salta" aunque cambie la longitud del texto.
+.window-label {
+    width: 210px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    text-align: left;
+}

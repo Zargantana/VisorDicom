@@ -11,6 +11,12 @@ import { UncompressedDecoder } from 'src/app/clases/Decoders/Uncompressed-decode
 import { DataTranslator } from 'src/app/dictionaries/data-tag-elements';
 import { AnticrawlerSecrets } from 'src/app/clases/Crosscutting/Anticrawler-secrets';
 
+export enum FILE_READER_READY_STATE {
+  EMPTY = 0, //Reader has been created. None of the read methods called yet.
+  LOADING = 1, //A read method has been called.
+  DONE = 2 //The operation is complete.
+}
+
 @Component({
   selector: 'app-test-screen',
   templateUrl: './test-screen.component.html',
@@ -35,6 +41,8 @@ export class TestScreenComponent implements OnInit {
   private viewingFrame: number = 0;
 
   private foundFiles: DCMFile[] = [];
+
+  // Pantalla de depuración del núcleo (compartida con VisorDicom): sin dependencias del portal ni de S3.
 
   ngOnInit(): void {
     this.addListeners();
@@ -88,7 +96,7 @@ export class TestScreenComponent implements OnInit {
 
   //TODO: JPEG Baseline process 1 -> buscar JPEG turbo npm
 
-  private createImageData(frame: string): void {
+  private createImageData(frame: string | ArrayBuffer | ArrayBufferView): void {
     if (this.reader) {
 
       var canvas = document.createElement("canvas");
@@ -196,9 +204,3 @@ export class TestScreenComponent implements OnInit {
   }
 
 }
-
-export enum FILE_READER_READY_STATE {
-    EMPTY = 0, //Reader has been created. None of the read methods called yet.
-    LOADING = 1, //A read method has been called.
-    DONE = 2 //The operation is complete.
-  }

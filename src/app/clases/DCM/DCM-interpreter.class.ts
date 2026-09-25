@@ -14,20 +14,28 @@ export class PaletteColorLookupTableDescriptorData {
 }
 
 export class PaletteColorLookupTableData {
+    private table: Uint16Array | Uint8Array;
+
     constructor(private tableData: string, private descriptor: PaletteColorLookupTableDescriptorData, private isLittleEndian: boolean) {
+        // PS3.3 C.7.6.3.1.5: bits por entrada 8 o 16. La LUT es OW: con 16 bits son palabras del endian del dataset.
+        const bytes = this.descriptor.bitsAlocados > 8 ? 2 : 1;
+        const entries = Math.floor(tableData.length / bytes);
+        this.table = bytes == 2 ? new Uint16Array(entries) : new Uint8Array(entries);
+        for (let i = 0; i < entries; i++) {
+            this.table[i] = bytes == 2 ? this.read16BitsNumber(tableData.substring(i * 2), isLittleEndian) : tableData.charCodeAt(i);
+        }
     }
 
+    /** Devuelve el color (0..255) para un indice de pixel. Fuera de rango -> primera/ultima entrada (PS3.3 C.7.6.3.1.5). */
     public LookupForInputValue(pixelValue: number): number {
-        let workingPixVal = (pixelValue < this.descriptor.firstInputValueMapped)?this.descriptor.firstInputValueMapped:pixelValue;
-        let alocatedTableEntryBytes = this.descriptor.bitsAlocados / 8;
-        let tableEntries = this.tableData.length / alocatedTableEntryBytes;
-        let tableEntryPointer = workingPixVal - this.descriptor.firstInputValueMapped;
-        if (tableEntryPointer >= tableEntries) { 
-            throw new Error('tableEntryPointer out of range');
+        let tableEntryPointer = pixelValue - this.descriptor.firstInputValueMapped;
+        if (tableEntryPointer < 0) {
+            tableEntryPointer = 0;
+        } else if (tableEntryPointer >= this.table.length) {
+            tableEntryPointer = this.table.length - 1;
         }
-        let bitsShiftTo8BitValue = (alocatedTableEntryBytes - 1) * 8;
-        return this.read16BitsNumber(
-                this.tableData.substring(tableEntryPointer * alocatedTableEntryBytes), this.isLittleEndian) >> bitsShiftTo8BitValue;
+        const value = this.table[tableEntryPointer];
+        return this.descriptor.bitsAlocados > 8 ? (value >> 8) : value;
     }
 
     private read16BitsNumber(raw: string, LE: boolean): number {
@@ -46,7 +54,9 @@ export const enum PhotometricInterpretationType {
   PALETTE_COLOR = 0,
   RGB = 1,
   MONOCHROME2 = 2,
-  MONOCHROME1 = 3
+  MONOCHROME1 = 3,
+  YBR_FULL = 4,
+  YBR_FULL_422 = 5
 }
 
 export class LUTInformation {
@@ -81,6 +91,8 @@ export const PALETTE_COLOR_PT1 = "PALETTE";
 export const PALETTE_COLOR_PT2 = "COLOR";
 export const MONOCHROME2 = "MONOCHROME2";
 export const MONOCHROME1 = "MONOCHROME1";
+export const YBR_FULL_422 = "YBR_FULL_422";
+export const YBR_FULL = "YBR_FULL";
 
 export class RescaleParameters {
     public Intercept: number = 0;
@@ -106,23 +118,19 @@ export class DCMInterpreter {
     }
 
     private getRescaleIntercept(): number {
-        const interceptTag = this.searchDCMTag(0x0028,0x1052);
-        if (interceptTag?.VL && interceptTag.Value) {
-            return parseInt(interceptTag.Value);
-        }
-        return 0;
+        const interceptTag = this.searchTopLevelFirst(0x0028,0x1052);
+        const value = this.parseDS(interceptTag?.Value)[0];
+        return (value === undefined) ? 0 : value;
     }
 
     private getRescaleSlope(): number {
-        const slopeTag = this.searchDCMTag(0x0028,0x1053);
-        if (slopeTag?.VL && slopeTag.Value) {
-            return parseInt(slopeTag.Value);
-        }
-        return 1;
+        const slopeTag = this.searchTopLevelFirst(0x0028,0x1053);
+        const value = this.parseDS(slopeTag?.Value)[0];
+        return (value === undefined || value === 0) ? 1 : value;
     }
 
     private getRescaleType(): string {
-        const typeTag = this.searchDCMTag(0x0028,0x1054);
+        const typeTag = this.searchTopLevelFirst(0x0028,0x1054);
         if (typeTag?.VL && typeTag.Value) {
             return Functions.clearDCMImpairValue(typeTag.Value);
         }
@@ -133,8 +141,8 @@ export class DCMInterpreter {
         const descriptors = this.getPaletteColorLookupTableDescriptorsData();
         const result: PaletteColorLookupTableData[] = [];
         for (let i = 0; i < 3; i++) {
-            let paletteColorDataTag = this.searchDCMTag(0x0028,0x1201 + i);
-            if (paletteColorDataTag?.Value) {
+            let paletteColorDataTag = this.searchTopLevelFirst(0x0028,0x1201 + i);
+            if (paletteColorDataTag?.Value && descriptors[i]) {
                 result.push( 
                     new PaletteColorLookupTableData(paletteColorDataTag.Value, descriptors[i], this.isLittleEndian));
             }
@@ -145,7 +153,7 @@ export class DCMInterpreter {
     private getPaletteColorLookupTableDescriptorsData(): PaletteColorLookupTableDescriptorData[] {
         const result: PaletteColorLookupTableDescriptorData[] = [];
         for (let i = 0x1101; i < 0x1104; i++) {
-            let paletteColorDescTag = this.searchDCMTag(0x0028,i);
+            let paletteColorDescTag = this.searchTopLevelFirst(0x0028,i);
             if (paletteColorDescTag?.Value) {
                 this.pushLookupDescriptor(result, paletteColorDescTag.Value);
             }
@@ -154,7 +162,7 @@ export class DCMInterpreter {
     }
 
     public getPhotometricInterpretation(): PhotometricInterpretationType {
-        let photometricInterpretation = this.searchDCMTag(0x0028,0x0004);
+        let photometricInterpretation = this.searchTopLevelFirst(0x0028,0x0004);
         if (photometricInterpretation?.Value) {
             if (photometricInterpretation.Value.includes(PALETTE_COLOR_PT1) &&
                 photometricInterpretation.Value.includes(PALETTE_COLOR_PT2)) {
@@ -165,6 +173,12 @@ export class DCMInterpreter {
             }
             if (photometricInterpretation.Value.includes(MONOCHROME1)) {
                 return PhotometricInterpretationType.MONOCHROME1;
+            }
+            if (photometricInterpretation.Value.includes(YBR_FULL_422)) {
+                return PhotometricInterpretationType.YBR_FULL_422;
+            }
+            if (photometricInterpretation.Value.includes(YBR_FULL)) {
+                return PhotometricInterpretationType.YBR_FULL;
             }
         }
         
@@ -186,55 +200,50 @@ export class DCMInterpreter {
     }
 
     private getWindowWidth(): number[] {
-        let tag = this.searchDCMTag(0x0028,0x1051);
-        let result: number[] = [];
-        if (tag && tag.Value) {
-            let values: string[] = tag.Value.split('\\');
-            for (let i = 0; i < values.length; i++) {
-                result.push( parseInt(values[i], 10) );
-            }
-        }
-        return result;
+        return this.parseDS(this.searchTopLevelFirst(0x0028,0x1051)?.Value);
     }
 
     private getWindowCenter(): number[] {
-        let tag = this.searchDCMTag(0x0028,0x1050);
-        let result: number[] = [];
-        if (tag && tag.Value) {
-            let values: string[] = tag.Value.split('\\');
-            for (let i = 0; i < values.length; i++) {
-                result.push( parseInt(values[i], 10) );
-            }
-        }
-        return result;
+        return this.parseDS(this.searchTopLevelFirst(0x0028,0x1050)?.Value);
     }
 
     private getWindowDescription(): string[] {
-        let tag = this.searchDCMTag(0x0028,0x1055);
+        let tag = this.searchTopLevelFirst(0x0028,0x1055);
         let values: string[] = [];
         if (tag && tag.Value) {
-            values = tag.Value.split('\\');
+            values = Functions.clearDCMImpairValue(tag.Value).split('\\').map(v => v.trim());
         }
         return values;
     }
 
     private getWindowVOIFunction(): VOIFunction {
         let result = VOIFunction.LINEAR;
-        let tag = this.searchDCMTag(0x0028,0x1056);
+        let tag = this.searchTopLevelFirst(0x0028,0x1056);
         if (tag && tag.Value) {
-            if (tag.Value.includes(VOI_FUNC_LINEAR)) {
-                result = VOIFunction.LINEAR;
-            } else if (tag.Value.includes(VOI_FUNC_LINEAR_EXACT)) {
+            // LINEAR_EXACT contiene "LINEAR": hay que mirarlo antes.
+            if (tag.Value.includes(VOI_FUNC_LINEAR_EXACT)) {
                 result = VOIFunction.LINEAR_EXACT;
             } else if (tag.Value.includes(VOI_FUNC_SIGMOID)) {
                 result = VOIFunction.SIGMOID;
-            } 
+            } else if (tag.Value.includes(VOI_FUNC_LINEAR)) {
+                result = VOIFunction.LINEAR;
+            }
         }
         return result;
     }
 
+    /** Decimal String (DS) multivalor "40.5\\-600" -> [40.5, -600]. parseInt truncaba (slope 0.5 -> 0). */
+    private parseDS(value: string | undefined): number[] {
+        if (!value) {
+            return [];
+        }
+        return Functions.clearDCMImpairValue(value).split('\\')
+            .map(v => parseFloat(v.trim()))
+            .filter(v => !isNaN(v));
+    }
+
     private getLUTDescription(LUT: LUTInformation) {
-        let tag = this.searchDCMTag(0x0028,0x3002);
+        let tag = this.searchTopLevelFirst(0x0028,0x3002);
         if (tag && tag.Value) {
             LUT.entries = Functions.getValueAs2ByteNumber(tag.Value.substring(0,2), this.reader.isLittleEndian);
             LUT.firstStoredPixelValueMapped = Functions.getValueAs2ByteNumber(tag.Value.substring(2,4), this.reader.isLittleEndian);
@@ -244,7 +253,7 @@ export class DCMInterpreter {
 
     private getLUTData(): string {
         let result: string = '';
-        let tag = this.searchDCMTag(0x0028,0x3006);
+        let tag = this.searchTopLevelFirst(0x0028,0x3006);
         if (tag && tag.Value) {
             result = tag.Value;
         }
@@ -262,26 +271,30 @@ export class DCMInterpreter {
         return raw.charCodeAt(LE?1:0) * 256 + raw.charCodeAt(LE?0:1);        
     }
 
+    /**
+     * Pixel Data (7FE0,0010) "en bruto":
+     *  - nativo (VL definida): [Value]
+     *  - encapsulado (VL indefinida): los items que le siguen, TAL CUAL: [BOT, frag1, frag2, ...]
+     * Se prefiere el (7FE0,0010) del dataset raiz; si no lo hay (fichero raro) se usa la heuristica antigua:
+     * de los dos primeros (p.ej. el de la Icon Image Sequence y el real) el mas grande.
+     */
     public getPixelDatas(): string[] {
+        const topLevel = this.findTopLevel(0x7FE0, 0x0010);
+        if (topLevel) {
+            return topLevel.VL ? [topLevel.Value ?? ''] : this.readDataStreamItems(topLevel);
+        }
         let finalResults: string[] = [];
         let finalResultsLength: number = 0;
 
         let PixelDatas = [this.searchDCMTag(0x7FE0,0x0010)];
         PixelDatas.push(this.searchDCMTag(0x7FE0,0x0010, PixelDatas[0]?.DS_tag_position));
-        //Dos pixels data. Trataremos uno por uno con try/catch y el mas grande que resulte se devuelve. Puede ser compuesto por múltiples sub campos(frames).
         for(let i = 0; i < PixelDatas.length; i++) {
-            //Buscar los frames o en Value o en subTags.
             let results: string[] = [];
             let resultsLength = 0;
             let pixelData = PixelDatas[i];
             if (pixelData) {
-                if (pixelData.VL) {
-                    results = [pixelData.Value??''];
-                } else {
-                    results = this.readDataStreamFragments(pixelData);
-                }
+                results = pixelData.VL ? [pixelData.Value??''] : this.readDataStreamItems(pixelData);
             }
-            //Check who is bigger
             for(let j = 0; j < results.length; j++) {
                 resultsLength += results[j].length;
             }
@@ -293,6 +306,7 @@ export class DCMInterpreter {
         return finalResults;
     }
 
+    /** Frames de un Pixel Data NATIVO: se trocea por FrameSize (Rows*Cols*Samples*BitsAllocated/8). */
     public getFramesData(): string[] {
         let pixelData = this.getPixelDatas();
         if ((pixelData.length == 1)&&(this.reader.Frames > 1)) {
@@ -311,36 +325,110 @@ export class DCMInterpreter {
         return framesData;
     }
 
-    private readDataStreamFragments(pixelData: FoundDCMTag): string[] {
-        let fragments: string[] = [];
+    /**
+     * Frames de un Pixel Data ENCAPSULADO (PS3.5 A.4): exactamente un string (bitstream comprimido) por frame.
+     *  - El primer item es SIEMPRE la Basic Offset Table (puede estar vacia) y se descarta.
+     *  - 1 frame: se concatenan todos los fragmentos.
+     *  - N frames y N fragmentos: 1 a 1.
+     *  - N frames y mas fragmentos: se agrupan usando la BOT o, si esta vacia, la Extended Offset Table
+     *    (7FE0,0001); si tampoco hay, cortando donde un fragmento empieza por un marcador de inicio de
+     *    codestream (JPEG SOI FFD8 / JPEG 2000 SOC FF4F).
+     */
+    public getEncapsulatedFrames(): string[] {
+        const items = this.getPixelDatas();
+        if (items.length == 0) {
+            return [];
+        }
+        const bot = items[0];
+        const fragments = items.slice(1);
+        const frames = Math.max(1, this.reader.Frames || 1);
+        if (fragments.length == 0) {
+            return [];
+        }
+        if (frames == 1) {
+            return [fragments.join('')];
+        }
+        if (fragments.length == frames) {
+            return fragments;
+        }
+
+        let offsets = this.readOffsetTable(bot, 4);
+        if (offsets.length != frames) {
+            offsets = this.readOffsetTable(this.searchTopLevelFirst(0x7FE0, 0x0001)?.Value ?? '', 8);
+        }
+        if (offsets.length == frames) {
+            const result: string[] = new Array(frames).fill('');
+            let fragmentStart = 0; // offset del primer byte del item (FFFE,E000) respecto al primer fragmento
+            let frame = 0;
+            for (const fragment of fragments) {
+                while (frame + 1 < frames && fragmentStart >= offsets[frame + 1]) {
+                    frame++;
+                }
+                result[frame] += fragment;
+                fragmentStart += 8 + fragment.length;
+            }
+            return result;
+        }
+
+        const result: string[] = [];
+        for (const fragment of fragments) {
+            if (result.length == 0 || this.startsCodestream(fragment)) {
+                result.push(fragment);
+            } else {
+                result[result.length - 1] += fragment;
+            }
+        }
+        return result;
+    }
+
+    private readOffsetTable(table: string, bytesPerEntry: number): number[] {
+        const result: number[] = [];
+        for (let i = 0; i + bytesPerEntry <= table.length; i += bytesPerEntry) {
+            let value = 0;
+            for (let b = bytesPerEntry - 1; b >= 0; b--) { // encapsulado => siempre little endian
+                value = value * 256 + table.charCodeAt(i + b);
+            }
+            result.push(value);
+        }
+        return result;
+    }
+
+    private startsCodestream(fragment: string): boolean {
+        const b0 = fragment.charCodeAt(0), b1 = fragment.charCodeAt(1);
+        return b0 == 0xFF && (b1 == 0xD8 || b1 == 0x4F);
+    }
+
+    /** Items (FFFE,E000) consecutivos que siguen al Pixel Data encapsulado: [BOT, frag1, ...]. */
+    private readDataStreamItems(pixelData: FoundDCMTag): string[] {
+        let items: string[] = [];
         let item;
         let lastFound = pixelData.DS_tag_position??0;
-        let currentPosition = 0;
-        while (item = this.searchDCMTag(0xFFFE,0xE000, lastFound)) {// Multiframe
-            currentPosition = item.DS_tag_position??0;
+        while (item = this.searchDCMTag(0xFFFE,0xE000, lastFound)) {
+            const currentPosition = item.DS_tag_position??0;
             if (currentPosition != (lastFound + 1)) {
                 break; 
             }
-            fragments.push(item.Value??'');// Discard first empty SQ start delimiter.
+            items.push(item.Value??'');
             lastFound = currentPosition;
         }
-        if (this.reader.Frames == 1) { //Meake one xurro only
-            let startAt: number = fragments.length;
-            let megachunk = fragments[fragments.length - 1];
-            
-            for(let i = 0; i < (fragments.length - 1) ; i++) {// Discard first not empty but with who knows value to discard SQ start delimiter.
-                if (fragments[i].length > 0xFF) {
-                    megachunk = fragments[i];
-                    startAt = i + 1;
-                }
-            }
+        return items;
+    }
 
-            for(let i = startAt; i < fragments.length; i++) {
-                megachunk += fragments[i];
+    /** Primer tag (High,Low) del dataset raiz (depth 0), o undefined. */
+    private findTopLevel(High: number, Low: number): FoundDCMTag | undefined {
+        const tags = this.reader.readed_tags;
+        for (let i = 0; i < tags.length; i++) {
+            const next = tags[i];
+            if (next.TagHigh == High && next.TagLow == Low && next.depth == 0) {
+                return { ...next, DS_tag_position: i };
             }
-            fragments = [megachunk];
         }
-        return fragments;
+        return undefined;
+    }
+
+    /** Busca primero en el dataset raiz y, si no esta, en cualquier nivel (p.ej. functional groups de Enhanced). */
+    private searchTopLevelFirst(High: number, Low: number): FoundDCMTag | undefined {
+        return this.findTopLevel(High, Low) ?? this.searchDCMTag(High, Low);
     }
 
     private searchDCMTag(High: number, Low: number, from: number = -1): FoundDCMTag | undefined {

@@ -1,7 +1,9 @@
-import { AfterViewInit, Component, ElementRef, EventEmitter, Input, Output, ViewChild } from '@angular/core';
+import { AfterViewInit, Component, ElementRef, EventEmitter, Inject, Input, Optional, Output, ViewChild } from '@angular/core';
 import { DCMFileReader } from 'src/app/clases/DCM/DCM-file-reader.class';
-import { ImageDCM } from 'src/app/clases/Images/image-DCM.class';
+import { classifierDCM } from 'src/app/clases/Images/classifier-DCM.class';
+import { ImageDCM, VOIWindowOption } from 'src/app/clases/Images/image-DCM.class';
 import { ThemeService } from 'src/app/services/theme.service';
+import { VIEWER_UPLOAD_HANDLER, ViewerUploadHandler } from '../../viewer-upload-handler';
 
 @Component({
   selector: 'basic-image-viewer',
@@ -43,6 +45,12 @@ export class BasicImageViewerComponent implements AfterViewInit{
   public fitScreen = true;
   public imageInfo = false;
 
+  /**
+   * Ventana VOI elegida por el usuario (indice en Window Center/Width). Vive en el visor, no en la imagen,
+   * para que se mantenga al pasar de imagen en una serie (CT: "ABDOMEN\PULMON" en todas las imagenes).
+   */
+  public selectedWindow: number = 0;
+
   private _viewerX: number = 0;
   private _viewerY: number = 0;
 
@@ -77,7 +85,7 @@ export class BasicImageViewerComponent implements AfterViewInit{
 
   //private firstViewInitDone: boolean = false;
 
-  constructor() { }
+  constructor(@Optional() @Inject(VIEWER_UPLOAD_HANDLER) private uploadHandler: ViewerUploadHandler | null) { }
 
   ngAfterViewInit(): void {
     console.log('After View Init.')
@@ -177,6 +185,7 @@ export class BasicImageViewerComponent implements AfterViewInit{
   public paintImage() {
     if (this.currentImage && this.imageDisplay) {
       this.RecalculateRatio();
+      this.applySelectedWindow(this.currentImage);
       this.currentImage.paintImage(this.imageDisplay);
     }
   }
@@ -184,8 +193,42 @@ export class BasicImageViewerComponent implements AfterViewInit{
   public paintImageF(imageDCM: ImageDCM) {
     if (this.imageDisplay) {
       this.RecalculateRatioF(imageDCM.reader);
+      this.applySelectedWindow(imageDCM);
       imageDCM.paintImage(this.imageDisplay);
     }
+  }
+
+  /** Ventanas VOI del fichero visible. El selector solo se muestra si hay mas de una. */
+  public get windows(): VOIWindowOption[] {
+    return this.currentImage?.windows ?? [];
+  }
+
+  /** Ventana realmente aplicada: la elegida, acotada a las que tiene la imagen actual. */
+  public get effectiveWindow(): number {
+    const count = this.windows.length;
+    return count ? Math.min(this.selectedWindow, count - 1) : 0;
+  }
+
+  public windowLabel(index: number): string {
+    const w = this.windows[index];
+    if (!w) {
+      return '';
+    }
+    const name = w.explanation ? w.explanation : ('Ventana ' + (index + 1));
+    return name + ' (C ' + w.center + ' / W ' + w.width + ')';
+  }
+
+  public onWindowSelected(value: string | number) {
+    const index = Math.trunc(+value);
+    if (!isNaN(index) && index != this.selectedWindow) {
+      this.selectedWindow = index;
+      this.paintImage();
+    }
+  }
+
+  private applySelectedWindow(imageDCM: ImageDCM) {
+    const count = imageDCM.windowCount;
+    imageDCM.selectedWindow = count ? Math.min(this.selectedWindow, count - 1) : 0;
   }
 
   public NextClick() {
@@ -223,4 +266,22 @@ export class BasicImageViewerComponent implements AfterViewInit{
     this.RecalculateRatio();
     return (this.reader?.Columns??0) * this.ratio;
   }
+
+  /** Solo hay subida si la aplicación registra un VIEWER_UPLOAD_HANDLER (ReadyDoctor sí, VisorDicom no). */
+  public get canUpload(): boolean {
+    return !!this.uploadHandler;
+  }
+
+  public get FileUploaded(): boolean {
+    return this.reader?.uploaded??true;
+  }
+
+  public Upload(): void {
+    if (this.reader && this.uploadHandler) {
+      var classifier = new classifierDCM();
+      classifier.ClassifyReader(this.reader);
+      this.uploadHandler.prepareUpload(classifier);
+    }
+  }
+
 }

@@ -2,48 +2,20 @@ import { BaseDecoder } from "./base-decoder-class";
 
 declare var JpegImage: any;
 
+/**
+ * JPEG Baseline (Process 1, 8 bits) y JPEG Extended (Process 2 & 4, 12 bits) con src/libs/jpeg-baseline.js
+ * (JpegImage, derivado de pdf.js). Con 3 componentes la libreria convierte YCbCr -> RGB.
+ */
 export class JPEGBaselineDecoder extends BaseDecoder {
-    
-    public Decode(): string[] {
-        let decodedPixelData: string[] = [];
-        let pixelData = this.interpret.getPixelDatas();
-        if (pixelData.length > 1) {
-            for(let i = 1; i < pixelData.length; i++) {
-                var decoder = new JpegImage();
-                let buffer = new Uint8Array(pixelData[i].length);
-                for (let j = 0; j < pixelData[i].length; j++) {
-                    buffer[j] = pixelData[i].charCodeAt(j);
-                }
-                decoder.parse(buffer);
-                let width = decoder.width;
-                let height = decoder.height;
+    public override outputIsRGB: boolean = true;
 
-                let decoded;
-                if (this.reader.BitsAllocated === 8) {
-                    decoded = decoder.getData(width, height);
-                } else if (this.reader.BitsAllocated === 16) {
-                    decoded = decoder.getData16(width, height);
-                }
-                decodedPixelData.push(decoded);
-            }
-        } else if (pixelData.length) {
-            var decoder = new JpegImage();
-            let buffer = new Uint8Array(pixelData[0].length);
-            for (let j = 0; j < pixelData[0].length; j++) {
-                buffer[j] = pixelData[0].charCodeAt(j);
-            }
-            decoder.parse(buffer);
-            let width = decoder.width;
-            let height = decoder.height;
-
-            let decoded;
-            if (this.reader.BitsAllocated === 8) {
-                decoded = decoder.getData(width, height);
-            } else if (this.reader.BitsAllocated === 16) {
-                decoded = decoder.getData16(width, height);
-            }
-            decodedPixelData.push(decoded);
-        }
-        return decodedPixelData;
+    public Decode(): any[] {
+        return this.interpret.getEncapsulatedFrames().map(frame => {
+            const decoder = new JpegImage();
+            decoder.parse(BaseDecoder.toBytes(frame));
+            return (this.reader.BitsAllocated > 8)
+                ? decoder.getData16(decoder.width, decoder.height)
+                : decoder.getData(decoder.width, decoder.height);
+        });
     }
 }

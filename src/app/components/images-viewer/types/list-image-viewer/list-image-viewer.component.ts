@@ -1,9 +1,10 @@
-import { Component, Input, ViewChild } from '@angular/core';
+import { Component, Inject, Input, Optional, ViewChild } from '@angular/core';
 import { DCMFileReader } from 'src/app/clases/DCM/DCM-file-reader.class';
 import { classifierDCM } from 'src/app/clases/Images/classifier-DCM.class';
 import { ImageDCM } from 'src/app/clases/Images/image-DCM.class';
 import { ThemeService } from 'src/app/services/theme.service';
 import { BasicImageViewerComponent } from '../../basic/basic-image-viewer/basic-image-viewer.component';
+import { VIEWER_UPLOAD_HANDLER, ViewerUploadHandler } from '../../viewer-upload-handler';
 
 @Component({
   selector: 'list-image-viewer',
@@ -26,11 +27,20 @@ export class ListImageViewerComponent{
   public stopPlaying: boolean = true;  
   public stoppedPlaying: boolean = true;  
 
-   public get isResizing(): boolean {
+  /** "Guardar" solo aparece si la aplicación registra un VIEWER_UPLOAD_HANDLER y queda algo sin subir. */
+  public get NotAllUploaded(): boolean {
+    let result: boolean = false;
+    if (this.uploadHandler && this.classifier) {
+      this.classifier.getArray().forEach((e) => { if (!e.uploaded) result = true });
+    }
+    return result;
+  }
+
+  public get isResizing(): boolean {
     return this.display?.issemiResizing??false;
   }
 
-  constructor() { }
+  constructor(@Optional() @Inject(VIEWER_UPLOAD_HANDLER) private uploadHandler: ViewerUploadHandler | null) { }
 
   public isDark(): boolean {
     return (ThemeService.current === 'dark');
@@ -143,6 +153,12 @@ export class ListImageViewerComponent{
       this.viewingImage = (++this.viewingImage) % this.classifier.numberOfImages + 1;
       this.reader = this.classifier.searchImageByIndex(this.viewingImage - 1);
       this.paintImage();
+    }
+  } 
+
+  public uploadClick() {
+    if (this.classifier && this.uploadHandler) {
+      this.uploadHandler.prepareUpload(this.classifier);
     }
   }
 }

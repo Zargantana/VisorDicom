@@ -4156,28 +4156,36 @@ export const Data_dictionary = [
 ];
 
 export class DataTranslator {
+	private static index: Map<string, number> | undefined;
+
     constructor(){
     }
 
+	/** Clave '(GGGG,EEEE)' en hexadecimal MAYUSCULAS, como en Data_dictionary. */
+	private static key(High: number, Low: number): string {
+		return '(' + High.toString(16).toUpperCase().padStart(4,'0') + ',' + Low.toString(16).toUpperCase().padStart(4,'0') + ')';
+	}
+
+	/** Indice O(1) construido una sola vez (antes: busqueda lineal de ~4000 entradas por tag). */
+	private static find(High: number, Low: number): number | undefined {
+		if (!DataTranslator.index) {
+			DataTranslator.index = new Map<string, number>();
+			for (let i = 0; i < Data_dictionary.length; i++) {
+				if (!DataTranslator.index.has(Data_dictionary[i][0])) {
+					DataTranslator.index.set(Data_dictionary[i][0], i);
+				}
+			}
+		}
+		return DataTranslator.index.get(DataTranslator.key(High, Low));
+	}
+
     public static getName(High: number, Low: number): string{
-		let identifier:string = 
-			'(' + High.toString(16).padStart(4,'0') + ',' + Low.toString(16).padStart(4,'0') + ')';
-        for (let i = 0; i < Data_dictionary.length; i++) {
-            if (Data_dictionary[i][0] == identifier) {
-                return Data_dictionary[i][2];
-            }
-        }
-        return 'Unknown Data Element Tag';
+		const i = DataTranslator.find(High, Low);
+		return (i === undefined) ? 'Unknown Data Element Tag' : Data_dictionary[i][2];
     }
-	
+
 	public static getVR(High: number, Low: number): string{
-		let identifier:string = 
-			'(' + High.toString(16).padStart(4,'0') + ',' + Low.toString(16).padStart(4,'0') + ')';
-		for (let i = 0; i < Data_dictionary.length; i++) {
-            if (Data_dictionary[i][0] == identifier) {
-                return Data_dictionary[i][1];
-            }
-        }
-        return 'Unknown Data Element Tag';
+		const i = DataTranslator.find(High, Low);
+		return (i === undefined) ? 'Unknown Data Element Tag' : Data_dictionary[i][1];
     }
 }

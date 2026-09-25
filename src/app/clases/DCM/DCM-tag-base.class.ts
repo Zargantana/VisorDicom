@@ -7,6 +7,8 @@ export abstract class DCMTagBase {
     public position: number | undefined;
     public dataOffset: number | undefined;
     public WarningFlag: boolean = false;
+    /** Nivel de anidamiento en el que se leyo el tag (0 = dataset raiz). Lo fija DCMFileReader. */
+    public depth: number = 0;
 
     constructor(){
         

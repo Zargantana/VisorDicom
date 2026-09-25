@@ -9,6 +9,13 @@ export const VR_OW = "OW";
 export const VR_SQ = "SQ";
 export const VR_UN = "UN";
 
+/**
+ * VRs que en Explicit VR usan 2 bytes reservados + longitud de 4 bytes (PS3.5 7.1.2, tabla 7.1-1).
+ * El resto de VRs usan longitud de 2 bytes.
+ */
+export const LONG_LENGTH_VRS = ['OB', 'OD', 'OF', 'OL', 'OV', 'OW', 'SQ', 'SV', 'UC', 'UN', 'UR', 'UT', 'UV'];
+export const UNDEFINED_LENGTH = 0xFFFFFFFF;
+
 export class DCMFileReader {
 
     public get rawData(): string {
@@ -19,6 +26,10 @@ export class DCMFileReader {
     }
     public get fileLength(): number {
         return this.file.file.size;
+    }
+    /** Fichero de origen (File original + rawData). Para subirlo tal cual: DicomObjectCodec.uploadBodyFor(). */
+    public get sourceFile(): DCMFile {
+        return this.file;
     }
 
     public uploaded: boolean = false;
@@ -50,6 +61,7 @@ export class DCMFileReader {
     public SeriesNumber: number = 0;
     public InstanceNumber: number = 0;
     public FrameTime: number = 0;
+    public HighBit: number = 0;
 
     private forceLittleEndianForHeaderActive: boolean = true;
     private _isLittleEndian: boolean = true;
@@ -61,6 +73,8 @@ export class DCMFileReader {
     }
 
     private current_position: number = 132;
+    /** Profundidad de anidamiento (secuencias / Pixel Data encapsulado de longitud indefinida). 0 = dataset raiz. */
+    private depth: number = 0;
     
 
     public last_readed_tag: DCMTag | undefined;
@@ -68,8 +82,15 @@ export class DCMFileReader {
     public readed_tags: DCMTag[] = [];
     
     
+    /** Bytes de un frame NATIVO (sin comprimir). Incluye SamplesPerPixel y el submuestreo de YBR_FULL_422. */
     public get FrameSize(): number {
-        return (this.BitsAllocated >> 3) * this.Rows * this.Columns;
+        const pixels = this.Rows * this.Columns;
+        const samples = Functions.clearDCMImpairValue(this.PhotometricInterpretation).trim() === 'YBR_FULL_422'
+            ? 2 : this.SamplesPerPixel;
+        if (this.BitsAllocated === 1) {
+            return Math.ceil(pixels * samples / 8);
+        }
+        return (this.BitsAllocated >> 3) * pixels * samples;
     }
 
     constructor(private file: DCMFile) {
@@ -82,11 +103,16 @@ export class DCMFileReader {
             this.readTag();
             if (this.last_readed_tag && (this.last_readed_tag.TagHigh != 0 || this.last_readed_tag.TagLow != 0)) {
                 this.readed_tags.push(this.last_readed_tag);
+                if (this.last_readed_tag.depth != 0) {
+                    // Atributo anidado (Icon Image Sequence, Referenced..., functional groups...): no debe
+                    // sobrescribir Rows/Columns/UIDs del dataset raiz. Queda en readed_tags para el interprete.
+                    continue;
+                }
                 if (this.last_readed_tag.TagHigh == 0x28) {
                     if (this.last_readed_tag.TagLow == 2) {
                         this.SamplesPerPixel = this.last_readed_tag.getValueAs2ByteNumber(this.isLittleEndian);
                     } else if (this.last_readed_tag.TagLow == 6) {
-                        this.PlannarConfiguration = this.last_readed_tag.getValueAsNumString();
+                        this.PlannarConfiguration = this.last_readed_tag.getValueAs2ByteNumber(this.isLittleEndian); // US binario
                     } else if (this.last_readed_tag.TagLow == 4) {
                         this.PhotometricInterpretation = this.last_readed_tag.Value??'';
                     } else if (this.last_readed_tag.TagLow == 8) {                        
@@ -99,6 +125,8 @@ export class DCMFileReader {
                         this.BitsAllocated = this.last_readed_tag.getValueAs2ByteNumber(this.isLittleEndian);
                     } else  if (this.last_readed_tag.TagLow == 0x101) {
                         this.BitsStored = this.last_readed_tag.getValueAs2ByteNumber(this.isLittleEndian);
+                    } else  if (this.last_readed_tag.TagLow == 0x102) {
+                        this.HighBit = this.last_readed_tag.getValueAs2ByteNumber(this.isLittleEndian);
                     } else  if (this.last_readed_tag.TagLow == 0x103) {
                         this.PixelRepresentation = this.last_readed_tag.getValueAs2ByteNumber(this.isLittleEndian);
                     }
@@ -155,7 +183,7 @@ export class DCMFileReader {
                 } else if (this.last_readed_tag.TagHigh == 0x18) {
                     if(this.last_readed_tag.TagLow == 0x1063) {
                         if (this.last_readed_tag.Value) {
-                            this.FrameTime = parseInt(Functions.clearDCMImpairValue(this.last_readed_tag.Value).trim());
+                            this.FrameTime = parseFloat(Functions.clearDCMImpairValue(this.last_readed_tag.Value).trim()); // DS
                         }
                     }
                 } else if (this.last_readed_tag.TagHigh == 0x20) {
@@ -183,144 +211,86 @@ export class DCMFileReader {
         }
     }
 
+    /**
+     * Lee un Data Element en current_position.
+     *
+     *   Explicit VR, VR "corta" : TAG(4) VR(2) VL(2)            VALUE   -> cabecera 8
+     *   Explicit VR, VR "larga" : TAG(4) VR(2) 0000(2) VL(4)    VALUE   -> cabecera 12  (LONG_LENGTH_VRS)
+     *   Implicit VR             : TAG(4) VL(4)                  VALUE   -> cabecera 8   (VR del diccionario, solo informativa)
+     *   Item / delimitadores    : FFFE,E000|E00D|E0DD VL(4)             -> cabecera 8   (nunca llevan VR)
+     *
+     * VL = 0xFFFFFFFF (longitud indefinida) en CUALQUIER elemento (SQ, UN, secuencia privada, Pixel Data encapsulado):
+     * se deja VL = 0 y se "entra" (depth++), de modo que los items/fragmentos siguientes se leen como tags
+     * consecutivos. (FFFE,E0DD) cierra ese nivel (depth--). Los SQ/items de longitud DEFINIDA se saltan enteros
+     * (su contenido queda en Value).
+     */
     private readTag(): void{
         try {
-            let offset = 0;
-            this.last_readed_tag = new DCMTag();
+            const raw = this.file.rawData;
+            const pos = this.current_position;
+            const tag = new DCMTag();
+            this.last_readed_tag = tag;
 
             //Read tag
-            this.last_readed_tag.setTag( 
-                this.file.rawData.substring(this.current_position, this.current_position + 4),
-                this.isLittleEndian); 
+            tag.setTag(raw.substring(pos, pos + 4), this.isLittleEndian);
             //If TX already readed, we know little/big endian. onece out of header tags 0x0002, TX rules. In header is Little endian always.
-            if (this.forceLittleEndianForHeaderActive && this.last_readed_tag.TagHigh != 0x02) {
+            if (this.forceLittleEndianForHeaderActive && tag.TagHigh != 0x02) {
                 this.forceLittleEndianForHeaderActive = false;
-                this.last_readed_tag.setTag( 
-                    this.file.rawData.substring(this.current_position, this.current_position + 4),
-                    this.isLittleEndian);
-            }           
-
-            //Read VR
-            if (this.last_readed_tag.TagHigh == 2 || this.isVRExplicit) {
-                this.last_readed_tag.VR = 
-                    this.file.rawData.substring(this.current_position + 4, this.current_position + 6);
-                offset += 2;
-            } else {
-                // Obtener el VR del tag de un diccionario.
-                if (this.last_readed_tag.TagHigh && this.last_readed_tag.TagLow) {
-                    this.last_readed_tag.VR = DataTranslator.getVR(
-                        this.last_readed_tag.TagHigh, 
-                        this.last_readed_tag.TagLow);
-                    //console.log('ImplicitVR: ' + this.last_readed_tag.VR);
-                }
+                tag.setTag(raw.substring(pos, pos + 4), this.isLittleEndian);
             }
-            
-            //Read Length             
-            if (this.last_readed_tag.TagHigh== 0xFFFE && this.last_readed_tag.TagLow == 0xE000) {//SQ Item 
-                this.last_readed_tag.VR = VR_SQ;
-                this.last_readed_tag.setVL32(
-                    this.file.rawData.substring(
-                        this.current_position + 4, 
-                        this.current_position + 8), 
-                    this.isLittleEndian);
-                if (this.last_readed_tag.VL == 0xFFFFFFFF) {
-                    this.last_readed_tag.VL = 0;
-                }    
-                offset = 2;            
-            } else if (this.last_readed_tag.TagHigh== 0xFFFE && this.last_readed_tag.TagLow == 0xE00D) {//SQ Item Delimitation
-                this.last_readed_tag.VR = '';
-                this.last_readed_tag.VL = 0;
-                offset = 2;
-            } else if (this.last_readed_tag.TagHigh== 0xFFFE && this.last_readed_tag.TagLow == 0xE0DD) {//SQ Sequence Delimitation
-                this.last_readed_tag.VR = '';
-                this.last_readed_tag.VL = 0;
-                offset = 2;
-            } else if (this.last_readed_tag.TagHigh == 0x7FE0 && this.last_readed_tag.TagLow == 0x10) {//Trabajar la longitud de PixelData [00 00 08 00] PIX PIX PIX... Length [LL LH HL HH]
-                let suposedVL = (this.Rows * this.Columns * this.BitsAllocated * this.Frames * this.SamplesPerPixel) / 8;
-                if (this.last_readed_tag.VR == 'OB' || this.last_readed_tag.VR == 'OW') {
-                    offset += 2;
-                }
-                this.last_readed_tag.setVL32(
-                    this.file.rawData.substring(
-                        this.current_position + 4 + offset, 
-                        this.current_position + 8 + offset), 
-                    this.isLittleEndian);
-                if (this.last_readed_tag.VL == 0xFFFFFFFF) {
-                    this.last_readed_tag.VL = 0;
+
+            let headerLength: number;
+            if (tag.TagHigh == 0xFFFE) { //Item (E000), Item Delimitation (E00D), Sequence Delimitation (E0DD)
+                tag.setVL32(raw.substring(pos + 4, pos + 8), this.isLittleEndian);
+                if (tag.TagLow == 0xE000) {
+                    tag.VR = VR_SQ;
                 } else {
-                    if (this.last_readed_tag.VL != suposedVL) {
-                        this.last_readed_tag.WarningFlag = true;
-                        //this.last_readed_tag.VL = suposedVL;
-                    }                    
+                    tag.VR = '';
+                    tag.VL = 0;
                 }
-                offset += 2;
-                
-            } else if (this.last_readed_tag.VR == VR_OW) {//Trabajar la longitud de un OW 00 00 [00 00 08 00] Length [LL LH HL HH]
-                this.last_readed_tag.setVL32(
-                    this.file.rawData.substring(
-                        this.current_position + 6 + offset, 
-                        this.current_position + 10 + offset), 
-                    this.isLittleEndian);
-                offset += 4;
-            } else if (this.last_readed_tag.VR == VR_OB) {
-                this.last_readed_tag.setVL32(
-                    this.file.rawData.substring(
-                        this.current_position + 6 + offset, 
-                        this.current_position + 10 + offset), 
-                    this.isLittleEndian);
-                offset += 4;
-            } else if (this.last_readed_tag.VR == VR_SQ) {//Trabajar los SQ length
-                if ( this.isVRExplicit ) {
-                    this.last_readed_tag.setVL32(
-                        this.file.rawData.substring(
-                            this.current_position + 6 + offset, 
-                            this.current_position + 10 + offset), 
-                        this.isLittleEndian);
-                    offset += 4;                    
+                headerLength = 8;
+            } else if (tag.TagHigh == 2 || this.isVRExplicit) {
+                tag.VR = raw.substring(pos + 4, pos + 6);
+                if (LONG_LENGTH_VRS.includes(tag.VR)) {
+                    tag.setVL32(raw.substring(pos + 8, pos + 12), this.isLittleEndian);
+                    headerLength = 12;
                 } else {
-                    this.last_readed_tag.setVL32(
-                        this.file.rawData.substring(
-                            this.current_position + 4 + offset, 
-                            this.current_position + 8 + offset), 
-                        this.isLittleEndian);
-                    offset += 2;
+                    tag.setVL(raw.substring(pos + 6, pos + 8), this.isLittleEndian);
+                    headerLength = 8;
                 }
-                if (this.last_readed_tag.VL == 0xFFFFFFFF) {//SQ Trabajar los undefined length
-                    this.last_readed_tag.VL = 0;
-                }                
-            } else if (this.last_readed_tag.VR == VR_UN) {
-                this.last_readed_tag.setVL32(
-                    this.file.rawData.substring(
-                        this.current_position + 6 + offset, 
-                        this.current_position + 10 + offset), 
-                    this.isLittleEndian);
-                offset += 4;
             } else {
-                if ( this.last_readed_tag.TagHigh == 2 || this.isVRExplicit ) {
-                    this.last_readed_tag.setVL(
-                        this.file.rawData.substring(
-                            this.current_position + 4 + offset, 
-                            this.current_position + 6 + offset), 
-                        this.isLittleEndian);
-                } else {
-                    this.last_readed_tag.setVL32(
-                        this.file.rawData.substring(
-                            this.current_position + 4 + offset, 
-                            this.current_position + 8 + offset), 
-                        this.isLittleEndian);
-                    offset +=2;
+                // Implicit VR: la VR sale del diccionario (solo informativa; la longitud siempre es de 4 bytes).
+                tag.VR = DataTranslator.getVR(tag.TagHigh ?? 0, tag.TagLow ?? 0);
+                tag.setVL32(raw.substring(pos + 4, pos + 8), this.isLittleEndian);
+                headerLength = 8;
+            }
+
+            let undefinedLength = false;
+            if (tag.VL == UNDEFINED_LENGTH) {
+                tag.VL = 0;
+                undefinedLength = true;
+            } else if (tag.TagHigh == 0x7FE0 && tag.TagLow == 0x10 && this.depth == 0) {
+                const suposedVL = (this.Rows * this.Columns * this.BitsAllocated * this.Frames * this.SamplesPerPixel) / 8;
+                if (tag.VL != suposedVL) {
+                    tag.WarningFlag = true;
                 }
             }
 
             //Read Value
-            this.last_readed_tag.Value = 
-                this.file.rawData.substring(
-                    this.current_position + 6 + offset, 
-                    this.current_position + 6 + offset + (this.last_readed_tag.VL?this.last_readed_tag.VL:0));
-               
-            this.updateCurrentPosition(offset);
+            tag.Value = raw.substring(pos + headerLength, pos + headerLength + (tag.VL ?? 0));
+
+            //Nesting depth
+            if (tag.TagHigh == 0xFFFE && tag.TagLow == 0xE0DD) {
+                this.depth = Math.max(0, this.depth - 1);
+            }
+            tag.depth = this.depth;
+            if (undefinedLength && tag.TagHigh != 0xFFFE) {
+                this.depth++;
+            }
+
+            this.updateCurrentPosition(headerLength - 6);
         } catch (error) {
-            this.last_readed_tag = undefined;  
+            this.last_readed_tag = undefined;
         }
     }
 
