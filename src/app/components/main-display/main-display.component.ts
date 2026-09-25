@@ -3,9 +3,10 @@ import { MenuService } from 'src/app/services/menu.service';
 import { ThemeService } from 'src/app/services/theme.service';
 
 @Component({
-  selector: 'main-display',
-  templateUrl: './main-display.component.html',
-  styleUrls: ['./main-display.component.scss']
+    selector: 'main-display',
+    templateUrl: './main-display.component.html',
+    styleUrls: ['./main-display.component.scss'],
+    standalone: false
 })
 export class MainDisplayComponent implements OnInit {
 

@@ -7,9 +7,10 @@ import { BasicImageViewerComponent } from '../../basic/basic-image-viewer/basic-
 import { VIEWER_UPLOAD_HANDLER, ViewerUploadHandler } from '../../viewer-upload-handler';
 
 @Component({
-  selector: 'scroll-image-viewer',
-  templateUrl: './scroll-image-viewer.component.html',
-  styleUrls: ['./scroll-image-viewer.component.scss']
+    selector: 'scroll-image-viewer',
+    templateUrl: './scroll-image-viewer.component.html',
+    styleUrls: ['./scroll-image-viewer.component.scss'],
+    standalone: false
 })
 export class ScrollImageViewerComponent implements OnInit {
 

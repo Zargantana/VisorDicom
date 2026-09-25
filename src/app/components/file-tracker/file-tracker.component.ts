@@ -12,9 +12,10 @@ export enum FILESTATUS {
 }
 
 @Component({
-  selector: 'file-tracker',
-  templateUrl: './file-tracker.component.html',
-  styleUrls: ['./file-tracker.component.scss']
+    selector: 'file-tracker',
+    templateUrl: './file-tracker.component.html',
+    styleUrls: ['./file-tracker.component.scss'],
+    standalone: false
 })
 export class FileTrackerComponent implements OnInit, OnDestroy {
   @Input() theDICOMFile: DCMFile | undefined;

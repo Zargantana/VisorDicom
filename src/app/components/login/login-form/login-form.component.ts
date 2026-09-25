@@ -4,9 +4,10 @@ import { LoginService } from 'src/app/services/login.service';
 import { ThemeService } from 'src/app/services/theme.service';
 
 @Component({
-  selector: 'login-form',
-  templateUrl: './login-form.component.html',
-  styleUrls: ['./login-form.component.scss']
+    selector: 'login-form',
+    templateUrl: './login-form.component.html',
+    styleUrls: ['./login-form.component.scss'],
+    standalone: false
 })
 export class LoginFormComponent implements AfterViewChecked {
 

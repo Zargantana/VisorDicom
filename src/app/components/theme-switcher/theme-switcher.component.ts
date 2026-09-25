@@ -2,9 +2,10 @@ import { Component, OnInit } from '@angular/core';
 import { ThemeService } from 'src/app/services/theme.service';
 
 @Component({
-  selector: 'theme-switcher',
-  templateUrl: './theme-switcher.component.html',
-  styleUrls: ['./theme-switcher.component.scss']
+    selector: 'theme-switcher',
+    templateUrl: './theme-switcher.component.html',
+    styleUrls: ['./theme-switcher.component.scss'],
+    standalone: false
 })
 export class ThemeSwitcherComponent implements OnInit {
 

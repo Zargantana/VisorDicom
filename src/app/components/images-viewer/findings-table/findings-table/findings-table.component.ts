@@ -3,9 +3,10 @@ import { classifierDCM } from 'src/app/clases/Images/classifier-DCM.class';
 import { ThemeService } from 'src/app/services/theme.service';
 
 @Component({
-  selector: 'findings-table',
-  templateUrl: './findings-table.component.html',
-  styleUrls: ['./findings-table.component.scss']
+    selector: 'findings-table',
+    templateUrl: './findings-table.component.html',
+    styleUrls: ['./findings-table.component.scss'],
+    standalone: false
 })
 export class FindingsTableComponent implements OnInit {
 

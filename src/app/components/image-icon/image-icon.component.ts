@@ -4,9 +4,10 @@ import { DCMFile } from 'src/app/clases/DCM/DCM-file.class';
 import { ImageDCM } from 'src/app/clases/Images/image-DCM.class';
 
 @Component({
-  selector: 'image-icon',
-  templateUrl: './image-icon.component.html',
-  styleUrls: ['./image-icon.component.scss']
+    selector: 'image-icon',
+    templateUrl: './image-icon.component.html',
+    styleUrls: ['./image-icon.component.scss'],
+    standalone: false
 })
 export class ImageIconComponent implements OnInit {
 

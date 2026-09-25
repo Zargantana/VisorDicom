@@ -3,9 +3,10 @@ import { LoginService } from 'src/app/services/login.service';
 import { ThemeService } from 'src/app/services/theme.service';
 
 @Component({
-  selector: 'login-floater',
-  templateUrl: './login-floater.component.html',
-  styleUrls: ['./login-floater.component.scss']
+    selector: 'login-floater',
+    templateUrl: './login-floater.component.html',
+    styleUrls: ['./login-floater.component.scss'],
+    standalone: false
 })
 export class LoginFloaterComponent implements OnInit {
 

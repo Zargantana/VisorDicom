@@ -6,9 +6,10 @@ import { ListImageViewerComponent } from './types/list-image-viewer/list-image-v
 import { ScrollImageViewerComponent } from './types/scroll-image-viewer/scroll-image-viewer.component';
 
 @Component({
-  selector: 'images-viewer',
-  templateUrl: './images-viewer.component.html',
-  styleUrls: ['./images-viewer.component.scss']
+    selector: 'images-viewer',
+    templateUrl: './images-viewer.component.html',
+    styleUrls: ['./images-viewer.component.scss'],
+    standalone: false
 })
 export class ImagesViewerComponent {
   

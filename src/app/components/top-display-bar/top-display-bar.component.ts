@@ -5,9 +5,10 @@ import { MenuService } from 'src/app/services/menu.service';
 import { ThemeService } from 'src/app/services/theme.service';
 
 @Component({
-  selector: 'top-display-bar',
-  templateUrl: './top-display-bar.component.html',
-  styleUrls: ['./top-display-bar.component.scss']
+    selector: 'top-display-bar',
+    templateUrl: './top-display-bar.component.html',
+    styleUrls: ['./top-display-bar.component.scss'],
+    standalone: false
 })
 export class TopDisplayBarComponent implements OnInit {
 
