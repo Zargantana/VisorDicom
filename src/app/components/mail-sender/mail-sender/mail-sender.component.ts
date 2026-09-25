@@ -3,9 +3,10 @@ import { AnticrawlerSecrets, AnticrawlerShore } from 'src/app/clases/Crosscuttin
 import { ThemeService } from 'src/app/services/theme.service';
 
 @Component({
-  selector: 'mail-sender',
-  templateUrl: './mail-sender.component.html',
-  styleUrls: ['./mail-sender.component.scss']
+    selector: 'mail-sender',
+    templateUrl: './mail-sender.component.html',
+    styleUrls: ['./mail-sender.component.scss'],
+    standalone: false
 })
 export class MailSenderComponent implements OnInit {
 

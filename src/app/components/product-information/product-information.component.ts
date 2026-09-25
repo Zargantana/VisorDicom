@@ -3,9 +3,10 @@ import { NewsService } from 'src/app/services/news.service';
 import { ThemeService } from 'src/app/services/theme.service';
 
 @Component({
-  selector: 'product-information',
-  templateUrl: './product-information.component.html',
-  styleUrls: ['./product-information.component.scss']
+    selector: 'product-information',
+    templateUrl: './product-information.component.html',
+    styleUrls: ['./product-information.component.scss'],
+    standalone: false
 })
 export class ProductInformationComponent implements OnInit {
 

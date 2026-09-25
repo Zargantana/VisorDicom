@@ -7,9 +7,10 @@ import { BasicImageViewerComponent } from '../../basic/basic-image-viewer/basic-
 import { VIEWER_UPLOAD_HANDLER, ViewerUploadHandler } from '../../viewer-upload-handler';
 
 @Component({
-  selector: 'list-image-viewer',
-  templateUrl: './list-image-viewer.component.html',
-  styleUrls: ['./list-image-viewer.component.scss']
+    selector: 'list-image-viewer',
+    templateUrl: './list-image-viewer.component.html',
+    styleUrls: ['./list-image-viewer.component.scss'],
+    standalone: false
 })
 export class ListImageViewerComponent{
 

@@ -3,9 +3,10 @@ import { NewsService } from 'src/app/services/news.service';
 import { ThemeService } from 'src/app/services/theme.service';
 
 @Component({
-  selector: 'news-banner',
-  templateUrl: './news-banner.component.html',
-  styleUrls: ['./news-banner.component.scss']
+    selector: 'news-banner',
+    templateUrl: './news-banner.component.html',
+    styleUrls: ['./news-banner.component.scss'],
+    standalone: false
 })
 export class NewsBannerComponent {
 

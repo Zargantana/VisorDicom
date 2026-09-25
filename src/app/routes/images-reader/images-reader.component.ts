@@ -2,9 +2,10 @@ import { Component, OnInit } from '@angular/core';
 import { environment } from 'src/environments/environment';
 
 @Component({
-  selector: 'route-images-reader',
-  templateUrl: './images-reader.component.html',
-  styleUrls: ['./images-reader.component.scss']
+    selector: 'route-images-reader',
+    templateUrl: './images-reader.component.html',
+    styleUrls: ['./images-reader.component.scss'],
+    standalone: false
 })
 export class ImagesReaderComponent implements OnInit {
   

@@ -18,9 +18,10 @@ export enum FILE_READER_READY_STATE {
 }
 
 @Component({
-  selector: 'app-test-screen',
-  templateUrl: './test-screen.component.html',
-  styleUrls: ['./test-screen.component.scss']
+    selector: 'app-test-screen',
+    templateUrl: './test-screen.component.html',
+    styleUrls: ['./test-screen.component.scss'],
+    standalone: false
 })
 export class TestScreenComponent implements OnInit {
   

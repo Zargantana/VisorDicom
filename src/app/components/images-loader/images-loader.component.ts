@@ -3,9 +3,10 @@ import { Subscription } from 'rxjs';
 import { DCMFile, FILEREAD_STATUS } from 'src/app/clases/DCM/DCM-file.class';
 
 @Component({
-  selector: 'images-loader',
-  templateUrl: './images-loader.component.html',
-  styleUrls: ['./images-loader.component.scss']
+    selector: 'images-loader',
+    templateUrl: './images-loader.component.html',
+    styleUrls: ['./images-loader.component.scss'],
+    standalone: false
 })
 export class ImagesLoaderComponent {
   public foundFiles: DCMFile[] = [];

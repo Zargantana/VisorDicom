@@ -6,9 +6,10 @@ import { ThemeService } from 'src/app/services/theme.service';
 import { VIEWER_UPLOAD_HANDLER, ViewerUploadHandler } from '../../viewer-upload-handler';
 
 @Component({
-  selector: 'basic-image-viewer',
-  templateUrl: './basic-image-viewer.component.html',
-  styleUrls: ['./basic-image-viewer.component.scss']
+    selector: 'basic-image-viewer',
+    templateUrl: './basic-image-viewer.component.html',
+    styleUrls: ['./basic-image-viewer.component.scss'],
+    standalone: false
 })
 export class BasicImageViewerComponent implements AfterViewInit{
   

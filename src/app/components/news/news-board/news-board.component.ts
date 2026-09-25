@@ -3,9 +3,10 @@ import { NewsService } from 'src/app/services/news.service';
 import { ThemeService } from 'src/app/services/theme.service';
 
 @Component({
-  selector: 'news-board',
-  templateUrl: './news-board.component.html',
-  styleUrls: ['./news-board.component.scss']
+    selector: 'news-board',
+    templateUrl: './news-board.component.html',
+    styleUrls: ['./news-board.component.scss'],
+    standalone: false
 })
 export class NewsBoardComponent {
 
