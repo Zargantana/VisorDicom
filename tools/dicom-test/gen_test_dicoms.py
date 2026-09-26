@@ -625,6 +625,33 @@ if ic is not None:
     else:
         print("cjpeg no disponible: se omiten t32-t36 (procesos JPEG retirados)")
 
+    # --- t50-t52: JPEG de 12 bits progresivo y aritmético (cjpeg 3.x de libjpeg-turbo, -precision 12) ----------
+    #     Los decodifica el build de 12 bits de libjpeg-turbo (assets/codecs/libjpegturbo12js.js).
+    cjpeg12 = False
+    if shutil.which("cjpeg"):
+        ver = subprocess.run(["cjpeg", "-version"], capture_output=True, text=True)
+        cjpeg12 = "libjpeg-turbo version 3" in (ver.stdout + ver.stderr) or "libjpeg-turbo version 4" in (ver.stdout + ver.stderr)
+    if cjpeg12:
+        cases = [
+            ("t50_jpeg_prog12_gray.dcm", "1.2.840.10008.1.2.4.55", ["-progressive"]),                # proceso 12
+            ("t51_jpeg_arith12_gray.dcm", "1.2.840.10008.1.2.4.52", ["-arithmetic"]),                # proceso 5
+            ("t52_jpeg_prog_arith12_gray.dcm", "1.2.840.10008.1.2.4.56", ["-progressive", "-arithmetic"]),  # proceso 13
+        ]
+        with tempfile.TemporaryDirectory() as tmp:
+            pgm = os.path.join(tmp, "in12.pgm")
+            # PGM de 16 bits (maxval 4095): muestras big-endian
+            open(pgm, "wb").write(b"P5\n%d %d\n4095\n" % (C, R) + g12.astype(">u2").tobytes())
+            for name, ts_uid, args in cases:
+                out_jpg = os.path.join(tmp, "out12.jpg")
+                subprocess.run(["cjpeg", "-precision", "12", "-quality", "95"] + args + ["-outfile", out_jpg, pgm], check=True, capture_output=True)
+                cs = open(out_jpg, "rb").read()
+                ds = image_ds("XA", R, C, 1, "MONOCHROME2", 16, 12, False)
+                ds.WindowCenter, ds.WindowWidth = 2048, 4096
+                save_encapsulated(ds, name, ts_uid, [cs], ic.jpeg8_decode(cs))
+                expect(name, rows=R, cols=C, frames=1, windows=1, kind="ref")
+    else:
+        print("cjpeg 3.x no disponible: se omiten t50-t52 (JPEG 12 bits progresivo y aritmético)")
+
 
 # =============================================================================================================
 # Modelos de color y presentación de grises ampliados (t40-t47). La verdad de los modelos "a mano"

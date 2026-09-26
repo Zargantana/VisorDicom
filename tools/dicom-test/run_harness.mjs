@@ -32,7 +32,7 @@ for (const lib of ['src/libs/lossless.js',
 {
   const { createRequire } = await import('node:module');
   const requireFromRoot = createRequire(path.join(root, 'package.json'));
-  for (const [file, globalName] of [['openjpegjs_decode.js', 'OpenJPEGJS'], ['libjpegturbojs_decode.js', 'libjpegturbojs_decode']]) {
+  for (const [file, globalName] of [['openjpegjs_decode.js', 'OpenJPEGJS'], ['libjpegturbojs_decode.js', 'libjpegturbojs_decode'], ['libjpegturbo12js.js', 'libjpegturbo12js']]) {
     const codec = path.join(root, 'src/assets/codecs', file);
     if (fs.existsSync(codec)) globalThis[globalName] = requireFromRoot(codec);
   }
