@@ -27,12 +27,16 @@ export function decodeWithEmscripten(codec: CodecName, className: string, bytes:
             // Los decoders de Cornerstone no lanzan si falla la cabecera: devuelven 0x0 (visto con JPEG 2000 Part 2 MCT).
             throw new Error(codec + ': no se pudo leer la cabecera del bitstream');
         }
-        const raw: Uint8Array = decoder.getDecodedBuffer().slice();
+        // Uint8Array en los builds de 8 bits y en OpenJPEG (muestras de 16 bits como bytes LE); el build de 12 bits de
+        // libjpeg-turbo devuelve directamente un Uint16Array. Se copia y se reinterpreta segun bitsPerSample.
+        const raw: Uint8Array | Uint16Array = decoder.getDecodedBuffer().slice();
         let data: DecodedFrame['data'];
         if (info.bitsPerSample > 8) {
-            data = info.isSigned ? new Int16Array(raw.buffer, 0, raw.length >> 1) : new Uint16Array(raw.buffer, 0, raw.length >> 1);
+            const u16 = raw instanceof Uint16Array ? raw : new Uint16Array(raw.buffer, raw.byteOffset, raw.byteLength >> 1);
+            data = info.isSigned ? new Int16Array(u16.buffer, u16.byteOffset, u16.length) : u16;
         } else {
-            data = info.isSigned ? new Int8Array(raw.buffer) : raw;
+            const u8 = raw instanceof Uint8Array ? raw : new Uint8Array(raw.buffer, raw.byteOffset, raw.byteLength);
+            data = info.isSigned ? new Int8Array(u8.buffer, u8.byteOffset, u8.length) : u8;
         }
         return { width: info.width, height: info.height, bitsPerSample: info.bitsPerSample,
                  componentCount: info.componentCount, isSigned: info.isSigned, data };

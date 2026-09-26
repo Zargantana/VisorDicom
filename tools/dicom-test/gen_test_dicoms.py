@@ -636,21 +636,26 @@ if ic is not None:
             ("t50_jpeg_prog12_gray.dcm", "1.2.840.10008.1.2.4.55", ["-progressive"]),                # proceso 12
             ("t51_jpeg_arith12_gray.dcm", "1.2.840.10008.1.2.4.52", ["-arithmetic"]),                # proceso 5
             ("t52_jpeg_prog_arith12_gray.dcm", "1.2.840.10008.1.2.4.56", ["-progressive", "-arithmetic"]),  # proceso 13
+            ("t53_jpeg_spectral12_gray.dcm", "1.2.840.10008.1.2.4.53", ["-scans", "SCANS"]),         # proceso 8
+            ("t54_jpeg_spectral_arith12_gray.dcm", "1.2.840.10008.1.2.4.54", ["-scans", "SCANS", "-arithmetic"]),  # proceso 9
         ]
+        spectral12 = "0: 0-0, 0, 0;\n0: 1-9, 0, 0;\n0: 10-63, 0, 0;\n"
         with tempfile.TemporaryDirectory() as tmp:
             pgm = os.path.join(tmp, "in12.pgm")
             # PGM de 16 bits (maxval 4095): muestras big-endian
             open(pgm, "wb").write(b"P5\n%d %d\n4095\n" % (C, R) + g12.astype(">u2").tobytes())
+            scans12 = os.path.join(tmp, "scans12.txt")
+            open(scans12, "w").write(spectral12)
             for name, ts_uid, args in cases:
                 out_jpg = os.path.join(tmp, "out12.jpg")
-                subprocess.run(["cjpeg", "-precision", "12", "-quality", "95"] + args + ["-outfile", out_jpg, pgm], check=True, capture_output=True)
+                subprocess.run(["cjpeg", "-precision", "12", "-quality", "95"] + [scans12 if a == "SCANS" else a for a in args] + ["-outfile", out_jpg, pgm], check=True, capture_output=True)
                 cs = open(out_jpg, "rb").read()
                 ds = image_ds("XA", R, C, 1, "MONOCHROME2", 16, 12, False)
                 ds.WindowCenter, ds.WindowWidth = 2048, 4096
                 save_encapsulated(ds, name, ts_uid, [cs], ic.jpeg8_decode(cs))
                 expect(name, rows=R, cols=C, frames=1, windows=1, kind="ref")
     else:
-        print("cjpeg 3.x no disponible: se omiten t50-t52 (JPEG 12 bits progresivo y aritmético)")
+        print("cjpeg 3.x no disponible: se omiten t50-t54 (JPEG 12 bits progresivo, aritmético y espectral)")
 
 
 # =============================================================================================================
