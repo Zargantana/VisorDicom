@@ -49,12 +49,69 @@ export class ImagesLoaderComponent {
     return active;
   }
 
-  public onSelected(event: any): void {
-    this.resetReadStatus();
-    this.totalFiles = event.target.files.length;
+  /** Resaltado de la zona de soltar mientras se arrastra algo encima */
+  public dragging: boolean = false;
 
-    for (let numFile = 0; numFile < event.target.files.length; numFile++) {
-      const file:File = event.target.files[numFile];
+  public onSelected(event: any): void {
+    this.loadFiles(Array.from(event.target.files as FileList));
+  }
+
+  public onDragOver(event: DragEvent): void {
+    event.preventDefault();
+    event.stopPropagation();
+    if (event.dataTransfer) event.dataTransfer.dropEffect = 'copy';
+    this.dragging = true;
+  }
+
+  public onDragLeave(event: DragEvent): void {
+    event.preventDefault();
+    this.dragging = false;
+  }
+
+  /** Soltar ficheros o carpetas: se leen igual que los elegidos con el botón. */
+  public async onDrop(event: DragEvent): Promise<void> {
+    event.preventDefault();
+    event.stopPropagation();
+    this.dragging = false;
+    const files = await ImagesLoaderComponent.filesFromDrop(event.dataTransfer);
+    if (files.length) this.loadFiles(files);
+  }
+
+  /**
+   * Ficheros de un arrastre. Las carpetas se recorren enteras con la API de entradas (Chrome, Edge, Firefox,
+   * Safari); si el navegador no la da, se usan los ficheros sueltos. Las entradas hay que cogerlas antes de
+   * cualquier espera: después del evento el DataTransfer se vacía.
+   */
+  private static async filesFromDrop(dataTransfer: DataTransfer | null): Promise<File[]> {
+    if (!dataTransfer) return [];
+    const entries = Array.from(dataTransfer.items ?? [])
+      .map((item: any) => (typeof item.webkitGetAsEntry === 'function' ? item.webkitGetAsEntry() : null))
+      .filter((entry) => !!entry);
+    if (!entries.length) return Array.from(dataTransfer.files ?? []);
+    const files: File[] = [];
+    const walk = async (entry: any): Promise<void> => {
+      if (entry.isFile) {
+        const file = await new Promise<File | null>((resolve) => entry.file(resolve, () => resolve(null)));
+        if (file) files.push(file);
+      } else if (entry.isDirectory) {
+        const reader = entry.createReader();
+        for (;;) {
+          const batch: any[] = await new Promise((resolve) => reader.readEntries(resolve, () => resolve([])));
+          if (!batch.length) break;
+          for (const child of batch) await walk(child);
+        }
+      }
+    };
+    for (const entry of entries) await walk(entry);
+    return files;
+  }
+
+  public loadFiles(files: File[]): void {
+    this.resetReadStatus();
+    this.totalFiles = files.length;
+
+    for (let numFile = 0; numFile < files.length; numFile++) {
+      const file: File = files[numFile];
       setTimeout(() => {
         if (file) {
           //console.log('File: ' + file.webkitRelativePath);
