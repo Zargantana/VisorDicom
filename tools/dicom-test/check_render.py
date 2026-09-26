@@ -14,7 +14,7 @@ HERE = os.path.dirname(__file__)
 # DICOM_TEST_OUT: otra carpeta (p. ej. out_real, con ficheros reales); expected.json puede estar vacío
 OUT = os.path.abspath(os.environ.get("DICOM_TEST_OUT") or os.path.join(HERE, "out"))
 REN = os.path.join(OUT, "render")
-summary = json.load(open(os.path.join(REN, "render.json")))
+summary = json.load(open(os.path.join(REN, "render.json"), encoding="utf-8"))  # el harness escribe UTF-8 (motivos con acentos)
 # DICOM_TEST_MANIFEST: {clave: {path}} (real/scan_corpus.py); las claves de render.json son las del manifiesto y los
 # ficheros están donde diga "path"
 MANIFEST = json.load(open(os.environ["DICOM_TEST_MANIFEST"], encoding="utf-8")) if os.environ.get("DICOM_TEST_MANIFEST") else {}
@@ -197,7 +197,7 @@ def expected_frames(path, win, indices=None):
     return outs
 
 
-EXPECTED = json.load(open(os.path.join(OUT, "expected.json")))
+EXPECTED = json.load(open(os.path.join(OUT, "expected.json"), encoding="utf-8"))
 # DICOM_TEST_FILTER: solo esas claves; el resultado se fusiona con el check.json anterior (para repetir unos pocos
 # ficheros de un corpus sin volver a comparar los miles restantes)
 import re

@@ -58,7 +58,8 @@ function rendererRSS() {
   } catch { return 0; }
 }
 
-const page = await browser.newPage({ viewport: { width: 1400, height: 900 } });
+// locale es-ES: la interfaz sale en el idioma del navegador y la prueba busca los textos en español
+const page = await browser.newPage({ locale: 'es-ES', viewport: { width: 1400, height: 900 } });
 const errors = [];
 page.on('pageerror', e => errors.push('JS: ' + String(e).slice(0, 160)));
 page.on('console', m => { if (m.type() === 'error') errors.push('console: ' + m.text().slice(0, 160)); });

@@ -63,7 +63,7 @@ const sizeOf = (p) => fs.statSync(p).isDirectory()
 
 // 1) Límite de FileReader.readAsBinaryString (DCMFile lee así el fichero entero)
 for (const f of args.filter((p) => fs.statSync(p).isFile())) {
-  const page = await browser.newPage();
+  const page = await browser.newPage({ locale: 'es-ES' });
   await page.setContent('<input type=file id=f>');
   await page.setInputFiles('#f', f);
   const r = await page.evaluate(() => new Promise((resolve) => {
@@ -79,7 +79,8 @@ for (const f of args.filter((p) => fs.statSync(p).isFile())) {
 
 // 2) La app: lectura, primera imagen y memoria del renderer
 for (const f of args) {
-  const page = await browser.newPage({ viewport: { width: 1100, height: 760 } });
+  // locale es-ES: la interfaz sale en el idioma del navegador y la prueba busca los textos en español
+  const page = await browser.newPage({ locale: 'es-ES', viewport: { width: 1100, height: 760 } });
   const errors = [];
   page.on('pageerror', (e) => errors.push(e.message.slice(0, 120)));
   page.on('console', (m) => { if (m.type() === 'error') errors.push(m.text().split('\n')[0].slice(0, 120)); });

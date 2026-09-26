@@ -51,7 +51,8 @@ const files = fs.readdirSync(outDir).filter((f) => pattern.test(f)).sort();
 const browser = await chromium.launch({ executablePath: process.env.CHROMIUM || '/opt/pw-browsers/chromium' });
 let fails = 0;
 for (const name of files) {
-  const page = await browser.newPage({ viewport: { width: 1400, height: 900 } });
+  // locale es-ES: la interfaz sale en el idioma del navegador y la prueba busca los textos en español
+  const page = await browser.newPage({ locale: 'es-ES', viewport: { width: 1400, height: 900 } });
   const problems = [];
   const codecs = [];
   page.on('console', (m) => { const t = m.text(); if (/Content Security Policy|Refused to/i.test(t)) problems.push('CSP: ' + t.slice(0, 160)); });

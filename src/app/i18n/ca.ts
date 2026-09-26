@@ -73,7 +73,7 @@ export const CA: Texts = {
   'news.h5.b': 'El CD sencer d\'una vegada:', 'news.h5.t': 'arrossega la carpeta i veuràs com apareixen els estudis, ordenats per pacient i sèrie, mentre es llegeixen.',
   'news.h6.b': 'Es veuen més estudis:', 'news.h6.t': 'més formats d\'imatge i de color, i pots triar el contrast quan l\'estudi en porta diversos.',
   'news.h7.b': 'En qualsevol dispositiu:', 'news.h7.t': 'Windows, Linux i Mac; Android i iOS. PC, tauleta i mòbil.',
-  'news.h8.b': 'En la teva llengua:', 'news.h8.t': 'castellà, anglès, català, basc, gallec i portuguès. Tria-la amb el botó del globus, a dalt a la dreta.',
+  'news.h8.b': 'En la teva llengua:', 'news.h8.t': 'castellà, anglès, català, basc, gallec, portuguès, francès, italià, alemany i japonès. Tria-la amb el botó del globus, a dalt a la dreta.',
   'news.more': 'més...',
   'news.less': '...menys',
   'news.hist.1': 'Neix VisorDicom, la versió lliure i gratuïta del visor.',

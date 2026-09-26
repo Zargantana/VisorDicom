@@ -38,7 +38,8 @@ def main():
 
     env = dict(os.environ, DICOM_TEST_OUT=out, DICOM_TEST_MANIFEST=os.path.join(out, "manifest.json"),
                DICOM_TEST_MAX_MB=args.max_mb, DICOM_TEST_MAX_FRAMES_OUT=args.frames_out,
-               DICOM_TEST_MAX_WINDOWS=args.windows, DICOM_TEST_RESUME="1", DICOM_TEST_VERBOSE="1")
+               DICOM_TEST_MAX_WINDOWS=args.windows, DICOM_TEST_RESUME="1", DICOM_TEST_VERBOSE="1",
+               PYTHONUTF8="1")  # check_render escribe acentos: su stdout va a check.log en UTF-8 también en Windows
     if args.filter:
         env["DICOM_TEST_FILTER"] = args.filter
     if args.skip_multiframe:

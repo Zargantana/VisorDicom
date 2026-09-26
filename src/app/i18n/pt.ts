@@ -73,7 +73,7 @@ export const PT: Texts = {
   'news.h5.b': 'O CD inteiro de uma vez:', 'news.h5.t': 'arraste a pasta e veja os estudos aparecerem, ordenados por paciente e série, enquanto são lidos.',
   'news.h6.b': 'Abrem-se mais estudos:', 'news.h6.t': 'mais formatos de imagem e de cor, e pode escolher o contraste quando o estudo traz vários.',
   'news.h7.b': 'Em qualquer dispositivo:', 'news.h7.t': 'Windows, Linux e Mac; Android e iOS. PC, tablet e telemóvel.',
-  'news.h8.b': 'Na sua língua:', 'news.h8.t': 'espanhol, inglês, catalão, basco, galego e português. Escolha-a com o botão do globo, no canto superior direito.',
+  'news.h8.b': 'Na sua língua:', 'news.h8.t': 'espanhol, inglês, catalão, basco, galego, português, francês, italiano, alemão e japonês. Escolha-a com o botão do globo, no canto superior direito.',
   'news.more': 'mais...',
   'news.less': '...menos',
   'news.hist.1': 'Nasce o VisorDicom, a versão livre e gratuita do visualizador.',

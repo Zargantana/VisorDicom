@@ -26,7 +26,8 @@ const require = createRequire(process.env.PLAYWRIGHT_MODULE || path.join(root, '
 let chromium;
 for (const name of ['playwright', 'playwright-core']) { try { chromium = require(name).chromium; break; } catch { /* siguiente */ } }
 const browser = process.env.CHROMIUM ? await chromium.launch({ executablePath: process.env.CHROMIUM }) : await chromium.launch({ channel: 'chrome' });
-const page = await browser.newPage({ viewport: { width: 1400, height: 900 } });
+// locale es-ES: la interfaz sale en el idioma del navegador y la prueba busca los textos en español
+const page = await browser.newPage({ locale: 'es-ES', viewport: { width: 1400, height: 900 } });
 const problems = [];
 const codecs = new Set();
 await page.addInitScript(() => {
