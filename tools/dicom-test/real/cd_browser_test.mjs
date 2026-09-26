@@ -98,7 +98,8 @@ if (loaderTree) {
   check('selector en vivo del cargador: imágenes', loaderTree.images === expected.images, `${loaderTree.images} vs ${expected.images}`);
   await page.locator('images-loader findings-table tbody tr').last().locator('td.ft-serie').click({ timeout: 10000 });
 } else {
-  await page.locator('button.loader-view').click({ timeout: 10000 }).catch(() => {});
+  // Sin selector no hay puerta al visor (desde 2026-09-27 no existe el botón "Ver imágenes")
+  check('selector en vivo del cargador presente', false, 'no se ha encontrado images-loader findings-table');
 }
 const t1 = Date.now();
 const painted = await page.waitForFunction(() => [...document.querySelectorAll('basic-image-viewer img')]

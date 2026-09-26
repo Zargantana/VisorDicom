@@ -94,14 +94,14 @@ for (const f of args) {
   const rss0 = rendererRSS();
   const t0 = Date.now();
   await page.setInputFiles('input#file', fs.statSync(f).isDirectory() ? fs.readdirSync(f).map((x) => path.join(f, x)) : f);
-  const read = await page.waitForFunction(() => { const b = document.querySelector('button.loader-view'); return !!b && !b.disabled; },
-    null, { timeout: 180000 }).then(() => true).catch(() => false);
+  // Leído = aparece una serie en el selector del cargador (desde 2026-09-27 no hay botón "Ver imágenes")
+  const read = await page.locator('images-loader findings-table td.ft-view').first().waitFor({ timeout: 180000 }).then(() => true).catch(() => false);
   const msRead = Date.now() - t0;
   const rss1 = rendererRSS();
   // Aviso del cargador (F0 del plan): con más de ≈512 MiB tiene que salir un motivo, no un TypeError
   const notice = read ? '' : await page.locator('.loader-errors').innerText({ timeout: 2000 }).catch(() => '');
   if (notice) errors.unshift('aviso: ' + notice.replace(/\s+/g, ' ').trim().slice(0, 160));
-  if (read) await page.locator('button.loader-view').click().catch(() => {});
+  if (read) await page.locator('images-loader findings-table td.ft-view').first().click().catch(() => {});
   const painted = read && await page.waitForFunction(() => [...document.querySelectorAll('basic-image-viewer img')]
     .some((i) => i.src.startsWith('data:image') && !i.hasAttribute('data-unsupported')), null, { timeout: 180000 })
     .then(() => true).catch(() => false);

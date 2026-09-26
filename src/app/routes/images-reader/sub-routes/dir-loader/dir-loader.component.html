@@ -1,27 +1,26 @@
 <div class="loader d-flex slab-flex-1 flex-column m-0 p-0">
     <!-- Barra siempre visible: elegir, y pasar al visor cuando se quiera (la lectura sigue por detrás) -->
     <!-- A la izquierda: el botón de elegir antes de leer; después, "Ver imágenes" o "Carga" -->
-    <div class="loader-bar d-flex align-items-center justify-content-start flex-wrap px-3 py-2 border-bottom" [class.border-dark]="!isDark()" [class.border-light]="isDark()">
-        @if (imgsLoader.totalFiles == 0) {
-            <label for="dirPicker" class="btn btn-primary loader-choose m-0"><i class="fa-solid fa-folder-open"></i> {{'loader.chooseFolder' | t}}</label>
-        }
-        <input type="file" id="dirPicker" name="dirPicker" class="d-none" (change)="imgsLoader.onSelected($event)" #dirUpload webkitDirectory multiple/>
-        @if (!showViewer && foundDCMFiles.length > 0) {
-            <button type="button" class="btn btn-success loader-view" [disabled]="foundDCMFiles.length == 0" (click)="openViewer()">
-                <i class="fa-solid fa-eye"></i> {{'loader.view' | t}} <span class="badge text-bg-light">{{foundDCMFiles.length}}</span>
-            </button>
-        } @else if (showViewer) {
-            <button type="button" class="btn btn-primary loader-view" (click)="showViewer = false">
-                <i class="fa-solid fa-sitemap"></i> {{'loader.back' | t}} <span class="badge text-bg-light">{{imgsViewer.classifier.numberOfSeries}}</span>
-            </button>
-        }
-    </div>
+    <!-- La barra solo aparece antes de elegir (botón de elegir) y en el visor (volver a los estudios encontrados). En la
+         pantalla de carga el acceso al visor es el selector de estudios: sin botón "Ver imágenes" (2026-09-27). -->
+    <input type="file" id="dirPicker" name="dirPicker" class="d-none" (change)="imgsLoader.onSelected($event)" #dirUpload webkitDirectory multiple/>
+    @if (imgsLoader.totalFiles == 0 || showViewer) {
+        <div class="loader-bar d-flex align-items-center justify-content-start flex-wrap px-3 py-2 border-bottom" [class.border-dark]="!isDark()" [class.border-light]="isDark()">
+            @if (imgsLoader.totalFiles == 0) {
+                <label for="dirPicker" class="btn btn-primary loader-choose m-0"><i class="fa-solid fa-folder-open"></i> {{'loader.chooseFolder' | t}}</label>
+            } @else {
+                <button type="button" class="btn btn-primary loader-view" (click)="showViewer = false">
+                    <i class="fa-solid fa-sitemap"></i> {{'loader.back' | t}} <span class="badge text-bg-light">{{imgsViewer.classifier.numberOfSeries}}</span>
+                </button>
+            }
+        </div>
+    }
     <div class="d-flex slab-flex-1 flex-column m-0 p-0">
         <div class="d-flex slab-flex-1 m-0 p-0" [class.d-none]="!showViewer">
             <images-viewer class="d-flex slab-flex-1 m-0 p-0" #imgsViewer [foundDCMFiles]="foundDCMFiles"></images-viewer>
         </div>
         <div class="d-flex slab-flex-1 m-0 p-0" [class.d-none]="showViewer">
-            <images-loader #imgsLoader [foundDCMFiles]="foundDCMFiles" [classifier]="imgsViewer.classifier"
+            <images-loader #imgsLoader [foundDCMFiles]="foundDCMFiles" [classifier]="imgsViewer.classifier" pickerId="dirPicker"
                 class="d-flex slab-flex-1 m-0 p-0"
                 (allFilesReaded)="imgsViewer.StartWatchingDCMFile();"
                 (someDCMFound)="imgsViewer.Classify();"

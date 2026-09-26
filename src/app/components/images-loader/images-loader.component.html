@@ -35,17 +35,14 @@
       <div class="progress loader-progress" role="progressbar" [attr.aria-valuenow]="progressPct" aria-valuemin="0" aria-valuemax="100">
         <div class="progress-bar" [class.progress-bar-striped]="!AllDone" [class.progress-bar-animated]="!AllDone" [class.bg-success]="AllDone" [style.width.%]="progressPct"></div>
       </div>
+      <!-- Sin "Ver imágenes": al visor se entra pulsando una serie del selector de abajo. Aquí, solo el estado y
+           la opción de elegir otros ficheros (la etiqueta apunta al input del cargador padre). -->
       <p class="loader-status m-0 text-center">
         @if (!AllDone) {
           {{'loader.reading' | t:readEndedFiles:totalFiles}}
-          @if (foundDCMFiles?.length) {
-            {{'loader.canView.before' | t}}<button type="button" class="btn btn-link loader-open" (click)="openViewer.emit()">{{'loader.canView.link' | t}}</button>{{'loader.canView.after' | t}}
-          }
         } @else {
           {{'loader.done' | t:(foundDCMFiles?.length ?? 0):totalFiles}}
-          @if (foundDCMFiles?.length) {
-            <button type="button" class="btn btn-link loader-open" (click)="openViewer.emit()"><i class="fa-solid fa-eye"></i> {{'loader.view' | t}}</button>
-          }
+          <label [attr.for]="pickerId" class="btn btn-link loader-open"><i class="fa-solid fa-folder-open"></i> {{'loader.chooseOther' | t}}</label>
         }
       </p>
       @if (readErrors.length) {
@@ -56,7 +53,8 @@
         </ul>
       }
       @if (seriesFound > 0 && classifier) {
-        <!-- Selector de estudios en vivo: el árbol crece según se leen los DICOM; pulsar abre el visor ahí -->
+        <!-- Selector de estudios en vivo: el árbol crece según se leen los DICOM; pulsar una fila abre el visor ahí.
+             Es la única puerta al visor desde esta pantalla. -->
         <div class="loader-tree">
           <div class="loader-tree-title">
             <i class="fa-solid fa-sitemap"></i> {{'loader.found' | t}}

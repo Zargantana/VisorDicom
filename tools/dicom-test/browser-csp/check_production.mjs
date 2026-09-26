@@ -42,8 +42,10 @@ let fails = 0;
 for (const name of files) {
   await page.goto(url + '/file-loader', { waitUntil: 'networkidle' });
   await page.locator('input#file').setInputFiles(path.join(outDir, name));
-  await page.waitForFunction(() => { const b = document.querySelector('button.loader-view'); return !!b && !b.disabled; }, null, { timeout: 60000 });
-  await page.locator('button.loader-view').click();
+  // Al visor se entra pulsando una serie del selector (el ojo de la primera fila)
+  const firstSeries = page.locator('images-loader findings-table td.ft-view').first();
+  await firstSeries.waitFor({ timeout: 60000 });
+  await firstSeries.click();
   const ok = await page.waitForFunction(() => [...document.querySelectorAll('img')]
     .some(i => i.src.startsWith('data:image') || i.hasAttribute('data-unsupported')), null, { timeout: 90000 }).then(() => true).catch(() => false);
   const state = await page.evaluate(() => {

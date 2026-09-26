@@ -7,6 +7,7 @@
       <th class="ft-mod">{{'table.modality' | t}}</th>
       <th class="ft-serie">{{'table.series' | t}}</th>
       <th class="ft-n">{{'table.images' | t}}</th>
+      <th class="ft-view"></th>
     </tr>
   </thead>
   <tbody>
@@ -33,6 +34,8 @@
           <div class="ft-ell"><span class="ft-strong">{{row.seriesNumber}}</span>@if (row.seriesDescription) { <span class="ft-muted">· {{row.seriesDescription}}</span> }</div>
         </td>
         <td class="ft-n selectable" [title]="row.seriesTitle" (click)="ReViewImage($event, row.uid)">{{row.count}}</td>
+        <!-- Icono de ver: la fila entera es pulsable, pero el ojo lo hace evidente -->
+        <td class="ft-view selectable" [title]="'table.view' | t" (click)="ReViewImage($event, row.uid)"><i class="fa-solid fa-eye"></i></td>
       </tr>
     }
   </tbody>

@@ -74,11 +74,13 @@ for (const name of files) {
   } catch {
     problems.push('la app no arrancó (sin input#file)');
   }
-  // Desde 2026-09-26 la pantalla de carga no salta sola al visor: se pulsa "Ver imágenes" (activo con el primer DICOM)
+  // La pantalla de carga no salta sola al visor: se entra pulsando una serie del selector (desde 2026-09-27 no hay
+  // botón "Ver imágenes"; antes se pulsaba ese botón)
   try {
-    await page.waitForFunction(() => { const b = document.querySelector('button.loader-view'); return !!b && !b.disabled; }, null, { timeout: expectFail ? 4000 : 15000 });
-    await page.locator('button.loader-view').click();
-  } catch { /* build anterior sin el botón, o fichero no reconocido: se sigue igual */ }
+    const firstSeries = page.locator('images-loader findings-table td.ft-view').first();
+    await firstSeries.waitFor({ timeout: expectFail ? 4000 : 15000 });
+    await firstSeries.click();
+  } catch { /* fichero no reconocido (sin serie en el selector): se sigue igual */ }
   try {
     await page.waitForFunction(() => [...document.querySelectorAll('basic-image-viewer img')].some((i) => i.src.startsWith('data:image')),
       null, { timeout: expectFail ? 4000 : 20000 });

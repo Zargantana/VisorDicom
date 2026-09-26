@@ -4,6 +4,7 @@ import { classifierDCM } from 'src/app/clases/Images/classifier-DCM.class';
 import { ImageDCM, VOIWindowOption } from 'src/app/clases/Images/image-DCM.class';
 import { ThemeService } from 'src/app/services/theme.service';
 import { VIEWER_UPLOAD_HANDLER, ViewerUploadHandler } from '../../viewer-upload-handler';
+import { ViewerFullscreen } from '../../viewer-fullscreen';
 
 @Component({
     selector: 'basic-image-viewer',
@@ -166,16 +167,21 @@ export class BasicImageViewerComponent implements AfterViewInit, DoCheck, OnDest
     this.enqueueRatioRecalc();
   }
 
-  /** El navegador entra o sale de pantalla completa (por el botón o con Esc): se recalcula el tamaño de la imagen */
+  /**
+   * El navegador entra o sale de pantalla completa (por el botón o con Esc): la aplicación esconde o enseña la barra
+   * superior y el menú (ViewerFullscreen) y se recalcula el tamaño de la imagen.
+   */
   @HostListener('document:fullscreenchange')
   public onFullscreenChange() {
     this.fullscreen = !!(document as any).fullscreenElement;
+    ViewerFullscreen.active = this.fullscreen;
     this.onResize();
   }
 
   ngOnDestroy(): void {
     const doc: any = document;
     if (doc.fullscreenElement && typeof doc.exitFullscreen === 'function') doc.exitFullscreen().catch(() => { /* nada */ });
+    ViewerFullscreen.active = false;
   }
 
   public infoClick() {

@@ -20,6 +20,8 @@ export class ImagesLoaderComponent {
    * objeto que usa `images-viewer`): se enseña en vivo como selector de estudios y crece con cada DICOM leído.
    */
   @Input() classifier: classifierDCM | null | undefined;
+  /** id del input de ficheros del cargador padre (file o dirPicker): "Elegir otros ficheros" lo abre con una etiqueta */
+  @Input() pickerId: string = 'file';
   @Output() someDCMFound = new EventEmitter<boolean>();
   @Output() readingNewFile = new EventEmitter<boolean>();
   @Output() fileReadEnd = new EventEmitter<FILEREAD_STATUS>();

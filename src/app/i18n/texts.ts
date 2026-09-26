@@ -42,8 +42,8 @@ export interface Texts {
   // Pantalla de carga
   'loader.chooseFiles': string;
   'loader.chooseFolder': string;
-  'loader.view': string;
   'loader.back': string;
+  'loader.chooseOther': string;
   'loader.drop.1': string;
   'loader.drop.or': string;
   'loader.drop.drag': string;
@@ -54,9 +54,6 @@ export interface Texts {
   'loader.read': string;
   'loader.dicom': string;
   'loader.reading': string;
-  'loader.canView.before': string;
-  'loader.canView.link': string;
-  'loader.canView.after': string;
   'loader.done': string;
   'loader.found': string;
   'loader.series.one': string;
@@ -73,6 +70,7 @@ export interface Texts {
   'table.image.one': string;
   'table.image.many': string;
   'table.noId': string;
+  'table.view': string;
   // Visor
   'viewer.save': string;
   'viewer.patientId': string;
