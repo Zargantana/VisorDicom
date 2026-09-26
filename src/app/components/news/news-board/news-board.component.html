@@ -1,24 +1,33 @@
 <div class="d-flex flex-column fixed-top justify-content-center align-items-center p-0 m-0 overflow-auto" [class.bg-dark-transparent]="isDark()" [class.bg-light-transparent]="!isDark()" style="height: 100vh; max-height: 100vh;" (click)="changeBannerVisibility()">
-    <div class="d-flex flex-column border rounded-top p-0 m-0"  [class.border-dark]="!isDark()" [class.border-light]="isDark()" [class.bg-dark]="isDark()" [class.bg-light]="!isDark()" onclick="event.stopPropagation();">
+    <div class="d-flex flex-column border rounded-top p-0 m-0"  [class.border-dark]="!isDark()" [class.border-light]="isDark()" [class.bg-dark]="isDark()" [class.bg-light]="!isDark()" (click)="$event.stopPropagation()">
         <div class="d-flex slab-flex-1 flex-row bg-infoPlata border-bottom text-center p-0 m-0 user-select-none"  [class.border-dark]="!isDark()" [class.border-light]="isDark()">
             <div class="d-flex flex-column justify-content-center px-1 m-0 clickable" (click)="changeBannerVisibility()">
                 <span class="dot m-1 p-1"></span>
             </div>
             <div class="d-flex flex-column justify-content-center px-1 m-0 clickable" (click)="menosClick()" [class.d-none]="!elfua">
                 <span class="orangedot m-1 p-1"></span>
-            </div>  
+            </div>
             <div class="d-flex slab-flex-1 flex-row justify-content-center text-center p-0 m-0">
                 <span class="p-0 m-0">&nbsp;</span>
-            </div>       
+            </div>
         </div>
         <div class="d-flex flex-column p-4 decreasingFont">
             <div class="d-flex slab-flex-1 flex-row justify-content-center text-center p-0 m-0">
                 <h3 class="p-0 m-0">Proyecto Open Source.</h3>
             </div>
+            <b>26/09/2026</b>
+            <ul class="pb-0 mb-0">
+                <li><b>Selector de ventana</b> cuando el estudio trae varias (ABDOMEN, PULMÓN...).</li>
+                <li><b>Nuevas compresiones:</b> HTJ2K (lossless, RPCL y con pérdida), JPEG 2000 Part 2, Deflate, Encapsulated Uncompressed y los procesos JPEG retirados. Verificadas JPEG Lossless SV1 y Process 14, JPEG Extended de 12 bits, JPEG-LS de 16 bits con signo y RLE de 16 bits y color.</li>
+                <li><b>Nuevos modelos de color:</b> YBR_PARTIAL_422, HSV, ARGB, CMYK, paletas segmentadas y paleta suplementaria.</li>
+                <li><b>Pipeline de grises y color corregido:</b> rescale fraccional, MONOCHROME1, Big Endian, paletas nativas, Planar Configuration, YBR y píxeles de relleno.</li>
+                <li><b>Códecs bajo demanda:</b> OpenJPEG y libjpeg-turbo se descargan solo cuando un estudio los necesita.</li>
+                <li>Batería de regresión de 73 casos y prueba en navegador con la CSP de producción. Conformance statement actualizado. Angular 21.</li>
+            </ul>
             <b>30/04/2025</b>
             <ul class="pb-0 mb-0">
-              <li>Ha nacido un nuevo VisorDicom nativo open source.</li>
-              <li>Cualquier empresa/privado interesado, contactar mediante el icono de mensaje de la barra superior.</li>
+                <li>Ha nacido un nuevo VisorDicom nativo open source.</li>
+                <li>Cualquier empresa/privado interesado, contactar mediante el icono de mensaje de la barra superior.</li>
             </ul>
             <a class="clickable text-primary px-0 pb-2 pt-0 m-0" (click)="masClick()" [class.d-none]="elfua">Últimos desarrollos...</a>
             <div class="d-flex flex-column p-0 m-0" [class.d-none]="!elfua">
@@ -34,7 +43,7 @@
                 <b>29/07/2023</b>
                 <ul class="pb-0 mb-0">
                     <li>Trazabilidad de las subidas de archivos en curso en la barra de título.</li>
-                </ul>            
+                </ul>
                 <b>25/05/2023</b>
                 <ul class="pb-0 mb-0">
                     <li>Mis imágenes para pacientes.</li>
@@ -55,21 +64,25 @@
                     <li>Lectura de imágenes en JPEG Baseline 1.</li>
                     <li>...</li>
                 </ul>
-                <div class="d-flex flex-row-reverse px-0 py-2 m-0"><a class="clickable align-self-right text-primary" (click)="menosClick()" [class.d-none]="!elfua">...menos</a></div>               
+                <div class="d-flex flex-row-reverse px-0 py-2 m-0"><a class="clickable align-self-right text-primary" (click)="menosClick()" [class.d-none]="!elfua">...menos</a></div>
             </div>
-            <b>Desarrollos pendientes...</b>    
+            <b>Próximamente...</b>
             <ul>
-                <li>Revisión de la lectura de imagen comprimidas en RLE Lossless de 16 bits.</li>                
-                <li>Revisión de imágenes de casos de prueba IHE MESA.</li>                
-                <li>Visor descargable.</li>
-                <li>Versión para móvil.</li>                
+                <li>Ventana y nivel arrastrando el ratón, con presets por modalidad (cerebro, hueso, pulmón).</li>
+                <li>Ecografías y angiografías en vídeo (H.264 y HEVC) en el modo cine.</li>
+                <li>Decodificación en segundo plano: CDs grandes sin bloquear el visor.</li>
+                <li>Nombres en cualquier alfabeto (Specific Character Set).</li>
+                <li>Lectura del DICOMDIR del CD y de ficheros sin preámbulo.</li>
+                <li>JPEG XL.</li>
+                <li>Revisión con los casos de prueba IHE MESA y con CDs reales de CR, DX y XA.</li>
+                <li>Visor instalable como aplicación. Versión para móvil y tableta.</li>
                 <li class="color-secondary">...</li>
             </ul>
             <div class="d-flex p-0 m-0">
                 <a class="clickable text-primary p-0 m-0" href="assets/ReleaseNotes.txt">Notas de la versión</a>
                 , &nbsp;
                 <a class="clickable text-primary p-0 m-0" href="assets/ConformanceStatement.pdf">Conformance statement.</a>
-            </div>            
+            </div>
         </div>
     </div>
 </div>
