@@ -1,8 +1,20 @@
 // Panel de carga: columna centrada con cuatro contadores, barra de progreso global, estado, el selector de estudios
 // en vivo y los ficheros que se están leyendo
+// Sin esto, la anchura mínima de la tabla del selector (34rem) subía por los contenedores flex en fila hasta
+// ensanchar toda la página en móvil, en vez de desplazarse dentro de su caja
+:host {
+  min-width: 0;
+  max-width: 100%;
+}
+
+.loader-panel {
+  min-width: 0;
+}
+
 .loader-column {
   width: 100%;
   max-width: 44rem;
+  min-width: 0;
   margin: 0 auto;
 }
 
@@ -87,6 +99,8 @@
 // Selector de estudios en vivo (la tabla de hallazgos del visor)
 .loader-tree {
   margin-top: 1.25rem;
+  min-width: 0;
+  max-width: 100%;
   border: 1px solid rgba(108, 117, 125, 0.45);
   border-radius: 0.75rem;
   overflow: hidden;
@@ -109,10 +123,17 @@
   }
 }
 
-.loader-tree-table {
-  display: block;
+// La tabla se desplaza en vertical y, en pantallas estrechas, también en horizontal (mínimo legible de 34rem).
+// contain: inline-size: el ancho de esta caja no depende de su contenido, así el mínimo de la tabla no sube más.
+.loader-tree-scroll {
   max-height: 45vh;
   overflow: auto;
+  contain: inline-size;
+}
+
+.loader-tree-table {
+  display: block;
+  min-width: 34rem;
 }
 
 .loader-errors {

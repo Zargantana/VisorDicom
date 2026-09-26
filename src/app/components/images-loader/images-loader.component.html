@@ -62,12 +62,14 @@
             <i class="fa-solid fa-sitemap"></i> Encontrado hasta ahora
             <small>{{seriesFound}} {{seriesFound == 1 ? 'serie' : 'series'}} · pulsa una para verla</small>
           </div>
-          <findings-table class="loader-tree-table" [classifier]="classifier"
-            (reviewImageClick)="requestView('series', $event)"
-            (reviewModalityClick)="requestView('modality', $event)"
-            (reviewStudyClick)="requestView('study', $event)"
-            (reviewPatientClick)="requestView('patient', $event)">
-          </findings-table>
+          <div class="loader-tree-scroll">
+            <findings-table class="loader-tree-table" [classifier]="classifier"
+              (reviewImageClick)="requestView('series', $event)"
+              (reviewModalityClick)="requestView('modality', $event)"
+              (reviewStudyClick)="requestView('study', $event)"
+              (reviewPatientClick)="requestView('patient', $event)">
+            </findings-table>
+          </div>
         </div>
       }
       @if (activeFiles.length) {

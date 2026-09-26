@@ -20,3 +20,14 @@
       font-size: 0.7vw;
     }
   }
+
+  // Móvil: con vw el texto se quedaba en 4-5 px (ilegible). Suelo en rem; el contenedor que la use se desplaza en
+  // horizontal si hace falta (p. ej. el selector en vivo del cargador).
+  @media (max-width: 767.98px) {
+    .decreasingFont {
+      font-size: 0.8rem;
+    }
+    .decreasingFontLittle {
+      font-size: 0.72rem;
+    }
+  }

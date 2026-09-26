@@ -26,6 +26,7 @@ def main():
     ap.add_argument("--windows", default="2")
     ap.add_argument("--heap-mb", default="8192")
     ap.add_argument("--skip-multiframe", default="", help="'frames,MB': multiframes con más de ambos (láminas por tiles) se marcan fuera del alcance sin decodificar")
+    ap.add_argument("--skip-sm-frames", default="", help="microscopía (SM) con más de N frames: fuera del alcance (tiles J2K de segundos cada uno)")
     ap.add_argument("--max-restarts", type=int, default=40)
     args = ap.parse_args()
     out = os.path.abspath(args.out)
@@ -42,6 +43,8 @@ def main():
         env["DICOM_TEST_FILTER"] = args.filter
     if args.skip_multiframe:
         env["DICOM_TEST_SKIP_MULTIFRAME"] = args.skip_multiframe
+    if args.skip_sm_frames:
+        env["DICOM_TEST_SKIP_SM_FRAMES"] = args.skip_sm_frames
     harness = [ "node", f"--max-old-space-size={args.heap_mb}", os.path.join(ROOT, "tools", "dicom-test", "run_harness.mjs")]
     log = open(os.path.join(out, "harness.log"), "a", encoding="utf-8", errors="replace")
     for attempt in range(args.max_restarts + 1):

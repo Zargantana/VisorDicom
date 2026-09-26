@@ -58,7 +58,7 @@ const filter = process.env.DICOM_TEST_FILTER ? new RegExp(process.env.DICOM_TEST
 // renderizan y guardan el primer frame, el central y el último (writtenFrames). DICOM_TEST_MAX_WINDOWS (3).
 const manifest = process.env.DICOM_TEST_MANIFEST ? JSON.parse(fs.readFileSync(process.env.DICOM_TEST_MANIFEST, 'utf8')) : null;
 const entries = manifest
-  ? Object.entries(manifest).filter(([k]) => !filter || filter.test(k)).sort(([a], [b]) => a.localeCompare(b)).map(([k, v]) => ({ name: k, file: v.path ?? v, frames: v.frames }))
+  ? Object.entries(manifest).filter(([k]) => !filter || filter.test(k)).sort(([a], [b]) => a.localeCompare(b)).map(([k, v]) => ({ name: k, file: v.path ?? v, frames: v.frames, modality: v.modality }))
   : fs.readdirSync(outDir).filter(f => f.endsWith('.dcm') && (!filter || filter.test(f))).sort().map(f => ({ name: f, file: path.join(outDir, f) }));
 const maxMB = +(process.env.DICOM_TEST_MAX_MB || 480);
 const maxFramesOut = +(process.env.DICOM_TEST_MAX_FRAMES_OUT || 0);
@@ -67,6 +67,9 @@ const maxFramesOut = +(process.env.DICOM_TEST_MAX_FRAMES_OUT || 0);
 // frames de golpe y con ellos tarda minutos. Solo con manifiesto (el número de frames sale del inventario).
 const skipMultiframe = (process.env.DICOM_TEST_SKIP_MULTIFRAME || '').split(',').map(Number);
 const skipFrames = skipMultiframe.length === 2 && skipMultiframe.every(n => n > 0) ? skipMultiframe : null;
+// DICOM_TEST_SKIP_SM_FRAMES=N: microscopía (modalidad SM, láminas completas) con más de N frames también es TILES,
+// sea cual sea el tamaño: sus tiles J2K de 2k×2k tardan segundos cada uno.
+const skipSmFrames = +(process.env.DICOM_TEST_SKIP_SM_FRAMES || 0);
 const maxWindows = Math.max(1, Math.min(3, +(process.env.DICOM_TEST_MAX_WINDOWS || 3)));
 // DICOM_TEST_RESUME=1: conserva render.json y salta las claves ya hechas (real/run_corpus.py relanza el harness si un
 // fichero tumba el proceso). render/inprogress.txt dice qué clave se estaba procesando.
@@ -76,13 +79,13 @@ if (process.env.DICOM_TEST_RESUME && fs.existsSync(summaryPath)) Object.assign(s
 const done = new Set(Object.keys(summary).map(k => k.split('#w')[0]));
 const t0 = Date.now();
 let sinceFlush = 0;
-for (const { name: f, file, frames } of entries) {
+for (const { name: f, file, frames, modality } of entries) {
   if (done.has(f)) continue;
   if (process.env.DICOM_TEST_VERBOSE) console.error(`> ${f}`);
   if (manifest) fs.writeFileSync(inProgress, f);
   if (manifest && ++sinceFlush >= 10) { fs.writeFileSync(summaryPath, JSON.stringify(summary, null, 1)); sinceFlush = 0; }
   const mb = fs.statSync(file).size / 1048576;
-  if (skipFrames && frames > skipFrames[0] && mb > skipFrames[1]) {
+  if ((skipFrames && frames > skipFrames[0] && mb > skipFrames[1]) || (skipSmFrames && modality === 'SM' && frames > skipSmFrames)) {
     summary[f] = { frames, decodedFrames: 0, windows: 0, skippedTiles: true,
                    unsupportedReason: `multiframe de ${frames} frames y ${Math.round(mb)} MB (lámina por tiles): fuera del alcance de esta versión del visor, que decodifica todos los frames de golpe` };
     continue;
