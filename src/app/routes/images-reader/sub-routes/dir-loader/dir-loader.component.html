@@ -1,9 +1,8 @@
 <div class="loader d-flex slab-flex-1 flex-column m-0 p-0">
     <!-- Barra siempre visible: elegir, y pasar al visor cuando se quiera (la lectura sigue por detrás) -->
     <div class="loader-bar d-flex align-items-center flex-wrap px-3 py-2 border-bottom" [class.border-dark]="!isDark()" [class.border-light]="isDark()">
-        <h1 class="loader-title m-0">Selecciona la unidad o carpeta</h1>
         @if (imgsLoader.totalFiles == 0) {
-            <label for="dirPicker" class="btn btn-primary loader-choose m-0"><i class="fa-solid fa-folder-open"></i> Elegir carpeta</label>
+            <label for="dirPicker" class="btn btn-primary loader-choose m-0"><i class="fa-solid fa-folder-open"></i> Selecciona la unidad o carpeta</label>
         }
         <input type="file" id="dirPicker" name="dirPicker" class="d-none" (change)="imgsLoader.onSelected($event)" #dirUpload webkitDirectory multiple/>
         <span class="loader-spacer"></span>
