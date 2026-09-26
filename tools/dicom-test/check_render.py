@@ -15,6 +15,14 @@ HERE = os.path.dirname(__file__)
 OUT = os.path.abspath(os.environ.get("DICOM_TEST_OUT") or os.path.join(HERE, "out"))
 REN = os.path.join(OUT, "render")
 summary = json.load(open(os.path.join(REN, "render.json")))
+# DICOM_TEST_MANIFEST: {clave: {path}} (real/scan_corpus.py); las claves de render.json son las del manifiesto y los
+# ficheros están donde diga "path"
+MANIFEST = json.load(open(os.environ["DICOM_TEST_MANIFEST"], encoding="utf-8")) if os.environ.get("DICOM_TEST_MANIFEST") else {}
+
+
+def source_path(name):
+    m = MANIFEST.get(name)
+    return (m["path"] if isinstance(m, dict) else m) if m else os.path.join(OUT, name)
 
 
 def voi_linear(x, c, w):
@@ -118,7 +126,7 @@ fails = 0
 for key, meta in summary.items():
     name, _, w = key.partition("#w")
     win = int(w) if w else 0
-    path = os.path.join(OUT, name)
+    path = source_path(name)
     exp_meta = EXPECTED.get(name, {})
     if exp_meta.get("kind") == "expect_fail":
         # Debe fallar de forma controlada: sin frames decodificados y sin excepción que tumbe el visor. Con
@@ -137,8 +145,12 @@ for key, meta in summary.items():
         exp = expected_frames(path, win)
     except Exception as e:
         rows.append((key, "SKIP", f"sin verdad pydicom: {e}"[:70])); continue
+    # writtenFrames: el harness solo guardó algunos frames (multiframe grande); se comparan esos
+    written = meta.get("writtenFrames")
+    if written is not None:
+        exp = [exp[k] for k in written if k < len(exp)]
     got = []
-    for k in range(meta["decodedFrames"]):
+    for k in (written if written is not None else range(meta["decodedFrames"])):
         buf = np.fromfile(os.path.join(REN, f"{key}.f{k}.rgba"), np.uint8)
         if meta["rows"] and buf.size == meta["rows"] * meta["cols"] * 4:
             got.append(buf.reshape(meta["rows"], meta["cols"], 4)[..., :3])
@@ -179,9 +191,13 @@ for key, meta in summary.items():
 for r in rows:
     print(f"{r[1]:5s} {r[0]:40s} {r[2]}")
 print(f"\n{fails} FAIL / {len(rows)} casos")
+# Resultado por caso, para informes (real/report_corpus.py)
+json.dump({r[0]: {"status": r[1], "detail": r[2]} for r in rows}, open(os.path.join(REN, "check.json"), "w", encoding="utf-8"), indent=1, ensure_ascii=False)
 
-# contact sheet
+# contact sheet (con un corpus grande, solo los fallos)
 tiles = [t for t in tiles if "t01_ct_evle_2win_0" not in t[0] or t[0].startswith("t01_ct_evle_2win_01")]
+if len(tiles) > 300:
+    tiles = [t for t in tiles if t[1] == "FAIL"]
 if not tiles:
     sys.exit(1 if fails else 0)
 W = max(t[2].shape[1] for t in tiles) + 10

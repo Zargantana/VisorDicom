@@ -51,16 +51,23 @@ export class classifierDCM {
         
     }
 
+    /**
+     * Rama con solo la primera serie. Si aun no hay ninguna imagen clasificada (p. ej. el primer fichero leido de un
+     * CD es el DICOMDIR, que no se clasifica), devuelve un clasificador vacio en vez de reventar.
+     */
     public SeriesBranchZero(): classifierDCM {
         let result: classifierDCM = new classifierDCM();
+        const firstSerie = this.studySplit[0]?.[0]?.[0]?.[0];
+        if (!firstSerie) {
+            return result;
+        }
 
         let patient = result.pushPatient(result.studySplit);
         const emptyStudy: DCMFileReader[][][] = [];
         patient.push(emptyStudy);
         const emptyModality: DCMFileReader[][] = [];
         emptyStudy.push(emptyModality);
-        emptyModality.push(this.studySplit[0][0][0][0]);
-       
+        emptyModality.push(firstSerie);
 
         return result;
     }
@@ -258,11 +265,29 @@ export class classifierDCM {
 
     private searchPatient(patients: DCMFileReader[][][][][], patientId: string): DCMFileReader[][][][] {
         for(let pat = 0; pat < patients.length; pat++) {
-            if (patients[pat][0][0][0][0].PatientId == patientId) {
+            if (classifierDCM.normId(patients[pat][0]?.[0]?.[0]?.[0]?.PatientId) == classifierDCM.normId(patientId)) {
                 return patients[pat];
             }
         }
         return this.insertNewPatientInOrderedPosition(patientId, patients);
+    }
+
+    /**
+     * Mismo estudio: por Study Instance UID. Solo si alguno de los dos no lo trae se recurre a la fecha. Antes se
+     * exigian las dos cosas y los estudios reales cuyas imagenes no llevan todas la misma Study Date (o alguna no la
+     * lleva) salian partidos en varios estudios.
+     */
+    private static sameStudy(a: DCMFileReader, b: DCMFileReader): boolean {
+        const uidA = classifierDCM.normId(a.StudyInstanceUID), uidB = classifierDCM.normId(b.StudyInstanceUID);
+        if (uidA && uidB) {
+            return uidA == uidB;
+        }
+        return classifierDCM.normId(a.StudyDate) == classifierDCM.normId(b.StudyDate);
+    }
+
+    /** Identificadores sin el relleno (NUL de los UID impares, espacios de LO/SH): el mismo valor escrito por dos equipos. */
+    private static normId(value: string | undefined | null): string {
+        return (value ?? '').replace(/\0/g, '').trim();
     }
 
     private searchStudySplitStudy(studies: DCMFileReader[][][][], reader: DCMFileReader): DCMFileReader[][][] {
@@ -272,7 +297,7 @@ export class classifierDCM {
                 const modality = study[mod];
                 for(let ser = 0; ser < modality.length; ser++) {
                     const serie = modality[ser];
-                    if ((serie[0].StudyDate == reader.StudyDate) && (serie[0].StudyInstanceUID == reader.StudyInstanceUID)) {
+                    if (classifierDCM.sameStudy(serie[0], reader)) {
                         return study;
                     }
                 }
@@ -284,9 +309,9 @@ export class classifierDCM {
     private searchStudySplitModality(modalities: DCMFileReader[][][], reader: DCMFileReader): DCMFileReader[][] {
         for(let mod = 0; mod < modalities.length; mod++) {
             const modality = modalities[mod];
-            if (modality[0][0].Modality == reader.Modality) {
+            if (classifierDCM.normId(modality[0][0].Modality) == classifierDCM.normId(reader.Modality)) {
                     return modality;
-            }            
+            }
         }
         const emptyModality: DCMFileReader[][] = [];
         modalities.push(emptyModality);
@@ -296,9 +321,9 @@ export class classifierDCM {
     private searchModalitySplitModality(modalities: DCMFileReader[][][][], reader: DCMFileReader): DCMFileReader[][][] {
         for(let mod = 0; mod < modalities.length; mod++) {
             const modality = modalities[mod];
-            if (modality[0][0][0].Modality == reader.Modality) {
+            if (classifierDCM.normId(modality[0][0][0].Modality) == classifierDCM.normId(reader.Modality)) {
                 return modality;
-            } 
+            }
         }
         const emptyModality: DCMFileReader[][][] = [];
         modalities.push(emptyModality);
@@ -310,7 +335,7 @@ export class classifierDCM {
             const study = studies[std];
             for(let ser = 0; ser < study.length; ser++) {
                 const serie = study[ser];
-                if ((serie[0].StudyDate == reader.StudyDate) && (serie[0].StudyInstanceUID == reader.StudyInstanceUID)) {
+                if (classifierDCM.sameStudy(serie[0], reader)) {
                     return study;
                 }
             }
@@ -324,7 +349,7 @@ export class classifierDCM {
     private searchSerie(series: DCMFileReader[][], reader: DCMFileReader): DCMFileReader[] {
         for(let ser = 0; ser < series.length; ser++) {
             const serie = series[ser];
-            if (serie[0].SeriesInstanceUID == reader.SeriesInstanceUID) {
+            if (classifierDCM.normId(serie[0].SeriesInstanceUID) == classifierDCM.normId(reader.SeriesInstanceUID)) {
                 return serie;
             }
         }

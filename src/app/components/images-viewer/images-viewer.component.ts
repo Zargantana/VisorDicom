@@ -113,15 +113,22 @@ export class ImagesViewerComponent {
         this.callToViewersResized();
       }
       this.nextToClassify = this.foundDCMFiles.length;
-      if (!this.selectedClassifier) {
-        this.selectedClassifier = this.classifier.SeriesBranchZero();  
-      }
-      if (!this.startedWatching && (this.listViewer || this.scrollviewer)) {
-        this.startedWatching = true;
-        this.listViewer?.StartWatchingDCMFileF(this.selectedClassifier);
-        setTimeout(() => this.scrollviewer?.tryToViewImages(), 100);
-      }
+      this.selectFirstSeries();
+    }
+  }
 
+  /**
+   * Selecciona la primera serie en cuanto hay alguna imagen clasificada y arranca los visores. Con un CD, el primer
+   * fichero leído suele ser el DICOMDIR (no se clasifica): hasta que llega una imagen no hay nada que seleccionar.
+   */
+  private selectFirstSeries(): void {
+    if (!this.selectedClassifier && this.classifier.numberOfImages > 0) {
+      this.selectedClassifier = this.classifier.SeriesBranchZero();
+    }
+    if (this.selectedClassifier && !this.startedWatching && (this.listViewer || this.scrollviewer)) {
+      this.startedWatching = true;
+      this.listViewer?.StartWatchingDCMFileF(this.selectedClassifier);
+      setTimeout(() => this.scrollviewer?.tryToViewImages(), 100);
     }
   }
 
@@ -133,15 +140,7 @@ export class ImagesViewerComponent {
         this.callToViewersResized();
       }
       this.nextToClassify = this.foundDCMFiles.length;
-      if (!this.selectedClassifier) {
-        this.selectedClassifier = this.classifier.SeriesBranchZero();  
-      }
-      if (!this.startedWatching && (this.listViewer || this.scrollviewer)) {
-        this.startedWatching = true;
-        this.listViewer?.StartWatchingDCMFileF(this.selectedClassifier);
-        setTimeout(() => this.scrollviewer?.tryToViewImages(), 100);
-      }
-
+      this.selectFirstSeries();
     }
   }
 

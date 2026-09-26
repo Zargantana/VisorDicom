@@ -52,24 +52,56 @@ const summary = {};
 // DICOM_TEST_FILTER: expresión regular para procesar solo algunos ficheros; DICOM_TEST_VERBOSE=1 avisa por stderr
 // antes de cada fichero (para saber cuál revienta si el proceso se queda sin memoria)
 const filter = process.env.DICOM_TEST_FILTER ? new RegExp(process.env.DICOM_TEST_FILTER) : null;
-const files = fs.readdirSync(outDir).filter(f => f.endsWith('.dcm') && (!filter || filter.test(f))).sort();
-for (const f of files) {
+// DICOM_TEST_MANIFEST: JSON {clave: {path}} (real/scan_corpus.py) para procesar ficheros de cualquier carpeta sin
+// copiarlos; las salidas llevan la clave. DICOM_TEST_MAX_MB (480): los mayores se marcan como el visor (tope del
+// string del navegador) sin leerlos. DICOM_TEST_MAX_FRAMES_OUT (0 = todos): en multiframes grandes solo se
+// renderizan y guardan el primer frame, el central y el último (writtenFrames). DICOM_TEST_MAX_WINDOWS (3).
+const manifest = process.env.DICOM_TEST_MANIFEST ? JSON.parse(fs.readFileSync(process.env.DICOM_TEST_MANIFEST, 'utf8')) : null;
+const entries = manifest
+  ? Object.entries(manifest).filter(([k]) => !filter || filter.test(k)).sort(([a], [b]) => a.localeCompare(b)).map(([k, v]) => ({ name: k, file: v.path ?? v }))
+  : fs.readdirSync(outDir).filter(f => f.endsWith('.dcm') && (!filter || filter.test(f))).sort().map(f => ({ name: f, file: path.join(outDir, f) }));
+const maxMB = +(process.env.DICOM_TEST_MAX_MB || 480);
+const maxFramesOut = +(process.env.DICOM_TEST_MAX_FRAMES_OUT || 0);
+const maxWindows = Math.max(1, Math.min(3, +(process.env.DICOM_TEST_MAX_WINDOWS || 3)));
+// DICOM_TEST_RESUME=1: conserva render.json y salta las claves ya hechas (real/run_corpus.py relanza el harness si un
+// fichero tumba el proceso). render/inprogress.txt dice qué clave se estaba procesando.
+const summaryPath = path.join(renderDir, 'render.json');
+const inProgress = path.join(renderDir, 'inprogress.txt');
+if (process.env.DICOM_TEST_RESUME && fs.existsSync(summaryPath)) Object.assign(summary, JSON.parse(fs.readFileSync(summaryPath, 'utf8')));
+const done = new Set(Object.keys(summary).map(k => k.split('#w')[0]));
+const t0 = Date.now();
+let sinceFlush = 0;
+for (const { name: f, file } of entries) {
+  if (done.has(f)) continue;
   if (process.env.DICOM_TEST_VERBOSE) console.error(`> ${f}`);
-  const bin = fs.readFileSync(path.join(outDir, f)).toString('latin1');
-  const variants = [0, 1, 2];
+  if (manifest) fs.writeFileSync(inProgress, f);
+  if (manifest && ++sinceFlush >= 10) { fs.writeFileSync(summaryPath, JSON.stringify(summary, null, 1)); sinceFlush = 0; }
+  const mb = fs.statSync(file).size / 1048576;
+  if (mb > maxMB) {
+    summary[f] = { frames: undefined, decodedFrames: 0, windows: 0,
+                   unsupportedReason: `fichero de ${Math.round(mb)} MB: supera el tope de ${maxMB} MB por fichero de esta versión del visor (string del navegador)`,
+                   skippedBig: true };
+    continue;
+  }
+  const bin = fs.readFileSync(file).toString('latin1');
+  const variants = [0, 1, 2].slice(0, maxWindows);
   for (const w of variants) {
     let r;
-    try { r = await renderBinaryString(bin, w); }
-    catch (e) { r = { error: 'THROW ' + (e?.message ?? e), rgba: [] }; }
+    const tf = Date.now();
+    try { r = await renderBinaryString(bin, w, maxFramesOut); }
+    catch (e) { r = { error: 'THROW ' + (e?.message ?? e), rgba: [], written: [] }; }
     if (w > 0 && !(r.windows > w)) continue; // solo renderizamos ventanas que existen
     const key = w === 0 ? f : `${f}#w${w}`;
     summary[key] = { rows: r.rows, cols: r.cols, frames: r.frames, ts: r.ts, tsName: r.tsName,
-                     windows: r.windows, windowCount: r.windowCount, decodedFrames: r.rgba.length, error: r.error,
-                     unsupportedReason: r.unsupportedReason, decodedBy: r.decodedBy };
-    r.rgba.forEach((buf, k) => fs.writeFileSync(path.join(renderDir, `${key}.f${k}.rgba`), Buffer.from(buf.buffer)));
+                     windows: r.windows, windowCount: r.windowCount, decodedFrames: r.decoded ?? r.rgba.length, error: r.error,
+                     unsupportedReason: r.unsupportedReason, decodedBy: r.decodedBy, ms: Date.now() - tf };
+    if (r.written) summary[key].writtenFrames = r.written;
+    r.rgba.forEach((buf, i) => fs.writeFileSync(path.join(renderDir, `${key}.f${r.written ? r.written[i] : i}.rgba`), Buffer.from(buf.buffer)));
   }
 }
-fs.writeFileSync(path.join(renderDir, 'render.json'), JSON.stringify(summary, null, 1));
+if (manifest) console.error(`harness: ${entries.length} ficheros en ${Math.round((Date.now() - t0) / 1000)} s`);
+if (fs.existsSync(inProgress)) fs.unlinkSync(inProgress);
+fs.writeFileSync(summaryPath, JSON.stringify(summary, null, 1));
 for (const [k, v] of Object.entries(summary)) {
   console.log(`${k.padEnd(38)} ${String(v.rows)}x${String(v.cols)} fr=${v.frames} dec=${v.decodedFrames} win=${v.windows} ${v.decodedBy ? '[' + v.decodedBy + '] ' : ''}${v.error ? 'ERR ' + v.error : ''}`);
 }

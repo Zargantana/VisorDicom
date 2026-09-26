@@ -353,6 +353,20 @@ ds["PixelData"].VR = "OB"
 save(ds, "t14_j2k_lossless_16.dcm", JPEG2000Lossless)
 expect("t14_j2k_lossless_16.dcm", rows=R, cols=C, frames=1, windows=1, kind="ramp16_win")
 
+# --- t76: dos imágenes del MISMO estudio y serie con Study Date distinta (pasa en CD reales: OFFIS 2002, WG12). El
+# clasificador agrupa por Study Instance UID, no por fecha; antes salían como dos estudios. Lo comprueba
+# real/classify_corpus.mjs sobre out/ (árbol del visor frente a pydicom).
+STUDY_76, SERIES_76 = generate_uid(), generate_uid()
+for i, date in enumerate(("19991117", "20000627")):
+    ds = base_ds("CT", "1.2.840.10008.5.1.4.1.1.2", STUDY_76, SERIES_76, inst=i + 1)
+    ds.StudyDate = date
+    stored76 = (ct_hu(shift=i) + 1024).astype(np.uint16)
+    set_mono16(ds, stored76, signed=False)
+    ds.WindowCenter, ds.WindowWidth = 40, 400
+    ds.PixelData = stored76.tobytes()
+    save(ds, f"t76_same_study_dates_{i + 1}.dcm", ExplicitVRLittleEndian)
+    expect(f"t76_same_study_dates_{i + 1}.dcm", rows=R, cols=C, frames=1, windows=1, kind="ct")
+
 # --- t75: el mismo J2K con la cabecera SIZ corrupta: los bytes de un delimitador de secuencia (FFFE,E0DD) dentro del
 # codestream, como JPEG2000-embedded-sequence-delimiter.dcm de pydicom-data (Rsiz = FEFF, Xsiz = DDE00100). OpenJPEG
 # rechaza la cabecera y jpx.js NO debe reservar memoria según un Xsiz de 3.700 millones (tumbaba el proceso con 4 GB):

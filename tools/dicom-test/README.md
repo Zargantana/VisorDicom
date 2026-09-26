@@ -50,7 +50,29 @@ DICOM_TEST_OUT=tools/dicom-test/out_real python tools/dicom-test/check_render.py
 ```
 
 Otras variables del harness: `DICOM_TEST_FILTER=<regex>` (solo esos ficheros) y `DICOM_TEST_VERBOSE=1` (traza de cada
-fichero). El juego trae muestras NEMA WG04 (US1/RG1/RG3/MR2/693 en J2K y HTJ2K), Big Endian de todos los tipos (SC
+fichero).
+
+### Un corpus entero (carpetas anidadas, CD, archivos comprimidos)
+
+Para pasar por el visor todos los ficheros de un árbol de carpetas sin copiarlos (ficheros sin extensión, DICOMDIR,
+`.zip`/`.tar`/`.tar.bz2`):
+
+```bash
+python tools/dicom-test/real/scan_corpus.py <carpeta> --out tools/dicom-test/out_corpus --extract   # inventario + manifest.json
+python tools/dicom-test/real/run_corpus.py            # harness (por manifiesto, reanudable) + check_render + out_corpus/report.md
+node tools/dicom-test/real/cd_browser_test.mjs <carpeta de un CD> --python <python con pydicom>   # carga por carpeta en Chrome
+```
+
+`classify_corpus.mjs <carpeta>` monta el árbol paciente → estudio → modalidad → serie con el clasificador del visor en
+Node (sin navegador) y lo compara con pydicom; sirve para cualquier carpeta y para `out/`.
+
+`run_corpus.py` usa `DICOM_TEST_MANIFEST` (clave → ruta), `DICOM_TEST_MAX_MB` (480: los mayores se marcan BIG, como
+hace el visor con el tope del string del navegador), `DICOM_TEST_MAX_FRAMES_OUT` (3: en multiframes grandes solo se
+guardan y comparan el primer frame, el central y el último, `writtenFrames`), `DICOM_TEST_MAX_WINDOWS` (2) y
+`DICOM_TEST_RESUME` (si un fichero tumba Node, queda como CRASH y se relanza). El informe agrupa por carpeta, Transfer
+Syntax y modalidad, y lista FAIL, CRASH, BIG y los motivos de los SKIP. `cd_browser_test.mjs` carga la carpeta entera
+por la interfaz ("Selecciona la unidad o carpeta"), compara el recuento del cargador y el árbol paciente → estudio →
+serie de la tabla de hallazgos con `expected_tree.py` (pydicom) y mide tiempos y memoria. El juego trae muestras NEMA WG04 (US1/RG1/RG3/MR2/693 en J2K y HTJ2K), Big Endian de todos los tipos (SC
 8/16/32 bits, paleta, RLE), JPEG de DCMTK y GDCM, Siemens con overlays, Aloka US, multiframe mejorado (`eCT_Supplemental`),
 mapas paramétricos en coma flotante, etc. Estado el 2026-09-26: **0 FAIL, 132 PASS, 29 SKIP** de 163 casos. Sigue sin
 haber muestras públicas de las TS privadas (GE DLX, Papyrus, Sectra): `gdcmData` de SourceForge no se deja descargar en
@@ -97,6 +119,7 @@ crudo (403), hay que bajarlo a mano.
 | t66-t73 | **Códec estándar bajo una TS privada ficticia** (raíz 2.25): RLE, JPEG baseline RGB, sin comprimir en Implicit VR (el parser detecta la VR), JPEG lossless, JPEG-LS, JPEG 2000, HTJ2K y JPEG progresivo. El visor lo reconoce por el contenido (`codec-sniffer.ts`, `decoded_by`) |
 | t74 | CT **Explicit VR Big Endian** con una secuencia de longitud definida y un OB privado antes del Pixel Data (las longitudes de 4 bytes en BE se leían con las mitades cambiadas) |
 | t75 | J2K con la **cabecera SIZ corrupta** (bytes de un delimitador FFFE,E0DD dentro del codestream, como en pydicom-data): rechazo con motivo; jpx.js no debe reservar memoria según un Xsiz absurdo |
+| t76 (×2) | **Mismo estudio con dos Study Date distintas** (pasa en CD reales): el clasificador agrupa por Study Instance UID. Lo comprueba `real/classify_corpus.mjs tools/dicom-test/out` (árbol del visor frente a pydicom), que conviene pasar tras tocar `classifier-DCM.class.ts` |
 
 Los casos encapsulados con TS que pydicom no sabe escribir (HTJ2K…) se guardan con un UID conocido de la misma longitud y luego se parchea el *meta header* (`save_encapsulated()`).
 
