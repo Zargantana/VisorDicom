@@ -1,6 +1,7 @@
 import { Component } from '@angular/core';
 import { LoginService } from './services/login.service';
 import { NewsService } from './services/news.service';
+import { SeoService } from './services/seo.service';
 import { ThemeService } from './services/theme.service';
 
 @Component({
@@ -11,6 +12,10 @@ import { ThemeService } from './services/theme.service';
 })
 export class AppComponent {
   title = 'VisorDicom';
+
+  constructor(seo: SeoService) {
+    seo.start();
+  }
 
   public isDark(): boolean {
     return (ThemeService.current === 'dark');

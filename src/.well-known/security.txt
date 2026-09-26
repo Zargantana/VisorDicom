@@ -1,0 +1,7 @@
+# security.txt de visordicom.es (RFC 9116)
+# Si has encontrado un problema de seguridad en el visor, gracias por avisar por aquí.
+Contact: https://github.com/Zargantana/VisorDicom/security/advisories/new
+Contact: https://github.com/Zargantana/VisorDicom/issues
+Expires: 2027-09-26T00:00:00.000Z
+Preferred-Languages: es, en
+Canonical: https://visordicom.es/.well-known/security.txt
