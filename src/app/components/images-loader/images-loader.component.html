@@ -8,52 +8,75 @@
       <small class="loader-drop-hint">Todo se lee en tu navegador.</small>
     </div>
   } @else {
-    <div class="loader-stats">
-      <div class="loader-stat">
-        <i class="fa-solid fa-file"></i>
-        <span class="loader-num">{{totalFiles}}</span>
-        <span class="loader-lbl">ficheros</span>
+    <!-- Columna centrada: contadores, progreso, estado y el selector de estudios en vivo -->
+    <div class="loader-column">
+      <div class="loader-stats">
+        <div class="loader-stat">
+          <i class="fa-solid fa-file"></i>
+          <span class="loader-num">{{totalFiles}}</span>
+          <span class="loader-lbl">ficheros</span>
+        </div>
+        <div class="loader-stat" [class.active]="!AllDone">
+          <i class="fa-solid fa-hourglass-half"></i>
+          <span class="loader-num">{{pendingFiles}}</span>
+          <span class="loader-lbl">pendientes</span>
+        </div>
+        <div class="loader-stat">
+          <i class="fa-solid fa-check"></i>
+          <span class="loader-num">{{readEndedFiles}}</span>
+          <span class="loader-lbl">leídos</span>
+        </div>
+        <div class="loader-stat dicom">
+          <i class="fa-solid fa-x-ray"></i>
+          <span class="loader-num">{{foundDCMFiles?.length}}</span>
+          <span class="loader-lbl">DICOM</span>
+        </div>
       </div>
-      <div class="loader-stat" [class.active]="!AllDone">
-        <i class="fa-solid fa-hourglass-half"></i>
-        <span class="loader-num">{{pendingFiles}}</span>
-        <span class="loader-lbl">pendientes</span>
+      <div class="progress loader-progress" role="progressbar" [attr.aria-valuenow]="progressPct" aria-valuemin="0" aria-valuemax="100">
+        <div class="progress-bar" [class.progress-bar-striped]="!AllDone" [class.progress-bar-animated]="!AllDone" [class.bg-success]="AllDone" [style.width.%]="progressPct"></div>
       </div>
-      <div class="loader-stat">
-        <i class="fa-solid fa-check"></i>
-        <span class="loader-num">{{readEndedFiles}}</span>
-        <span class="loader-lbl">leídos</span>
-      </div>
-      <div class="loader-stat dicom">
-        <i class="fa-solid fa-x-ray"></i>
-        <span class="loader-num">{{foundDCMFiles?.length}}</span>
-        <span class="loader-lbl">DICOM</span>
-      </div>
-    </div>
-    <div class="progress loader-progress" role="progressbar" [attr.aria-valuenow]="progressPct" aria-valuemin="0" aria-valuemax="100">
-      <div class="progress-bar" [class.progress-bar-striped]="!AllDone" [class.progress-bar-animated]="!AllDone" [class.bg-success]="AllDone" [style.width.%]="progressPct"></div>
-    </div>
-    <p class="loader-status m-0">
-      @if (!AllDone) {
-        Leyendo {{readEndedFiles}} de {{totalFiles}}…
-      } @else {
-        Listo: {{foundDCMFiles?.length}} DICOM entre {{totalFiles}} ficheros.
-        @if (foundDCMFiles?.length) { Pulsa <b>Ver imágenes</b>. }
+      <p class="loader-status m-0 text-center">
+        @if (!AllDone) {
+          Leyendo {{readEndedFiles}} de {{totalFiles}}…
+          @if (foundDCMFiles?.length) {
+            Ya puedes <button type="button" class="btn btn-link loader-open" (click)="openViewer.emit()">ver imágenes</button>.
+          }
+        } @else {
+          Listo: {{foundDCMFiles?.length}} DICOM entre {{totalFiles}} ficheros.
+          @if (foundDCMFiles?.length) {
+            <button type="button" class="btn btn-link loader-open" (click)="openViewer.emit()"><i class="fa-solid fa-eye"></i> Ver imágenes</button>
+          }
+        }
+      </p>
+      @if (readErrors.length) {
+        <ul class="loader-errors m-0" role="alert">
+          @for (reason of readErrors; track $index) {
+            <li><i class="fa-solid fa-triangle-exclamation"></i> {{reason}}</li>
+          }
+        </ul>
       }
-    </p>
-    @if (readErrors.length) {
-      <ul class="loader-errors m-0" role="alert">
-        @for (reason of readErrors; track $index) {
-          <li><i class="fa-solid fa-triangle-exclamation"></i> {{reason}}</li>
-        }
-      </ul>
-    }
-    @if (activeFiles.length) {
-      <div class="loader-files">
-        @for (item of activeFiles; track item) {
-          <file-tracker [theDICOMFile]="item"></file-tracker>
-        }
-      </div>
-    }
+      @if (seriesFound > 0 && classifier) {
+        <!-- Selector de estudios en vivo: el árbol crece según se leen los DICOM; pulsar abre el visor ahí -->
+        <div class="loader-tree">
+          <div class="loader-tree-title">
+            <i class="fa-solid fa-sitemap"></i> Encontrado hasta ahora
+            <small>{{seriesFound}} {{seriesFound == 1 ? 'serie' : 'series'}} · pulsa una para verla</small>
+          </div>
+          <findings-table class="loader-tree-table" [classifier]="classifier"
+            (reviewImageClick)="requestView('series', $event)"
+            (reviewModalityClick)="requestView('modality', $event)"
+            (reviewStudyClick)="requestView('study', $event)"
+            (reviewPatientClick)="requestView('patient', $event)">
+          </findings-table>
+        </div>
+      }
+      @if (activeFiles.length) {
+        <div class="loader-files">
+          @for (item of activeFiles; track item) {
+            <file-tracker [theDICOMFile]="item"></file-tracker>
+          }
+        </div>
+      }
+    </div>
   }
 </div>

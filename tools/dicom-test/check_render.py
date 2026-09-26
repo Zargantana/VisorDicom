@@ -32,23 +32,31 @@ def voi_linear(x, c, w):
     return np.where(x <= lo, 0, np.where(x > hi, 255, y))
 
 
-def expected_frames(path, win):
+def expected_frames(path, win, indices=None):
+    """Frames esperados (RGB 0..255). Con `indices` (writtenFrames del harness en multiframes grandes) solo se
+    decodifican esos frames con pydicom, frame a frame: una lámina de 5.000 tiles o una tomosíntesis de 700 MB no
+    hace falta decodificarla entera para comparar tres frames."""
     ds = pydicom.dcmread(path)
     ts = str(ds.file_meta.TransferSyntaxUID)
+    nf = int(getattr(ds, "NumberOfFrames", 1) or 1)
     ref = os.path.join(OUT, "ref", os.path.basename(path) + ".npy")
     if os.path.exists(ref):  # TS que pydicom no decodifica: verdad guardada por gen_test_dicoms.py
         arr = np.load(ref)
+        frames = arr if nf > 1 else arr[None, ...]
     elif ts == "1.2.840.10008.1.2.1.98":  # pydicom no la conoce: frames nativos encapsulados
         from pydicom.encaps import generate_frames
-        nf = int(getattr(ds, "NumberOfFrames", 1))
         raw = b"".join(generate_frames(ds.PixelData, number_of_frames=nf))
         dt = np.int16 if ds.PixelRepresentation else np.uint16
-        arr = np.frombuffer(raw, dt).reshape(ds.Rows, ds.Columns)
+        frames = np.frombuffer(raw, dt).reshape(ds.Rows, ds.Columns)[None, ...]
+    elif indices is not None and nf > 1:
+        from pydicom.pixels import pixel_array as decode_frame
+        frames = [decode_frame(ds, index=k) for k in indices if k < nf]
     else:
         arr = ds.pixel_array
-    nf = int(getattr(ds, "NumberOfFrames", 1) or 1)
+        frames = arr if nf > 1 else arr[None, ...]
+    if indices is not None and not (isinstance(frames, list)):
+        frames = [frames[k] for k in indices if k < len(frames)]
     pi = ds.PhotometricInterpretation
-    frames = arr if nf > 1 else arr[None, ...]
     # Multiframe mejorado: ventana y rescale en los Shared Functional Groups (el visor los encuentra con
     # searchTopLevelFirst cuando no están en el dataset raíz; los per-frame no se aplican)
     shared = ds.get("SharedFunctionalGroupsSequence")
@@ -141,14 +149,13 @@ for key, meta in summary.items():
     if not exp_meta and meta["decodedFrames"] == 0 and meta.get("unsupportedReason") and not (meta.get("error") or "").startswith("THROW"):
         # Fichero real sin expectativa: el visor lo rechaza de forma controlada y explica por qué (p. ej. Float Pixel Data)
         rows.append((key, "SKIP", ("rechazo controlado: " + meta["unsupportedReason"])[:90])); continue
+    # writtenFrames: el harness solo guardó algunos frames (multiframe grande); se comparan esos y pydicom solo
+    # decodifica esos
+    written = meta.get("writtenFrames")
     try:
-        exp = expected_frames(path, win)
+        exp = expected_frames(path, win, written)
     except Exception as e:
         rows.append((key, "SKIP", f"sin verdad pydicom: {e}"[:70])); continue
-    # writtenFrames: el harness solo guardó algunos frames (multiframe grande); se comparan esos
-    written = meta.get("writtenFrames")
-    if written is not None:
-        exp = [exp[k] for k in written if k < len(exp)]
     got = []
     for k in (written if written is not None else range(meta["decodedFrames"])):
         buf = np.fromfile(os.path.join(REN, f"{key}.f{k}.rgba"), np.uint8)

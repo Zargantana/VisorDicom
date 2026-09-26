@@ -80,8 +80,23 @@ check('el cargador termina', finished, `${status} en ${Math.round(msLoad / 1000)
 if (m) check('DICOM encontrados = ficheros con preámbulo DICM', +m[1] === expected.dicomFound, `${m[1]} vs ${expected.dicomFound}`);
 if (notices) console.log('avisos del cargador: ' + notices.replace(/\s+/g, ' ').trim().slice(0, 300));
 
-// "Ver imágenes" y la tabla de hallazgos (árbol completo)
-await page.locator('button.loader-view').click({ timeout: 10000 }).catch(() => {});
+// Selector de estudios en vivo del cargador: el árbol completo tiene que estar ahí antes de abrir el visor, y pulsar
+// una serie abre el visor en ella. Si no hay selector (build antiguo), se pulsa "Ver imágenes".
+const loaderTree = await page.evaluate(() => {
+  const table = document.querySelector('images-loader findings-table');
+  if (!table) return null;
+  const text = el => (el.textContent || '').trim();
+  const seriesRows = [...table.querySelectorAll('.row.clickable.selectable')];
+  return { series: seriesRows.length, images: seriesRows.reduce((s, r) => s + (+text(r.children[1]) || 0), 0) };
+});
+await page.screenshot({ path: path.join(root, 'tools', 'dicom-test', 'out', 'cd_loader.png'), fullPage: false }).catch(() => {});
+if (loaderTree) {
+  check('selector en vivo del cargador: series', loaderTree.series === expected.series, `${loaderTree.series} vs ${expected.series}`);
+  check('selector en vivo del cargador: imágenes', loaderTree.images === expected.images, `${loaderTree.images} vs ${expected.images}`);
+  await page.locator('images-loader findings-table .row.clickable.selectable').last().locator('div').first().click({ timeout: 10000 });
+} else {
+  await page.locator('button.loader-view').click({ timeout: 10000 }).catch(() => {});
+}
 const t1 = Date.now();
 const painted = await page.waitForFunction(() => [...document.querySelectorAll('basic-image-viewer img')]
   .some(i => i.src.startsWith('data:image') && !i.hasAttribute('data-unsupported')), null, { timeout: 300000 }).then(() => true).catch(() => false);

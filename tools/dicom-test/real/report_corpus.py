@@ -29,6 +29,8 @@ def main():
             return "CRASH", meta["error"]
         if meta.get("skippedBig"):
             return "BIG", meta.get("unsupportedReason", "")
+        if meta.get("skippedTiles"):
+            return "TILES", meta.get("unsupportedReason", "")
         if not keys:
             return "PENDIENTE", "sin comparar"
         sts = [check[k]["status"] for k in keys]
@@ -47,13 +49,13 @@ def main():
         rows.append({"key": key, "rel": m["rel"], "top": top, "mb": m["mb"], "ts": inv.get("ts_name", m.get("ts", "")),
                      "modality": m.get("modality", ""), "frames": m.get("frames", 1), "status": st, "detail": det,
                      "ms": (render.get(key) or {}).get("ms"), "decodedBy": (render.get(key) or {}).get("decodedBy")})
-    order = ["PASS", "SKIP", "BIG", "CRASH", "FAIL", "PENDIENTE"]
+    order = ["PASS", "SKIP", "BIG", "TILES", "CRASH", "FAIL", "PENDIENTE"]
     tot = Counter(r["status"] for r in rows)
     lines = ["# Corpus de imágenes reales: resultado del visor", "",
              f"Imágenes: {len(rows)} · " + " · ".join(f"{s}: {tot.get(s, 0)}" for s in order), "",
              "PASS = píxeles iguales a pydicom (±3, o tolerancia de compresión con pérdida). SKIP = rechazo controlado con motivo o sin verdad "
-             "de pydicom. BIG = mayor que el tope de la versión actual (string del navegador). CRASH = tumbó el proceso de Node. "
-             "FAIL = se pinta pero distinto de pydicom, o error.", ""]
+             "de pydicom. BIG = mayor que el tope de la versión actual (string del navegador). TILES = lámina de patología por tiles "
+             "(miles de frames), fuera del alcance. CRASH = tumbó el proceso de Node. FAIL = se pinta pero distinto de pydicom, o error.", ""]
 
     def table(title, group):
         lines.extend([f"## {title}", "", "| Grupo | Imágenes | " + " | ".join(order) + " |", "|---|---|" + "---|" * len(order)])
@@ -86,9 +88,10 @@ def main():
         for r in rs:
             lines.append(f"- `{r['rel']}` · {r['ts']} · {r['modality']}: {r['detail'][:200]}")
         lines += ["", "</details>", ""]
-    rs = [r for r in rows if r["status"] == "BIG"]
-    if rs:
-        lines += [f"## BIG ({len(rs)})", ""] + [f"- `{r['rel']}` · {r['mb']} MB · {r['ts']} · {r['frames']} frames" for r in rs] + [""]
+    for st in ("BIG", "TILES"):
+        rs = [r for r in rows if r["status"] == st]
+        if rs:
+            lines += [f"## {st} ({len(rs)})", ""] + [f"- `{r['rel']}` · {r['mb']} MB · {r['ts']} · {r['frames']} frames" for r in rs] + [""]
     sniffed = [r for r in rows if r.get("decodedBy")]
     if sniffed:
         lines += [f"## Reconocidos por el contenido (TS privada o desconocida) ({len(sniffed)})", ""] + \

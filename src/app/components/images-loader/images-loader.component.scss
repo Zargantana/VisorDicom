@@ -1,9 +1,15 @@
-// Panel de carga: cuatro contadores, barra de progreso global, estado y los ficheros que se están leyendo
+// Panel de carga: columna centrada con cuatro contadores, barra de progreso global, estado, el selector de estudios
+// en vivo y los ficheros que se están leyendo
+.loader-column {
+  width: 100%;
+  max-width: 44rem;
+  margin: 0 auto;
+}
+
 .loader-stats {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
   gap: 0.75rem;
-  max-width: 40rem;
 }
 
 .loader-stat {
@@ -51,7 +57,6 @@
 
 .loader-progress {
   height: 10px;
-  max-width: 40rem;
   margin-top: 1rem;
 }
 
@@ -60,9 +65,58 @@
   color: #6c757d;
 }
 
+// "Ver imágenes" dentro del texto: un enlace con el mismo cuerpo que el texto, sin relleno
+.loader-open {
+  padding: 0;
+  vertical-align: baseline;
+  font-size: inherit;
+  font-weight: 600;
+  color: #198754;
+  text-decoration: underline;
+  text-decoration-thickness: from-font;
+
+  &:hover, &:focus {
+    color: #146c43;
+  }
+
+  i {
+    margin-right: 0.2rem;
+  }
+}
+
+// Selector de estudios en vivo (la tabla de hallazgos del visor)
+.loader-tree {
+  margin-top: 1.25rem;
+  border: 1px solid rgba(108, 117, 125, 0.45);
+  border-radius: 0.75rem;
+  overflow: hidden;
+}
+
+.loader-tree-title {
+  padding: 0.5rem 0.75rem;
+  font-weight: 600;
+  border-bottom: 1px solid rgba(108, 117, 125, 0.3);
+
+  i {
+    margin-right: 0.35rem;
+    opacity: 0.75;
+  }
+
+  small {
+    margin-left: 0.5rem;
+    font-weight: 400;
+    opacity: 0.7;
+  }
+}
+
+.loader-tree-table {
+  display: block;
+  max-height: 45vh;
+  overflow: auto;
+}
+
 .loader-errors {
   margin-top: 0.5rem !important;
-  max-width: 40rem;
   padding-left: 0;
   list-style: none;
   color: #b02a37;
@@ -80,7 +134,6 @@
 
 .loader-files {
   margin-top: 1rem;
-  max-width: 40rem;
   display: flex;
   flex-direction: column;
   gap: 0.4rem;

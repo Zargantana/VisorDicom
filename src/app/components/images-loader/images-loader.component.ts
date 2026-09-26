@@ -1,6 +1,10 @@
 import { Component, EventEmitter, Input, Output } from '@angular/core';
 import { Subscription } from 'rxjs';
 import { DCMFile, FILEREAD_STATUS } from 'src/app/clases/DCM/DCM-file.class';
+import { classifierDCM } from 'src/app/clases/Images/classifier-DCM.class';
+
+/** Nivel del árbol que el usuario ha pulsado en el selector del cargador (paciente, estudio, modalidad o serie). */
+export type ViewSeriesRequest = { level: 'patient' | 'study' | 'modality' | 'series'; uid: string };
 
 @Component({
     selector: 'images-loader',
@@ -11,10 +15,28 @@ import { DCMFile, FILEREAD_STATUS } from 'src/app/clases/DCM/DCM-file.class';
 export class ImagesLoaderComponent {
   public foundFiles: DCMFile[] = [];
   @Input() foundDCMFiles: DCMFile[] | undefined;
+  /**
+   * Árbol paciente → estudio → modalidad → serie que el visor va montando mientras se leen los ficheros (el mismo
+   * objeto que usa `images-viewer`): se enseña en vivo como selector de estudios y crece con cada DICOM leído.
+   */
+  @Input() classifier: classifierDCM | null | undefined;
   @Output() someDCMFound = new EventEmitter<boolean>();
   @Output() readingNewFile = new EventEmitter<boolean>();
   @Output() fileReadEnd = new EventEmitter<FILEREAD_STATUS>();
   @Output() allFilesReaded = new EventEmitter<boolean>();
+  /** El usuario quiere pasar al visor (enlace "Ver imágenes" del texto de estado). */
+  @Output() openViewer = new EventEmitter<void>();
+  /** El usuario ha pulsado un paciente, estudio, modalidad o serie del selector: abrir el visor ahí. */
+  @Output() viewSeries = new EventEmitter<ViewSeriesRequest>();
+
+  /** Series ya clasificadas (para enseñar el selector en cuanto hay algo) */
+  public get seriesFound(): number {
+    return this.classifier?.numberOfSeries ?? 0;
+  }
+
+  public requestView(level: ViewSeriesRequest['level'], uid: string): void {
+    this.viewSeries.emit({ level, uid });
+  }
   
   private foundFilesSubscriptions: Subscription[] = [];
   

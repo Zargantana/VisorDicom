@@ -1,5 +1,7 @@
 import { Component } from '@angular/core';
 import { DCMFile } from 'src/app/clases/DCM/DCM-file.class';
+import { ViewSeriesRequest } from 'src/app/components/images-loader/images-loader.component';
+import { ImagesViewerComponent } from 'src/app/components/images-viewer/images-viewer.component';
 import { ThemeService } from 'src/app/services/theme.service';
 
 @Component({
@@ -22,6 +24,19 @@ export class DirLoaderComponent {
   public openViewer(): void {
     this.showViewer = true;
     setTimeout(() => window.dispatchEvent(new Event('resize')), 50);
+  }
+
+  /** Abre el visor en el paciente, estudio, modalidad o serie que el usuario ha pulsado en el selector del cargador. */
+  public openSeries(viewer: ImagesViewerComponent, request: ViewSeriesRequest): void {
+    this.openViewer();
+    setTimeout(() => {
+      switch (request.level) {
+        case 'patient': viewer.ReViewPatient(request.uid); break;
+        case 'study': viewer.ReViewStudy(request.uid); break;
+        case 'modality': viewer.ReViewModality(request.uid); break;
+        default: viewer.ReViewImage(request.uid);
+      }
+    }, 0);
   }
 
   public isDark(): boolean {

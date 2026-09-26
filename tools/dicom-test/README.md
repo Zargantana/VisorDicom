@@ -68,8 +68,10 @@ Node (sin navegador) y lo compara con pydicom; sirve para cualquier carpeta y pa
 
 `run_corpus.py` usa `DICOM_TEST_MANIFEST` (clave → ruta), `DICOM_TEST_MAX_MB` (480: los mayores se marcan BIG, como
 hace el visor con el tope del string del navegador), `DICOM_TEST_MAX_FRAMES_OUT` (3: en multiframes grandes solo se
-guardan y comparan el primer frame, el central y el último, `writtenFrames`), `DICOM_TEST_MAX_WINDOWS` (2) y
-`DICOM_TEST_RESUME` (si un fichero tumba Node, queda como CRASH y se relanza). El informe agrupa por carpeta, Transfer
+guardan y comparan el primer frame, el central y el último, `writtenFrames`; pydicom solo decodifica esos),
+`DICOM_TEST_MAX_WINDOWS` (2), `DICOM_TEST_RESUME` (si un fichero tumba Node, queda como CRASH y se relanza) y, con
+`--skip-multiframe frames,MB`, `DICOM_TEST_SKIP_MULTIFRAME` (las láminas de patología por tiles, con miles de frames,
+se marcan TILES sin decodificarlas: el visor decodifica todos los frames de golpe y tardaría minutos). El informe agrupa por carpeta, Transfer
 Syntax y modalidad, y lista FAIL, CRASH, BIG y los motivos de los SKIP. `cd_browser_test.mjs` carga la carpeta entera
 por la interfaz ("Selecciona la unidad o carpeta"), compara el recuento del cargador y el árbol paciente → estudio →
 serie de la tabla de hallazgos con `expected_tree.py` (pydicom) y mide tiempos y memoria. El juego trae muestras NEMA WG04 (US1/RG1/RG3/MR2/693 en J2K y HTJ2K), Big Endian de todos los tipos (SC
