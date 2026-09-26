@@ -61,7 +61,7 @@ for (const name of files) {
     console.error(`Refused to (securitypolicyviolation) ${e.violatedDirective} ${e.blockedURI}`)));
   await page.goto(origin + '/');
   await page.waitForTimeout(600);
-  for (const label of ['Encontrar imágenes', 'Unos ficheros.']) {
+  for (const label of ['Encontrar imágenes', 'Unos ficheros']) {
     const link = page.getByText(label).first();
     if (await link.count()) { await link.click().catch(() => {}); await page.waitForTimeout(400); }
   }
@@ -73,6 +73,11 @@ for (const name of files) {
   } catch {
     problems.push('la app no arrancó (sin input#file)');
   }
+  // Desde 2026-09-26 la pantalla de carga no salta sola al visor: se pulsa "Ver imágenes" (activo con el primer DICOM)
+  try {
+    await page.waitForFunction(() => { const b = document.querySelector('button.loader-view'); return !!b && !b.disabled; }, null, { timeout: expectFail ? 4000 : 15000 });
+    await page.locator('button.loader-view').click();
+  } catch { /* build anterior sin el botón, o fichero no reconocido: se sigue igual */ }
   try {
     await page.waitForFunction(() => [...document.querySelectorAll('basic-image-viewer img')].some((i) => i.src.startsWith('data:image')),
       null, { timeout: expectFail ? 4000 : 20000 });

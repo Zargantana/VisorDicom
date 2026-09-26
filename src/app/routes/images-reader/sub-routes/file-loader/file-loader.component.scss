@@ -1,0 +1,29 @@
+// Barra de la pantalla de carga: título, botón de elegir y, a la derecha, el botón de ir al visor
+.loader-bar {
+    gap: 0.5rem 0.75rem;
+}
+
+.loader-title {
+    font-size: 1.4rem;
+    margin-right: 0.5rem;
+}
+
+.loader-spacer {
+    flex: 1 1 auto;
+}
+
+.loader-view .badge {
+    margin-left: 0.25rem;
+}
+
+@media (max-width: 575.98px) {
+    .loader-title {
+        font-size: 1.1rem;
+        flex: 0 0 100%;
+    }
+
+    .loader-choose,
+    .loader-view {
+        flex: 1 1 auto;
+    }
+}

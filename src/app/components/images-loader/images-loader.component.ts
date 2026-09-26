@@ -30,6 +30,25 @@ export class ImagesLoaderComponent {
     return FILEREAD_STATUS;
   }
 
+  /** Ficheros que aún no han terminado de leerse */
+  public get pendingFiles(): number {
+    return Math.max(0, this.totalFiles - this.readEndedFiles);
+  }
+
+  /** Progreso global, 0-100 */
+  public get progressPct(): number {
+    return this.totalFiles ? Math.round(100 * this.readEndedFiles / this.totalFiles) : 0;
+  }
+
+  /** Los últimos ficheros que se están leyendo ahora mismo (para no listar cientos) */
+  public get activeFiles(): DCMFile[] {
+    const active: DCMFile[] = [];
+    for (let i = this.foundFiles.length - 1; i >= 0 && active.length < 6; i--) {
+      if (this.foundFiles[i].readStatus == FILEREAD_STATUS.NONE) active.unshift(this.foundFiles[i]);
+    }
+    return active;
+  }
+
   public onSelected(event: any): void {
     this.resetReadStatus();
     this.totalFiles = event.target.files.length;
