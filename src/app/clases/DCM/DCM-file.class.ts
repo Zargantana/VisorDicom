@@ -178,7 +178,25 @@ export class DCMFile {
             compressed[i] = this.rawData.charCodeAt(meta.end + i);
         }
         const stream = new Blob([compressed]).stream().pipeThrough(new Decompression('deflate-raw'));
-        const inflated = new Uint8Array(await new Response(stream as any).arrayBuffer());
+        // Se lee por trozos en lugar de new Response(stream).arrayBuffer(): PS3.5 A.5 permite un byte nulo de
+        // relleno tras el stream deflate (pydicom lo escribe) y el DecompressionStream de Chrome lo considera
+        // "junk" y falla DESPUES de haber entregado todo el dataset. Si ya hay datos, se aceptan.
+        const reader = (stream as ReadableStream<Uint8Array>).getReader();
+        const chunks: Uint8Array[] = [];
+        let total = 0;
+        try {
+            for (;;) {
+                const { done, value } = await reader.read();
+                if (done) break;
+                if (value) { chunks.push(value); total += value.length; }
+            }
+        } catch (error) {
+            if (total === 0) throw error;
+            console.debug('Deflate: datos tras el final del stream (relleno) en ' + this.file.name + ': ' + error);
+        }
+        const inflated = new Uint8Array(total);
+        let offset = 0;
+        for (const chunk of chunks) { inflated.set(chunk, offset); offset += chunk.length; }
         this.rawData = this.rawData.substring(0, meta.end) + DCMFile.bytesToBinaryString(inflated);
         this.length = this.rawData.length;
         this.inflated = true;
