@@ -31,12 +31,11 @@
     background-color:  rgb(228, 186, 124);
     border-color:  rgb(179, 110, 7);
   }
-  
 
-  // El panel: ancho de lectura (los puntos se parten en varias lineas, la letra no encoge), alto maximo y
-  // scroll propio; el centrado del overlay nunca deja la cabecera fuera de la pantalla.
+
+  // El panel: ancho de lectura, alto maximo y scroll propio; el centrado del overlay nunca deja la cabecera fuera.
   .news-panel {
-    width: min(56rem, 96vw);
+    width: min(44rem, 96vw);
     max-height: calc(100vh - 2rem);
     margin: 1rem 0;
   }
@@ -45,15 +44,104 @@
     min-height: 0;                 // deja que flex encoja el contenido y aparezca el scroll
     overflow-y: auto;
     overscroll-behavior: contain;  // el scroll no pasa a la pagina
+    gap: 1rem;
   }
 
   .decreasingFont {
     font-size: 1rem;
-    line-height: 1.4;
+    line-height: 1.35;
   }
 
-  @media (max-width: 900px) {
-    .decreasingFont {
-      font-size: 0.95rem;
+  // Cabecera: titulo y fecha en una linea
+  .news-head {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 1rem;
+    flex-wrap: wrap;
+  }
+
+  .news-date {
+    font-weight: 600;
+    color: #6c757d;
+  }
+
+  // Novedades: un icono y una frase por linea
+  .news-highlights {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.45rem;
+
+    li {
+      display: grid;
+      grid-template-columns: 1.6rem 1fr;
+      align-items: baseline;
+      column-gap: 0.4rem;
     }
+
+    i {
+      text-align: center;
+      color: #0d6efd;
+    }
+  }
+
+  // Historia: fecha y frase, una linea por version
+  .news-history {
+    display: grid;
+    grid-template-columns: 7.2rem 1fr;
+    column-gap: 0.9rem;
+    row-gap: 0.25rem;
+    margin: 0;
+
+    dt {
+      font-weight: 600;
+      color: #6c757d;
+      font-variant-numeric: tabular-nums;
+    }
+
+    dd {
+      margin: 0;
+    }
+  }
+
+  .news-more {
+    padding: 0;
+    margin: -0.5rem 0 0 0;
+    align-self: flex-start;
+  }
+
+  // Proximamente: etiquetas en linea
+  .news-next {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.4rem;
+  }
+
+  .news-tag {
+    border: 1px solid #adb5bd;
+    border-radius: 1rem;
+    padding: 0.05rem 0.6rem;
+    font-size: 0.9em;
+    white-space: nowrap;
+  }
+
+  .news-links {
+    display: flex;
+    gap: 1.5rem;
+    font-size: 0.9em;
+  }
+
+  .dark {
+    .news-date, .news-history dt { color: #adb5bd; }
+    .news-highlights i { color: #6ea8fe; }
+    .news-tag { border-color: #6c757d; }
+  }
+
+  @media (max-width: 600px) {
+    .decreasingFont { font-size: 0.95rem; }
+    .news-history { grid-template-columns: 6.4rem 1fr; }
   }
