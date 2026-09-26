@@ -835,10 +835,17 @@ def save_private(ds, name, ts_uid, implicit, ref=None, pixel_data=None, fragment
         np.save(os.path.join(REF, name + ".npy"), np.asarray(ref))
 
 
-def ct_private(modality="CT"):
+STUDY_PRIV, SERIES_PRIV = generate_uid(), generate_uid()
+
+
+def ct_private(modality="CT", inst=None):
     ds = image_ds(modality, R, C, 1, "MONOCHROME2", 16, 16, True)
     ds.RescaleSlope, ds.RescaleIntercept = 1, 0
     ds.WindowCenter, ds.WindowWidth = 40, 400
+    if inst is not None:
+        # t60-t62 forman una serie de tres cortes (mismo estudio y serie): la prueba del portal con
+        # E2E_FILES=t60,t61,t62 sube las tres TS privadas de una vez con "Guardar" y las vuelve a abrir
+        ds.StudyInstanceUID, ds.SeriesInstanceUID, ds.InstanceNumber = STUDY_PRIV, SERIES_PRIV, inst
     return ds
 
 
@@ -846,16 +853,16 @@ hu_p = ct_hu()
 FAKE_TS = generate_uid(prefix=None)  # 2.25.<UUID>: privada y única, no es de ningún fabricante
 
 # --- t60: GE privada: cabecera Implicit VR LE, Pixel Data en Big Endian (1.2.840.113619.5.2) -------------------
-save_private(ct_private(), "t60_ge_private_be_pixels.dcm", "1.2.840.113619.5.2", True, hu_p,
+save_private(ct_private(inst=1), "t60_ge_private_be_pixels.dcm", "1.2.840.113619.5.2", True, hu_p,
              pixel_data=hu_p.astype(">i2").tobytes())
 expect("t60_ge_private_be_pixels.dcm", rows=R, cols=C, frames=1, windows=1, kind="ref")
 # --- t61: Philips CT-private-ELE: Explicit VR LE nativa (1.3.46.670589.33.1.4.1) ----------------------------------
-save_private(ct_private(), "t61_philips_ct_private_ele.dcm", "1.3.46.670589.33.1.4.1", False, hu_p,
+save_private(ct_private(inst=2), "t61_philips_ct_private_ele.dcm", "1.3.46.670589.33.1.4.1", False, hu_p,
              pixel_data=hu_p.astype("<i2").tobytes())
 expect("t61_philips_ct_private_ele.dcm", rows=R, cols=C, frames=1, windows=1, kind="ref")
 # --- t62: Papyrus 3 Implicit VR Little Endian (retirada, 1.2.840.10008.1.20) --------------------------------------
 # pydicom la cree explícita: se graba como 1.2.840.10008.1.2 (+ relleno NUL = 18 bytes) y se parchea el UID.
-save_private(ct_private(), "t62_papyrus3_implicit.dcm", ImplicitVRLittleEndian, True, hu_p,
+save_private(ct_private(inst=3), "t62_papyrus3_implicit.dcm", ImplicitVRLittleEndian, True, hu_p,
              pixel_data=hu_p.astype("<i2").tobytes())
 _path = os.path.join(OUT, "t62_papyrus3_implicit.dcm")
 _raw = open(_path, "rb").read()
