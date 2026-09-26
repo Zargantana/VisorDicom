@@ -11,77 +11,50 @@
                 <span class="p-0 m-0">&nbsp;</span>
             </div>
         </div>
-        <div class="news-content d-flex flex-column p-4 decreasingFont">
-            <div class="d-flex slab-flex-1 flex-row justify-content-center text-center p-0 m-0">
-                <h3 class="p-0 m-0">Proyecto Open Source.</h3>
+        <div class="news-content d-flex flex-column p-4 decreasingFont" [class.dark]="isDark()">
+            <div class="news-head">
+                <h3 class="p-0 m-0">Novedades</h3>
+                <span class="news-date">26/09/2026</span>
             </div>
-            <b>26/09/2026</b>
-            <ul class="pb-0 mb-0">
-                <li><b>Selector de ventana</b> cuando el estudio trae varias (ABDOMEN, PULMÓN...).</li>
-                <li><b>Nuevas compresiones:</b> HTJ2K (lossless, RPCL y con pérdida), JPEG 2000 Part 2, Deflate, Encapsulated Uncompressed y los procesos JPEG retirados. Verificadas JPEG Lossless SV1 y Process 14, JPEG Extended de 12 bits, JPEG-LS de 16 bits con signo y RLE de 16 bits y color.</li>
-                <li><b>Nuevos modelos de color:</b> YBR_PARTIAL_422, HSV, ARGB, CMYK, paletas segmentadas y paleta suplementaria.</li>
-                <li><b>Pipeline de grises y color corregido:</b> rescale fraccional, MONOCHROME1, Big Endian, paletas nativas, Planar Configuration, YBR y píxeles de relleno.</li>
-                <li><b>Códecs bajo demanda:</b> OpenJPEG y libjpeg-turbo se descargan solo cuando un estudio los necesita.</li>
-                <li>Batería de regresión de 73 casos y prueba en navegador con la CSP de producción. Conformance statement actualizado. Angular 21.</li>
+
+            <ul class="news-highlights">
+                <li><i class="fa-solid fa-file-zipper"></i><span><b>Más compresiones:</b> HTJ2K, JPEG 2000 Part 2, Deflate y los JPEG retirados.</span></li>
+                <li><i class="fa-solid fa-palette"></i><span><b>Más color:</b> YBR parcial, HSV, ARGB, CMYK y paletas segmentadas.</span></li>
+                <li><i class="fa-solid fa-sliders"></i><span><b>Selector de ventana</b> cuando el estudio trae varias.</span></li>
+                <li><i class="fa-solid fa-download"></i><span><b>Códecs bajo demanda:</b> se descargan solo cuando hacen falta.</span></li>
+                <li><i class="fa-solid fa-vial-circle-check"></i><span><b>73 casos de prueba</b> y conformance statement al día.</span></li>
+                <li><i class="fa-solid fa-code-branch"></i><span><b>Open source:</b> ¿interesado? Icono de mensaje, arriba.</span></li>
             </ul>
-            <b>30/04/2025</b>
-            <ul class="pb-0 mb-0">
-                <li>Ha nacido un nuevo VisorDicom nativo open source.</li>
-                <li>Cualquier empresa/privado interesado, contactar mediante el icono de mensaje de la barra superior.</li>
-            </ul>
-            <a class="clickable text-primary px-0 pb-2 pt-0 m-0" (click)="masClick()" [class.d-none]="elfua">Últimos desarrollos...</a>
+
+            <a class="clickable text-primary news-more" (click)="masClick()" [class.d-none]="elfua">más...</a>
             <div class="d-flex flex-column p-0 m-0" [class.d-none]="!elfua">
-                <b>14/10/2024</b>
-                <ul class="pb-0 mb-0">
-                    <li>Detenido backend.</li>
-                    <li>Continúa activa la funcionalidad de visualizador DICOM.</li>
-                </ul>
-                <b>20/04/2024</b>
-                <ul class="pb-0 mb-0">
-                    <li>Incluido StudyDescription en los listados.</li>
-                </ul>
-                <b>29/07/2023</b>
-                <ul class="pb-0 mb-0">
-                    <li>Trazabilidad de las subidas de archivos en curso en la barra de título.</li>
-                </ul>
-                <b>25/05/2023</b>
-                <ul class="pb-0 mb-0">
-                    <li>Mis imágenes para pacientes.</li>
-                    <li>Los pacientes pueden compartir estudios de imagen con los doctores.</li>
-                </ul>
-                <b>08/05/2023</b>
-                <ul class="pb-0 mb-0">
-                    <li>Primera versión con plena capacidad para ver las imágenes guardadas.</li>
-                </ul>
-                <b>15/01/2023</b>
-                <ul class="pb-0 mb-0">
-                    <li>Adaptaciones para mejorar la experiencia con el navegador <b>Chrome en Mac</b>.</li>
-                    <li>Release notes descargables.</li>
-                    <li>Descartados los DICOMDIR.</li>
-                </ul>
-                <b>11/01/2023</b>
-                <ul class="pb-0 mb-0">
-                    <li>Lectura de imágenes en JPEG Baseline 1.</li>
-                    <li>...</li>
-                </ul>
-                <div class="d-flex flex-row-reverse px-0 py-2 m-0"><a class="clickable align-self-right text-primary" (click)="menosClick()" [class.d-none]="!elfua">...menos</a></div>
+                <dl class="news-history">
+                    <dt>30/04/2025</dt><dd>Nace VisorDicom, el visor open source.</dd>
+                    <dt>14/10/2024</dt><dd>Backend detenido. El visor sigue.</dd>
+                    <dt>20/04/2024</dt><dd>StudyDescription en los listados.</dd>
+                    <dt>29/07/2023</dt><dd>Subidas en curso en la barra de título.</dd>
+                    <dt>25/05/2023</dt><dd>Mis imágenes y compartir con doctores.</dd>
+                    <dt>08/05/2023</dt><dd>Ver las imágenes guardadas.</dd>
+                    <dt>15/01/2023</dt><dd>Chrome en Mac. Notas descargables.</dd>
+                    <dt>11/01/2023</dt><dd>JPEG Baseline y Big Endian.</dd>
+                </dl>
+                <div class="d-flex flex-row-reverse p-0 m-0"><a class="clickable text-primary news-more" (click)="menosClick()" [class.d-none]="!elfua">...menos</a></div>
             </div>
-            <b>Próximamente...</b>
-            <ul>
-                <li>Ventana y nivel arrastrando el ratón, con presets por modalidad (cerebro, hueso, pulmón).</li>
-                <li>Ecografías y angiografías en vídeo (H.264 y HEVC) en el modo cine.</li>
-                <li>Decodificación en segundo plano: CDs grandes sin bloquear el visor.</li>
-                <li>Nombres en cualquier alfabeto (Specific Character Set).</li>
-                <li>Lectura del DICOMDIR del CD y de ficheros sin preámbulo.</li>
-                <li>JPEG XL.</li>
-                <li>Revisión con los casos de prueba IHE MESA y con CDs reales de CR, DX y XA.</li>
-                <li>Visor instalable como aplicación. Versión para móvil y tableta.</li>
-                <li class="color-secondary">...</li>
-            </ul>
-            <div class="d-flex p-0 m-0">
-                <a class="clickable text-primary p-0 m-0" href="assets/ReleaseNotes.txt">Notas de la versión</a>
-                , &nbsp;
-                <a class="clickable text-primary p-0 m-0" href="assets/ConformanceStatement.pdf">Conformance statement.</a>
+
+            <div class="news-next">
+                <b>Próximamente</b>
+                <span class="news-tag">Ventana con el ratón</span>
+                <span class="news-tag">Vídeo en cine</span>
+                <span class="news-tag">CDs grandes sin bloqueos</span>
+                <span class="news-tag">Cualquier alfabeto</span>
+                <span class="news-tag">DICOMDIR</span>
+                <span class="news-tag">JPEG XL</span>
+                <span class="news-tag">Móvil</span>
+            </div>
+
+            <div class="news-links">
+                <a class="clickable text-primary" href="assets/ReleaseNotes.txt">Notas de la versión</a>
+                <a class="clickable text-primary" href="assets/ConformanceStatement.pdf">Conformance statement</a>
             </div>
         </div>
     </div>
