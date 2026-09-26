@@ -12,6 +12,7 @@
 \date{\today}
 
 \begin{document}
+\sloppy % los UIDs largos no se pueden partir
 
 \maketitle
 
@@ -49,23 +50,38 @@ The Web DICOM Viewer is a \textbf{VIEWER} application that does not establish ne
     \item All storage SOP classes containing image data (e.g., CT, MR, XA, US, NM, CR, OT).
   \end{itemize}
   
-  \item \textbf{Supported Transfer Syntaxes:}
+  \item \textbf{Supported Transfer Syntaxes} (decoding only; all verified with a synthetic regression suite):
   \begin{itemize}
-    \item Explicit VR Little Endian (1.2.840.10008.1.2.1)
     \item Implicit VR Little Endian (1.2.840.10008.1.2)
-    \item JPEG Baseline (Process 1) (1.2.840.10008.1.2.4.50)
-    \item JPEG Lossless (1.2.840.10008.1.2.4.70)
-    \item JPEG-LS Lossless (1.2.840.10008.1.2.4.80)
-    \item JPEG 2000 Lossless (1.2.840.10008.1.2.4.90)
+    \item Explicit VR Little Endian (1.2.840.10008.1.2.1)
+    \item Encapsulated Uncompressed Explicit VR Little Endian (1.2.840.10008.1.2.1.98)
+    \item Deflated Explicit VR Little Endian (1.2.840.10008.1.2.1.99)
+    \item Explicit VR Big Endian, retired (1.2.840.10008.1.2.2)
+    \item JPEG Baseline, Process 1 (1.2.840.10008.1.2.4.50)
+    \item JPEG Extended, Process 2 \& 4, 8 and 12 bit (1.2.840.10008.1.2.4.51)
+    \item JPEG Extended, Process 3 \& 5, arithmetic coding, 8 bit, retired (1.2.840.10008.1.2.4.52)
+    \item JPEG Spectral Selection, Non-Hierarchical, Process 6 \& 8 and 7 \& 9, 8 bit, retired (1.2.840.10008.1.2.4.53, .54)
+    \item JPEG Full Progression, Non-Hierarchical, Process 10 \& 12 and 11 \& 13, 8 bit, retired (1.2.840.10008.1.2.4.55, .56)
+    \item JPEG Lossless, Non-Hierarchical, Process 14, any predictor, 2--16 bit (1.2.840.10008.1.2.4.57)
+    \item JPEG Lossless, Non-Hierarchical, First-Order Prediction, Process 14 Selection Value 1 (1.2.840.10008.1.2.4.70)
+    \item JPEG-LS Lossless and Near-Lossless (1.2.840.10008.1.2.4.80, .81)
+    \item JPEG 2000 Image Compression, Lossless Only and lossy (1.2.840.10008.1.2.4.90, .91)
+    \item JPEG 2000 Part 2 Multi-component, Lossless Only and lossy (1.2.840.10008.1.2.4.92, .93), except array-based multi-component transformations (see Limitations)
+    \item High-Throughput JPEG 2000, Lossless Only, with RPCL Options (Lossless Only) and lossy (1.2.840.10008.1.2.4.201, .202, .203)
     \item RLE Lossless (1.2.840.10008.1.2.5)
   \end{itemize}
-  
+
+  \item \textbf{Supported Photometric Interpretations:} MONOCHROME1, MONOCHROME2, PALETTE COLOR (including segmented palette color lookup tables), RGB, YBR\_FULL, YBR\_FULL\_422, YBR\_PARTIAL\_422, YBR\_PARTIAL\_420, YBR\_ICT and YBR\_RCT (JPEG 2000), and the retired HSV, ARGB and CMYK. Planar Configuration 0 and 1 are supported.
+
   \item \textbf{Image Display Capabilities:}
   \begin{itemize}
-    \item Only the first defined window level (Window Center / Window Width) is used for rendering.
-    \item Support for grayscale and color images as provided in the DICOM file.
+    \item Grayscale pipeline: Rescale Slope/Intercept (linear Modality LUT), VOI (Window Center/Width with the LINEAR, LINEAR\_EXACT and SIGMOID functions, or a VOI LUT), and presentation (MONOCHROME1 and Presentation LUT Shape INVERSE are inverted).
+    \item When the file defines several windows, the user can select any of them; the first one is used by default. Without a window or VOI LUT, images of up to 8 bits are displayed over their full range and deeper images use the minimum and maximum of the frame.
+    \item Pixel Padding Value / Range Limit: padding is shown in black and excluded from the automatic window.
+    \item Supplemental Palette Color Lookup Tables (MONOCHROME2 with Pixel Presentation COLOR or MIXED).
+    \item Multi-frame images are displayed frame by frame and played as a cine loop using Frame Time.
   \end{itemize}
-  
+
 \end{itemize}
 
 \subsection*{3.2 Supported Modalities}
@@ -97,17 +113,19 @@ MR & Magnetic Resonance (if uploaded) \\
   \item Users upload DICOM files via an HTML file input element.
   \item The system displays a list of studies and associated series.
   \item Users can select a study and navigate through its images.
-  \item Two display modes:
+  \item Two display modes, chosen per series:
     \begin{itemize}
-      \item For studies with modality OT or more than 50 images: scroll navigation via mouse wheel.
-      \item For other studies: a series list view with selection and optional cine loop playback.
+      \item CT, MR and PT series with more than 10 images, and series of other modalities with more than 25 images: stack navigation with the mouse wheel.
+      \item Otherwise (always for US, CR, DX and XA): an image list with selection and, for multi-frame images, cine loop playback.
     \end{itemize}
 \end{itemize}
 
 \section*{6. Limitations}
 
 \begin{itemize}
-  \item Only the first window level is supported.
+  \item Not supported: JPEG 2000 Part 2 array-based multi-component transformations, hierarchical JPEG (processes 16--29), 12-bit JPEG with arithmetic coding or progression, JPEG XL, MPEG-2, MPEG-4 AVC/H.264 and HEVC/H.265 video, JPIP referenced pixel data, Float and Double Float Pixel Data, and ICC profile color management.
+  \item JPEG Lossless with arithmetic coding (Process 15, 1.2.840.10008.1.2.4.58) is decoded on a best-effort basis for 8-bit images and has not been verified.
+  \item Non-linear Modality LUT Sequences and per-frame functional group windows of enhanced multi-frame images are not applied.
   \item No support for DICOM C-FIND, C-MOVE, or other DICOM services.
   \item No integration with PACS or DICOMweb servers.
   \item Only file-based workflows supported.

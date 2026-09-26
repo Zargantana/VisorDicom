@@ -31,13 +31,14 @@ export class UncompressedDecoder extends BaseDecoder {
             }
             return unpacked;
         }
-        // Planar Configuration 1 (RRR..GGG..BBB) -> entrelazado (RGBRGB..).
-        if (this.reader.SamplesPerPixel == 3 && this.reader.PlannarConfiguration == 1) {
+        // Planar Configuration 1 (RRR..GGG..BBB, o 4 planos en ARGB/CMYK) -> entrelazado (RGBRGB..).
+        const spp = this.reader.SamplesPerPixel;
+        if (spp > 1 && this.reader.PlannarConfiguration == 1) {
             const bytesPerSample = Math.max(1, bitsAllocated >> 3);
             const plane = this.reader.Rows * this.reader.Columns * bytesPerSample;
-            const interleaved = new Uint8Array(plane * 3);
+            const interleaved = new Uint8Array(plane * spp);
             for (let p = 0, o = 0; p < plane; p += bytesPerSample) {
-                for (let s = 0; s < 3; s++) {
+                for (let s = 0; s < spp; s++) {
                     for (let b = 0; b < bytesPerSample; b++) {
                         interleaved[o++] = bytes[s * plane + p + b];
                     }

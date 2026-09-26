@@ -16,14 +16,32 @@ export class PaletteColorLookupTableDescriptorData {
 export class PaletteColorLookupTableData {
     private table: Uint16Array | Uint8Array;
 
-    constructor(private tableData: string, private descriptor: PaletteColorLookupTableDescriptorData, private isLittleEndian: boolean) {
+    /**
+     * @param tableData LUT tal cual (OW, binary string) o valores ya expandidos (paleta segmentada).
+     */
+    constructor(tableData: string | ArrayLike<number>, private descriptor: PaletteColorLookupTableDescriptorData, isLittleEndian: boolean = true) {
         // PS3.3 C.7.6.3.1.5: bits por entrada 8 o 16. La LUT es OW: con 16 bits son palabras del endian del dataset.
         const bytes = this.descriptor.bitsAlocados > 8 ? 2 : 1;
+        if (typeof tableData !== 'string') {
+            this.table = bytes == 2 ? Uint16Array.from(tableData) : Uint8Array.from(tableData);
+            return;
+        }
         const entries = Math.floor(tableData.length / bytes);
         this.table = bytes == 2 ? new Uint16Array(entries) : new Uint8Array(entries);
         for (let i = 0; i < entries; i++) {
             this.table[i] = bytes == 2 ? this.read16BitsNumber(tableData.substring(i * 2), isLittleEndian) : tableData.charCodeAt(i);
         }
+    }
+
+    /** Primer valor de pixel mapeado por la LUT (segundo valor del descriptor; con signo si PixelRepresentation = 1). */
+    public get firstMapped(): number {
+        return this.descriptor.firstInputValueMapped;
+    }
+
+    /** true si el valor cae dentro de la LUT (sin recortar). Lo usa la paleta suplementaria. */
+    public contains(pixelValue: number): boolean {
+        const index = pixelValue - this.descriptor.firstInputValueMapped;
+        return index >= 0 && index < this.table.length;
     }
 
     /** Devuelve el color (0..255) para un indice de pixel. Fuera de rango -> primera/ultima entrada (PS3.3 C.7.6.3.1.5). */
@@ -56,7 +74,14 @@ export const enum PhotometricInterpretationType {
   MONOCHROME2 = 2,
   MONOCHROME1 = 3,
   YBR_FULL = 4,
-  YBR_FULL_422 = 5
+  YBR_FULL_422 = 5,
+  YBR_PARTIAL_422 = 6,   // retirado (rango parcial, 4:2:2)
+  YBR_PARTIAL_420 = 7,   // solo en MPEG-2/H.264
+  YBR_ICT = 8,           // JPEG 2000 irreversible
+  YBR_RCT = 9,           // JPEG 2000 reversible
+  HSV = 10,              // retirado
+  ARGB = 11,             // retirado
+  CMYK = 12              // retirado
 }
 
 export class LUTInformation {
@@ -141,10 +166,20 @@ export class DCMInterpreter {
         const descriptors = this.getPaletteColorLookupTableDescriptorsData();
         const result: PaletteColorLookupTableData[] = [];
         for (let i = 0; i < 3; i++) {
+            if (!descriptors[i]) {
+                continue;
+            }
             let paletteColorDataTag = this.searchTopLevelFirst(0x0028,0x1201 + i);
-            if (paletteColorDataTag?.Value && descriptors[i]) {
-                result.push( 
+            if (paletteColorDataTag?.Value) {
+                result.push(
                     new PaletteColorLookupTableData(paletteColorDataTag.Value, descriptors[i], this.isLittleEndian));
+                continue;
+            }
+            // Segmented Red/Green/Blue Palette Color Lookup Table Data (0028,1221-1223), PS3.3 C.7.9.2
+            const segmented = this.searchTopLevelFirst(0x0028,0x1221 + i);
+            if (segmented?.Value) {
+                const values = this.expandSegmentedLUT(this.segmentedWords(segmented.Value, descriptors[i].bitsAlocados));
+                result.push(new PaletteColorLookupTableData(values, descriptors[i]));
             }
         }
         return result;
@@ -161,28 +196,77 @@ export class DCMInterpreter {
         return result;
     }
 
+    /**
+     * Photometric Interpretation (0028,0004) por coincidencia EXACTA del valor limpio. Antes solo se reconocían
+     * cinco valores con includes() y el resto (YBR_PARTIAL_*, YBR_ICT/RCT, HSV, ARGB, CMYK) caía en RGB.
+     * Si el valor no casa exacto, se mantiene la búsqueda antigua por includes() (valores con basura alrededor).
+     * Valor ausente o desconocido -> RGB (comportamiento histórico).
+     */
     public getPhotometricInterpretation(): PhotometricInterpretationType {
-        let photometricInterpretation = this.searchTopLevelFirst(0x0028,0x0004);
-        if (photometricInterpretation?.Value) {
-            if (photometricInterpretation.Value.includes(PALETTE_COLOR_PT1) &&
-                photometricInterpretation.Value.includes(PALETTE_COLOR_PT2)) {
-                return PhotometricInterpretationType.PALETTE_COLOR;
-            }
-            if (photometricInterpretation.Value.includes(MONOCHROME2)) {
-                return PhotometricInterpretationType.MONOCHROME2;
-            }
-            if (photometricInterpretation.Value.includes(MONOCHROME1)) {
-                return PhotometricInterpretationType.MONOCHROME1;
-            }
-            if (photometricInterpretation.Value.includes(YBR_FULL_422)) {
-                return PhotometricInterpretationType.YBR_FULL_422;
-            }
-            if (photometricInterpretation.Value.includes(YBR_FULL)) {
-                return PhotometricInterpretationType.YBR_FULL;
-            }
+        const tag = this.searchTopLevelFirst(0x0028,0x0004);
+        const value = tag?.Value ? Functions.clearDCMImpairValue(tag.Value).replace(/\0/g, '').trim().toUpperCase() : '';
+        switch (value) {
+            case 'PALETTE COLOR': return PhotometricInterpretationType.PALETTE_COLOR;
+            case 'MONOCHROME2': return PhotometricInterpretationType.MONOCHROME2;
+            case 'MONOCHROME1': return PhotometricInterpretationType.MONOCHROME1;
+            case 'YBR_FULL': return PhotometricInterpretationType.YBR_FULL;
+            case 'YBR_FULL_422': return PhotometricInterpretationType.YBR_FULL_422;
+            case 'YBR_PARTIAL_422': return PhotometricInterpretationType.YBR_PARTIAL_422;
+            case 'YBR_PARTIAL_420': return PhotometricInterpretationType.YBR_PARTIAL_420;
+            case 'YBR_ICT': return PhotometricInterpretationType.YBR_ICT;
+            case 'YBR_RCT': return PhotometricInterpretationType.YBR_RCT;
+            case 'HSV': return PhotometricInterpretationType.HSV;
+            case 'ARGB': return PhotometricInterpretationType.ARGB;
+            case 'CMYK': return PhotometricInterpretationType.CMYK;
         }
-        
+        if (value.includes(PALETTE_COLOR_PT1) && value.includes(PALETTE_COLOR_PT2)) {
+            return PhotometricInterpretationType.PALETTE_COLOR;
+        }
+        if (value.includes(MONOCHROME2)) {
+            return PhotometricInterpretationType.MONOCHROME2;
+        }
+        if (value.includes(MONOCHROME1)) {
+            return PhotometricInterpretationType.MONOCHROME1;
+        }
+        if (value.includes(YBR_FULL_422)) {
+            return PhotometricInterpretationType.YBR_FULL_422;
+        }
+        if (value.includes(YBR_FULL)) {
+            return PhotometricInterpretationType.YBR_FULL;
+        }
         return PhotometricInterpretationType.RGB;
+    }
+
+    /** Pixel Presentation (0008,9205): MONOCHROME, COLOR, MIXED, TRUE_COLOR... ('' si no está). */
+    public getPixelPresentation(): string {
+        const tag = this.searchTopLevelFirst(0x0008,0x9205);
+        return tag?.Value ? Functions.clearDCMImpairValue(tag.Value).trim().toUpperCase() : '';
+    }
+
+    /** Presentation LUT Shape (2050,0020): IDENTITY | INVERSE ('' si no está). */
+    public getPresentationLUTShape(): string {
+        const tag = this.searchTopLevelFirst(0x2050,0x0020);
+        return tag?.Value ? Functions.clearDCMImpairValue(tag.Value).trim().toUpperCase() : '';
+    }
+
+    /**
+     * Pixel Padding Value (0028,0120) y Pixel Padding Range Limit (0028,0121), US o SS según Pixel Representation.
+     * Devuelve [min, max] de valores almacenados que son relleno (fuera del campo de visión), o null.
+     */
+    public getPixelPaddingRange(): [number, number] | null {
+        const padding = this.searchTopLevelFirst(0x0028,0x0120);
+        if (!padding?.Value || padding.Value.length < 2) {
+            return null;
+        }
+        const value = this.readUSorSS(padding.Value);
+        const limitTag = this.searchTopLevelFirst(0x0028,0x0121);
+        const limit = (limitTag?.Value && limitTag.Value.length >= 2) ? this.readUSorSS(limitTag.Value) : value;
+        return [Math.min(value, limit), Math.max(value, limit)];
+    }
+
+    private readUSorSS(raw: string): number {
+        const v = this.read16BitsNumber(raw, this.isLittleEndian);
+        return (this.reader.PixelRepresentation && v > 0x7FFF) ? v - 0x10000 : v;
     }
 
     public getVOIData(): VOIData {
@@ -263,8 +347,69 @@ export class DCMInterpreter {
     private pushLookupDescriptor(result: PaletteColorLookupTableDescriptorData[], paletteColorDescTagValue: string) {
         result.push(new PaletteColorLookupTableDescriptorData(
             this.read16BitsNumber(paletteColorDescTagValue, this.isLittleEndian),
-            this.read16BitsNumber(paletteColorDescTagValue.substring(2), this.isLittleEndian),
+            this.readUSorSS(paletteColorDescTagValue.substring(2)),   // primer valor mapeado: US o SS
             this.read16BitsNumber(paletteColorDescTagValue.substring(4), this.isLittleEndian)));
+    }
+
+    /** Datos de una LUT segmentada -> entradas (palabras de 16 bits, o bytes si el descriptor es de 8 bits). */
+    private segmentedWords(raw: string, bits: number): number[] {
+        const words: number[] = [];
+        if (bits > 8) {
+            for (let i = 0; i + 1 < raw.length; i += 2) {
+                words.push(this.read16BitsNumber(raw.substring(i), this.isLittleEndian));
+            }
+        } else {
+            for (let i = 0; i < raw.length; i++) {
+                words.push(raw.charCodeAt(i));
+            }
+        }
+        return words;
+    }
+
+    /**
+     * Expande una LUT segmentada (PS3.3 C.7.9.2). Segmentos: [tipo, longitud, datos...]
+     *   0 discreto : longitud valores tal cual
+     *   1 lineal   : 1 valor y1; interpola `longitud` entradas desde el último valor (exclusive) hasta y1
+     *   2 indirecto: offset de 32 bits (16 bits bajos primero) al primer segmento a copiar y `longitud` = nº de
+     *                segmentos a copiar. El offset se cuenta en ENTRADAS de la LUT, como hacen GDCM y pydicom.
+     */
+    private expandSegmentedLUT(words: number[], start: number = 0, maxSegments: number = Infinity,
+                               lastValue: number | undefined = undefined, depth: number = 0): number[] {
+        const lut: number[] = [];
+        let offset = start;
+        let segments = 0;
+        while (offset + 1 < words.length && segments < maxSegments) {
+            const opcode = words[offset];
+            const length = words[offset + 1];
+            offset += 2;
+            const previous = lut.length ? lut[lut.length - 1] : lastValue;
+            if (opcode == 0) {
+                for (let k = 0; k < length && offset + k < words.length; k++) {
+                    lut.push(words[offset + k]);
+                }
+                offset += length;
+            } else if (opcode == 1) {
+                if (previous === undefined) {
+                    break; // un segmento lineal no puede ser el primero
+                }
+                const y1 = words[offset];
+                offset += 1;
+                for (let k = 1; k <= length; k++) {
+                    lut.push(Math.round(previous + (y1 - previous) * k / length));
+                }
+            } else if (opcode == 2) {
+                if (previous === undefined || depth > 8) {
+                    break;
+                }
+                const target = (words[offset] | (words[offset + 1] << 16)) >>> 0;
+                offset += 2;
+                lut.push(...this.expandSegmentedLUT(words, target, length, previous, depth + 1));
+            } else {
+                break; // tipo de segmento desconocido
+            }
+            segments++;
+        }
+        return lut;
     }
 
     private read16BitsNumber(raw: string, LE: boolean): number {

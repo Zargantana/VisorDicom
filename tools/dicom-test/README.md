@@ -5,8 +5,8 @@ generados con pydicom, y compara el RGBA resultante con la "verdad" calculada co
 PS3.3 C.11 (Modality LUT → VOI → Presentation).
 
 ```bash
-pip install pydicom numpy pillow pyjpegls   # pyjpegls es opcional (caso t22, JPEG-LS)
-npm ci                                      # esbuild viene con @angular-devkit
+pip install pydicom numpy pillow pyjpegls imagecodecs   # pyjpegls (t22) e imagecodecs (t24-t36) son opcionales
+npm ci                                                  # esbuild viene con @angular-devkit
 
 python3 tools/dicom-test/gen_test_dicoms.py   # → tools/dicom-test/out/*.dcm + expected.json
 node    tools/dicom-test/run_harness.mjs      # → out/render/<fichero>[#wN].f<frame>.rgba + render.json
@@ -15,14 +15,25 @@ python3 tools/dicom-test/check_render.py      # → PASS/FAIL por caso + out/ren
 
 `check_render.py` devuelve un código de salida distinto de 0 si algún caso falla. `out/` está en `.gitignore`.
 
+**Dependencias opcionales.** Si falta una herramienta, `gen_test_dicoms.py` omite sus casos y lo dice en la salida. Un `0 FAIL` con casos omitidos **no prueba** esas TS:
+
+| Herramienta | Casos | Instalación |
+|---|---|---|
+| `pyjpegls` | t22 (JPEG-LS) | `pip install pyjpegls` (en Windows, Python 3.12) |
+| `imagecodecs` (libjpeg-turbo, OpenJPEG y OpenJPH nativos) | t24-t31 (HTJ2K, J2K RGB, JPEG lossless 12/16 bits, JPEG 12 bits) | `pip install imagecodecs` |
+| `cjpeg` de libjpeg-turbo | t32-t36 (JPEG aritmético, progresivo, *spectral selection*) | `apt install libjpeg-turbo-progs`; en Windows viene con libjpeg-turbo |
+| `gcc` + `libopenjp2-dev` | t27 (J2K Part 2 con MCT por matriz: **fallo esperado**) | `apt install gcc libopenjp2-7-dev`. Compila `j2k-part2/j2k_part2_mct.c`: el `opj_compress` de las distros no acepta `-m` |
+
 ## Piezas
 
 | Fichero | Qué hace |
 |---|---|
 | `gen_test_dicoms.py` | Genera un caso por cada situación del estándar que ha dado guerra (ver la tabla) |
 | `harness-entry.ts` | Punto de entrada que se empaqueta con esbuild. Usa `ImageDCM.renderFrameRGBA()` (o el camino antiguo si no existe, para medir `main`) |
-| `run_harness.mjs` | Stubs mínimos de DOM (`FileReader`, `File`, `print` para CharLS), carga los codecs globales de `src/libs` y renderiza cada fichero con cada ventana VOI (`#w1`, `#w2`…) |
-| `check_render.py` | Verdad con pydicom (`pixel_array`, `apply_color_lut`, fórmula VOI LINEAR) y tolerancias (±3 lossless; más holgada para JPEG con pérdida) |
+| `run_harness.mjs` | Stubs mínimos de DOM (`FileReader`, `File`, `print` para CharLS), carga los codecs globales de `src/libs`, registra los códecs bajo demanda de `src/assets/codecs` como globales (en Node no hay `<script>`) y renderiza cada fichero con cada ventana VOI (`#w1`, `#w2`…). Llama a `ImageDCM.prepare()` antes de pintar |
+| `check_render.py` | Verdad con pydicom (`pixel_array`, `apply_color_lut`, fórmula VOI LINEAR) y tolerancias (±3 lossless; más holgada para JPEG con pérdida). Si existe `out/ref/<fichero>.npy`, esa es la verdad (TS que pydicom no decodifica). `kind="expect_fail"`: pasa si el visor no decodifica ningún frame y no lanza |
+| `j2k-part2/j2k_part2_mct.c` | Genera un codestream J2K **Part 2** con MCT por matriz (`opj_set_MCT`) para t27 |
+| `browser-csp/run_browser_csp_test.mjs` | Prueba en Chromium del build de producción con la CSP de producción (ver abajo) |
 
 ## Casos
 
@@ -47,11 +58,40 @@ python3 tools/dicom-test/check_render.py      # → PASS/FAIL por caso + out/ren
 | t19 / t20 / t21 | RLE **YBR_FULL** / **YBR_FULL_422** nativo / RGB **Planar Configuration 1** |
 | t22 | **JPEG-LS** 16 bits con signo, 2 ventanas (si está pyjpegls) |
 | t23 | CT **12 bits con signo** dentro de 16 (extensión de signo) |
+| t24 / t25 / t26 | **HTJ2K** lossless 12 bits (.201) / RPCL RGB con RCT (.202) / con pérdida, CT con 2 ventanas (.203) |
+| t27 | J2K **Part 2** con MCT por matriz (.93): **fallo esperado**, el visor debe rechazarlo sin lanzar |
+| t28 | J2K lossless **RGB con RCT** (.90) |
+| t29 / t30 | JPEG lossless **SV1 12 bits** (.70) / **predictor 6, 16 bits con signo** (.57) |
+| t31 | JPEG Extended **12 bits** (.51) |
+| t32 / t33 / t34 | JPEG **aritmético** RGB (.52) / **progresivo** RGB (.55) / progresivo aritmético gris (.56) |
+| t35 / t36 | JPEG ***spectral selection*** Huffman (.53) / aritmético (.54) |
+| t40 | **YBR_PARTIAL_422** nativo |
+| t41 / t42 / t43 | **HSV** / **CMYK** / **ARGB** con Planar Configuration 1 |
+| t44 | **Paleta segmentada** (opcodes discreto, lineal e indirecto) |
+| t45 | **Supplemental Palette** (MONOCHROME2, Pixel Presentation MIXED, *first mapped* 1000) |
+| t46 | MONOCHROME2 con Presentation LUT Shape **INVERSE** |
+| t47 | CT con **Pixel Padding** −2000 sin ventana (negro y fuera de la auto-ventana) |
+
+Los casos encapsulados con TS que pydicom no sabe escribir (HTJ2K…) se guardan con un UID conocido de la misma longitud y luego se parchea el *meta header* (`save_encapsulated()`).
+
+## Prueba en navegador con la CSP de producción
+
+```bash
+npx ng build --configuration production
+PLAYWRIGHT_MODULE=<package.json donde esté playwright> node tools/dicom-test/browser-csp/run_browser_csp_test.mjs [dist/ready-doctor-web] [regex de ficheros]
+```
+
+Sirve el `dist` con las mismas cabeceras de seguridad que producción (CSP, `nosniff`, Referrer-Policy) y *fallback* SPA, carga cada `.dcm` de `out/` por la UI ("Encontrar imágenes" → "Unos ficheros."), y comprueba:
+- que la imagen se pinta y que sus píxeles son **iguales** a los del harness (`out/render/<fichero>.f0.rgba`);
+- que no hay violaciones de CSP ni errores de página;
+- qué códecs de `assets/codecs` se descargan y con qué `Content-Type`.
+
+Hay que pasarla si cambian los códecs, la forma de cargarlos o la CSP. Chromium: `CHROMIUM=<ruta>` (por defecto `/opt/pw-browsers/chromium`).
 
 ## Añadir un caso
 
-1. Añade el fichero en `gen_test_dicoms.py` (función `save()` + `expect()`).
-2. Si pydicom no sabe decodificarlo, añade la verdad a mano en `expected_frames()` de `check_render.py`.
+1. Añade el fichero en `gen_test_dicoms.py` (función `save()` + `expect()`; `save_encapsulated()` si la TS es encapsulada).
+2. Si pydicom no sabe decodificarlo, guarda la verdad en `out/ref/<fichero>.npy` (lo hace `save_encapsulated()`) o añádela a mano en `expected_frames()` de `check_render.py`.
 3. Ejecuta los tres comandos. Si el visor falla, arréglalo y vuelve a ejecutar.
 
 

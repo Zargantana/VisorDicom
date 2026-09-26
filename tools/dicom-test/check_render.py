@@ -26,7 +26,10 @@ def voi_linear(x, c, w):
 def expected_frames(path, win):
     ds = pydicom.dcmread(path)
     ts = str(ds.file_meta.TransferSyntaxUID)
-    if ts == "1.2.840.10008.1.2.1.98":  # pydicom no la conoce: frames nativos encapsulados
+    ref = os.path.join(OUT, "ref", os.path.basename(path) + ".npy")
+    if os.path.exists(ref):  # TS que pydicom no decodifica: verdad guardada por gen_test_dicoms.py
+        arr = np.load(ref)
+    elif ts == "1.2.840.10008.1.2.1.98":  # pydicom no la conoce: frames nativos encapsulados
         from pydicom.encaps import generate_frames
         nf = int(getattr(ds, "NumberOfFrames", 1))
         raw = b"".join(generate_frames(ds.PixelData, number_of_frames=nf))
@@ -41,6 +44,12 @@ def expected_frames(path, win):
     for fr in frames:
         if pi in ("MONOCHROME1", "MONOCHROME2"):
             x = fr.astype(np.float64) * float(getattr(ds, "RescaleSlope", 1)) + float(getattr(ds, "RescaleIntercept", 0))
+            # Pixel Padding (0028,0120/0121): negro y fuera de la auto-ventana
+            padmask = np.zeros(fr.shape, bool)
+            if "PixelPaddingValue" in ds:
+                p0 = int(ds.PixelPaddingValue)
+                p1 = int(ds.get("PixelPaddingRangeLimit", p0))
+                padmask = (fr >= min(p0, p1)) & (fr <= max(p0, p1))
             wc = ds.get("WindowCenter"); ww = ds.get("WindowWidth")
             if wc is not None:
                 wcs = list(wc) if isinstance(wc, pydicom.multival.MultiValue) else [wc]
@@ -52,12 +61,24 @@ def expected_frames(path, win):
                     mn, mx = (-(1 << (bs - 1)), (1 << (bs - 1)) - 1) if ds.PixelRepresentation else (0, (1 << bs) - 1)
                     mn = mn * float(getattr(ds, "RescaleSlope", 1)) + float(getattr(ds, "RescaleIntercept", 0))
                     mx = mx * float(getattr(ds, "RescaleSlope", 1)) + float(getattr(ds, "RescaleIntercept", 0))
-                else:        # auto-ventana min/max del frame
-                    mn, mx = x.min(), x.max()
+                else:        # auto-ventana min/max del frame (sin el relleno)
+                    xv = x[~padmask] if (~padmask).any() else x
+                    mn, mx = xv.min(), xv.max()
                 y = (x - mn) * 255 / max(mx - mn, 1)
-            if pi == "MONOCHROME1":
+            if pi == "MONOCHROME1" or (pi == "MONOCHROME2" and str(ds.get("PresentationLUTShape", "")).upper() == "INVERSE"):
                 y = 255 - y
+            y = np.where(padmask, 0, y)
             rgb = np.repeat(y[..., None], 3, axis=2)
+            # Supplemental Palette (MONOCHROME2 + Pixel Presentation COLOR/MIXED): valores de la LUT en color
+            if pi == "MONOCHROME2" and str(ds.get("PixelPresentation", "")).upper() in ("COLOR", "MIXED") \
+                    and "RedPaletteColorLookupTableDescriptor" in ds:
+                first = int(ds.RedPaletteColorLookupTableDescriptor[1])
+                luts = [np.frombuffer(ds[t].value, "<u2") for t in ("RedPaletteColorLookupTableData",
+                        "GreenPaletteColorLookupTableData", "BluePaletteColorLookupTableData")]
+                inside = (fr >= first) & (fr < first + len(luts[0]))
+                idx = np.clip(fr.astype(np.int64) - first, 0, len(luts[0]) - 1)
+                for c in range(3):
+                    rgb[..., c] = np.where(inside, luts[c][idx] >> 8, rgb[..., c])
         elif pi == "PALETTE COLOR":
             rgb = apply_color_lut(fr, ds).astype(np.float64) / 257
         else:
@@ -68,6 +89,8 @@ def expected_frames(path, win):
     return outs
 
 
+EXPECTED = json.load(open(os.path.join(OUT, "expected.json")))
+
 rows = []
 tiles = []
 fails = 0
@@ -75,6 +98,12 @@ for key, meta in summary.items():
     name, _, w = key.partition("#w")
     win = int(w) if w else 0
     path = os.path.join(OUT, name)
+    if EXPECTED.get(name, {}).get("kind") == "expect_fail":
+        # Debe fallar de forma controlada: sin frames decodificados y sin excepción que tumbe el visor.
+        ok = meta["decodedFrames"] == 0 and not (meta.get("error") or "").startswith("THROW")
+        fails += 0 if ok else 1
+        rows.append((key, "PASS" if ok else "FAIL", "fallo esperado y controlado" if ok else f"se esperaba rechazo: {meta}"))
+        continue
     try:
         exp = expected_frames(path, win)
     except Exception as e:
@@ -85,7 +114,7 @@ for key, meta in summary.items():
         if meta["rows"] and buf.size == meta["rows"] * meta["cols"] * 4:
             got.append(buf.reshape(meta["rows"], meta["cols"], 4)[..., :3])
     status, detail = "PASS", ""
-    lossy = "4.50" in (meta.get("ts") or "")
+    lossy = (meta.get("ts") or "").split(".")[-1] in ("50", "51", "52", "53", "54", "55", "56", "81", "91", "93", "203")
     tol_max, tol_mean = (60, 4.0) if lossy else (3, 0.6)
     if meta.get("error"):
         status, detail = "FAIL", "error: " + meta["error"]

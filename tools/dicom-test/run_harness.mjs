@@ -27,6 +27,16 @@ for (const lib of ['src/libs/lossless.js',
                    'src/libs/jpeg-baseline.js', 'src/libs/jpeg-ls.js', 'src/libs/jpx.js']) {
   vm.runInThisContext(fs.readFileSync(path.join(root, lib), 'utf8'), { filename: lib });
 }
+// Códecs bajo demanda (src/assets/codecs): en el navegador los carga CodecLoader con un <script>; aquí se registra
+// el mismo global (factoría emscripten) para que CodecLoader lo encuentre sin DOM.
+{
+  const { createRequire } = await import('node:module');
+  const requireFromRoot = createRequire(path.join(root, 'package.json'));
+  for (const [file, globalName] of [['openjpegjs_decode.js', 'OpenJPEGJS'], ['libjpegturbojs_decode.js', 'libjpegturbojs_decode']]) {
+    const codec = path.join(root, 'src/assets/codecs', file);
+    if (fs.existsSync(codec)) globalThis[globalName] = requireFromRoot(codec);
+  }
+}
 
 const bundle = path.join(renderDir, 'harness.bundle.cjs');
 await build({
