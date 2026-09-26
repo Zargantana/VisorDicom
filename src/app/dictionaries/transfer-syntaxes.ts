@@ -73,6 +73,17 @@ export const TX_dictionary = [
     ['1.2.840.10008.1.2.7.1','SMPTE ST 2110-20 Uncompressed Progressive Active Video'],
     ['1.2.840.10008.1.2.7.2','SMPTE ST 2110-20 Uncompressed Interlaced Active Video'],
     ['1.2.840.10008.1.2.7.3','SMPTE ST 2110-30 PCM Digital Audio'],
+    // --- Retirada del estándar y privadas de fabricante (fuentes: dicom3tools transyn.tpl, GDCM, DCMTK) ---
+    ['1.2.840.10008.1.20','Papyrus 3 Implicit VR Little Endian (Retired)'],
+    ['1.2.840.113619.5.2','GE Private Implicit VR Little Endian with Big Endian Pixel Data'],
+    ['1.3.46.670589.33.1.4.1','Philips Private CT Explicit VR Little Endian (CT-private-ELE)'],
+    ['1.3.6.1.4.1.5962.300.1','PixelMed Private Bzip2 Explicit VR Little Endian'],
+    ['1.3.6.1.4.1.5962.300.2','PixelMed Private Encapsulated Raw Little Endian'],
+    ['1.2.752.24.3.7.6','Sectra Compression (Private Syntax)'],
+    ['1.2.752.24.3.7.7','Sectra Compression LS (Private Syntax)'],
+    ['1.2.840.113711.1.2.100.1','ALI Wavelet (Private Syntax)'],
+    ['1.2.840.113704.7.0.4.4','Algotec Compressed (Private Syntax)'],
+    ['2.16.840.1.113709.1.2.2','GE PACS COMPRESS_EXPRESS (Private Syntax)'],
 ];
 
 export enum TRANSFER_SYNTAX {
@@ -136,7 +147,34 @@ export enum TRANSFER_SYNTAX {
     XML_Encoding = 57,
     SMPTE_ST_2110_20_Progressive = 58,
     SMPTE_ST_2110_20_Interlaced = 59,
-    SMPTE_ST_2110_30_Audio = 60
+    SMPTE_ST_2110_30_Audio = 60,
+    Papyrus_3_Implicit_VR_Little_Endian = 61,
+    GE_Private_Implicit_VR_LE_Big_Endian_Pixels = 62,
+    Philips_Private_CT_Explicit_VR_LE = 63,
+    PixelMed_Private_Bzip2_Explicit_VR_LE = 64,
+    PixelMed_Private_Encapsulated_Raw_LE = 65,
+    Sectra_Compression = 66,
+    Sectra_Compression_LS = 67,
+    ALI_Wavelet = 68,
+    Algotec_Compressed = 69,
+    GE_PACS_Compress_Express = 70
+};
+
+/** TS con VR implícita: la estándar, la Papyrus 3 retirada y la privada de GE (cabecera Implicit VR LE). */
+const IMPLICIT_VR_UIDS = ['1.2.840.10008.1.2', '1.2.840.10008.1.20', '1.2.840.113619.5.2'];
+
+/**
+ * Compresiones propietarias sin decodificador público (ni en GDCM, DCMTK, dicom3tools, pydicom, fo-dicom ni
+ * dcm4che, que como mucho conocen el nombre). El visor las identifica y explica qué hacer. Si el contenido
+ * resulta ser un códec estándar (ver codec-sniffer), se decodifica igualmente.
+ */
+export const PROPRIETARY_TS_NOTES: { [uid: string]: string } = {
+    '1.2.752.24.3.7.6': 'Compresión privada de Sectra. No hay decodificador público: exporta el estudio desde el PACS Sectra en una Transfer Syntax estándar (Explicit VR Little Endian o JPEG Lossless).',
+    '1.2.752.24.3.7.7': 'Compresión privada de Sectra (LS). No hay decodificador público: exporta el estudio desde el PACS Sectra en una Transfer Syntax estándar (Explicit VR Little Endian o JPEG Lossless).',
+    '1.2.840.113711.1.2.100.1': 'Compresión wavelet privada de ALI (McKesson). No hay decodificador público: exporta el estudio en una Transfer Syntax estándar.',
+    '1.2.840.113704.7.0.4.4': 'Compresión privada de Algotec (Carestream). No hay decodificador público: exporta el estudio en una Transfer Syntax estándar.',
+    '2.16.840.1.113709.1.2.2': 'Compresión privada del PACS de GE (COMPRESS_EXPRESS). No hay decodificador público: exporta el estudio en una Transfer Syntax estándar.',
+    '1.3.6.1.4.1.5962.300.1': 'Dataset comprimido con bzip2 (sintaxis privada de PixelMed). Conviértelo a una Transfer Syntax estándar con el toolkit PixelMed.',
 };
 
 /** UID tal cual viene del fichero (con padding NUL o espacio) -> UID limpio. */
@@ -172,12 +210,30 @@ export class TXTranslator {
         return (tx === undefined) ? 'Unknown TX' : TX_dictionary[tx][1];
     }
 
-    /** Solo Implicit VR Little Endian (1.2.840.10008.1.2) es implicita. */
-    public static isVRExplicit(identifier:string): boolean{
-        return cleanUID(identifier) !== TX_dictionary[0][0];
+    /** true si el UID está en el diccionario (estándar o privada conocida). */
+    public static isKnown(identifier:string): boolean{
+        return TXTranslator.map.getClean(identifier) !== undefined;
     }
 
+    /** Implícitas: 1.2.840.10008.1.2, Papyrus 3 (1.20) y la privada de GE. Una TS desconocida se trata como explícita
+     *  hasta ver el primer elemento del dataset (DCMFileReader detecta la VR). */
+    public static isVRExplicit(identifier:string): boolean{
+        return !IMPLICIT_VR_UIDS.includes(cleanUID(identifier));
+    }
+
+    /** Cabecera (dataset) en Big Endian: solo Explicit VR Big Endian. */
     public static isVREBigEndian(identifier:string): boolean{
         return cleanUID(identifier) === TX_dictionary[3][0];
+    }
+
+    /** Píxeles en Big Endian: Explicit VR Big Endian y la privada de GE (cabecera LE, Pixel Data BE). */
+    public static isPixelDataBigEndian(identifier:string): boolean{
+        const uid = cleanUID(identifier);
+        return uid === TX_dictionary[3][0] || uid === TX_dictionary[TRANSFER_SYNTAX.GE_Private_Implicit_VR_LE_Big_Endian_Pixels][0];
+    }
+
+    /** Explicación para el usuario si la TS es una compresión propietaria sin decodificador público (o null). */
+    public static proprietaryNote(identifier:string): string | null{
+        return PROPRIETARY_TS_NOTES[cleanUID(identifier)] ?? null;
     }
 }

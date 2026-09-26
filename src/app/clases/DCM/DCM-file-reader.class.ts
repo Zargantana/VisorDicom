@@ -15,6 +15,9 @@ export const VR_UN = "UN";
  */
 export const LONG_LENGTH_VRS = ['OB', 'OD', 'OF', 'OL', 'OV', 'OW', 'SQ', 'SV', 'UC', 'UN', 'UR', 'UT', 'UV'];
 export const UNDEFINED_LENGTH = 0xFFFFFFFF;
+/** Todas las VR de PS3.5 6.2: sirven para saber si un dataset con TS desconocida es de VR explícita. */
+export const ALL_VRS = ['AE', 'AS', 'AT', 'CS', 'DA', 'DS', 'DT', 'FD', 'FL', 'IS', 'LO', 'LT', 'OB', 'OD', 'OF', 'OL',
+    'OV', 'OW', 'PN', 'SH', 'SL', 'SQ', 'SS', 'ST', 'SV', 'TM', 'UC', 'UI', 'UL', 'UN', 'UR', 'US', 'UT', 'UV'];
 
 export class DCMFileReader {
 
@@ -45,6 +48,10 @@ export class DCMFileReader {
     public TransferSyntaxName: string = 'Implicit VR Endian';
     
     public isVRExplicit: boolean = true;
+    /** Pixel Data en little endian. Igual que isLittleEndian salvo en la TS privada de GE (cabecera LE, píxeles BE). */
+    public isPixelDataLittleEndian: boolean = true;
+    /** TS privada o desconocida: la VR (explícita o implícita) se decide con el primer elemento del dataset. */
+    private detectVR: boolean = false;
     public PlannarConfiguration = 0;
     public PhotometricInterpretation: string = '';
     public Modality: string = '';
@@ -136,9 +143,12 @@ export class DCMFileReader {
                     } else if(this.last_readed_tag.TagLow == 0x10) {
                         if (this.last_readed_tag.Value) {
                             this.TransferSyntax = this.last_readed_tag.Value;
-                            this.TransferSyntaxName = TXTranslator.getName(this.TransferSyntax.trim());
-                            this.isVRExplicit = TXTranslator.isVRExplicit(this.TransferSyntax.trim());
-                            this.isLittleEndian = !TXTranslator.isVREBigEndian(this.TransferSyntax.trim());
+                            const ts = this.TransferSyntax.trim();
+                            this.TransferSyntaxName = TXTranslator.getName(ts);
+                            this.isVRExplicit = TXTranslator.isVRExplicit(ts);
+                            this.isLittleEndian = !TXTranslator.isVREBigEndian(ts);
+                            this.isPixelDataLittleEndian = !TXTranslator.isPixelDataBigEndian(ts);
+                            this.detectVR = !TXTranslator.isKnown(ts);
                         }
                     }
                 } else if (this.last_readed_tag.TagHigh == 8) {
@@ -237,6 +247,12 @@ export class DCMFileReader {
             if (this.forceLittleEndianForHeaderActive && tag.TagHigh != 0x02) {
                 this.forceLittleEndianForHeaderActive = false;
                 tag.setTag(raw.substring(pos, pos + 4), this.isLittleEndian);
+                if (this.detectVR) {
+                    // TS desconocida: explícita si tras el tag vienen dos letras que forman una VR. En implícita esos
+                    // bytes son la parte baja de la longitud, y el primer elemento (grupo 0008) nunca mide tanto.
+                    this.isVRExplicit = ALL_VRS.includes(raw.substring(pos + 4, pos + 6));
+                    this.detectVR = false;
+                }
             }
 
             let headerLength: number;

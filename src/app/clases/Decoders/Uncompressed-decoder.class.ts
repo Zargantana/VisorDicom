@@ -1,8 +1,9 @@
 import { BaseDecoder } from "./base-decoder-class";
 
 /**
- * Transfer Syntax nativas: Implicit VR LE, Explicit VR LE, Explicit VR BE (retirada) y Deflated Explicit VR LE
- * (ya inflado por DCMFile.inflateIfDeflated). Devuelve un ArrayBuffer little endian, entrelazado, por frame.
+ * Transfer Syntax nativas: Implicit VR LE, Explicit VR LE, Explicit VR BE (retirada), Deflated Explicit VR LE
+ * (ya inflado por DCMFile.inflateIfDeflated), Papyrus 3 y las privadas nativas de GE y Philips.
+ * Devuelve un ArrayBuffer little endian, entrelazado, por frame.
  */
 export class UncompressedDecoder extends BaseDecoder {
     public Decode(): any[] {
@@ -13,8 +14,8 @@ export class UncompressedDecoder extends BaseDecoder {
     /** Deja el frame como lo esperan las clases de color: little endian, 1 muestra por byte si 1 bit, RGB entrelazado. */
     protected normalize(bytes: Uint8Array): Uint8Array {
         const bitsAllocated = this.reader.BitsAllocated;
-        // Explicit VR Big Endian: palabras de 16/32 bits en orden inverso.
-        if (!this.reader.isLittleEndian && bitsAllocated > 8) {
+        // Explicit VR Big Endian y privada de GE (1.2.840.113619.5.2): palabras de 16/32 bits en orden inverso.
+        if (!this.reader.isPixelDataLittleEndian && bitsAllocated > 8) {
             const size = bitsAllocated > 16 ? 4 : 2;
             for (let i = 0; i + size <= bytes.length; i += size) {
                 for (let a = i, b = i + size - 1; a < b; a++, b--) {

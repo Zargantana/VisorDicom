@@ -71,6 +71,15 @@ The Web DICOM Viewer is a \textbf{VIEWER} application that does not establish ne
     \item RLE Lossless (1.2.840.10008.1.2.5)
   \end{itemize}
 
+  \item \textbf{Retired and Private Transfer Syntaxes} (decoding only; verified with the same suite):
+  \begin{itemize}
+    \item Papyrus 3 Implicit VR Little Endian, retired (1.2.840.10008.1.20)
+    \item GE Private Implicit VR Little Endian with Big Endian Pixel Data (1.2.840.113619.5.2)
+    \item Philips Private CT Explicit VR Little Endian, ``CT-private-ELE'' (1.3.46.670589.33.1.4.1)
+    \item PixelMed Private Encapsulated Raw Little Endian (1.3.6.1.4.1.5962.300.2)
+    \item Any other private or unknown Transfer Syntax whose Pixel Data contains a standard codestream: the codec is identified from the content (JPEG baseline, extended, lossless, progressive or arithmetic; JPEG-LS; JPEG 2000; HTJ2K; RLE; or uncompressed pixels of the expected size). Explicit or implicit VR is detected from the first data element.
+  \end{itemize}
+
   \item \textbf{Supported Photometric Interpretations:} MONOCHROME1, MONOCHROME2, PALETTE COLOR (including segmented palette color lookup tables), RGB, YBR\_FULL, YBR\_FULL\_422, YBR\_PARTIAL\_422, YBR\_PARTIAL\_420, YBR\_ICT and YBR\_RCT (JPEG 2000), and the retired HSV, ARGB and CMYK. Planar Configuration 0 and 1 are supported.
 
   \item \textbf{Image Display Capabilities:}
@@ -129,6 +138,7 @@ MR & Magnetic Resonance (if uploaded) \\
   \item No support for DICOM C-FIND, C-MOVE, or other DICOM services.
   \item No integration with PACS or DICOMweb servers.
   \item Only file-based workflows supported.
+  \item Proprietary compressions without a public decoder are recognized and reported to the user, with the advice to export the study in a standard Transfer Syntax, but not decoded: Sectra Compression (1.2.752.24.3.7.6), Sectra Compression LS (1.2.752.24.3.7.7), ALI Wavelet (1.2.840.113711.1.2.100.1), Algotec Compressed (1.2.840.113704.7.0.4.4), GE PACS COMPRESS\_EXPRESS (2.16.840.1.113709.1.2.2) and PixelMed Bzip2 Explicit VR Little Endian (1.3.6.1.4.1.5962.300.1).
 \end{itemize}
 
 \section*{7. Security}

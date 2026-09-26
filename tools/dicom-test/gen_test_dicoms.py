@@ -780,6 +780,125 @@ ds.PixelData = pad.tobytes()
 save(ds, "t47_ct_pixel_padding_nowin.dcm", ExplicitVRLittleEndian)
 expect("t47_ct_pixel_padding_nowin.dcm", rows=R, cols=C, frames=1, windows=0, kind="padding")
 
+# =============================================================================================================
+# Transfer Syntax privadas y retiradas (t60-t73). UIDs de dicom3tools (transyn.tpl), GDCM y DCMTK.
+#  - t60-t63: decodificables (GE con píxeles Big Endian, Philips CT-private-ELE, Papyrus 3, PixelMed raw).
+#  - t64-t65: compresión propietaria sin decodificador público (Sectra) y TS desconocida: rechazo con motivo.
+#  - t66-t73: TS privada ficticia (raíz 2.25 = UUID) con un códec estándar dentro: el visor lo reconoce por el
+#    contenido del Pixel Data (codec-sniffer.ts). t73 además es Implicit VR (el parser detecta la VR).
+# =============================================================================================================
+def save_private(ds, name, ts_uid, implicit, ref=None, pixel_data=None, fragments=None):
+    ds.file_meta.TransferSyntaxUID = UID(ts_uid)
+    if fragments is not None:
+        ds.PixelData = encapsulate(fragments)
+        ds["PixelData"].is_undefined_length = True
+        ds["PixelData"].VR = "OB"
+    else:
+        ds.PixelData = pixel_data
+        ds["PixelData"].VR = "OW" if ds.BitsAllocated > 8 else "OB"
+    ds.save_as(os.path.join(OUT, name), enforce_file_format=True, implicit_vr=implicit, little_endian=True)
+    if ref is not None:
+        np.save(os.path.join(REF, name + ".npy"), np.asarray(ref))
+
+
+def ct_private(modality="CT"):
+    ds = image_ds(modality, R, C, 1, "MONOCHROME2", 16, 16, True)
+    ds.RescaleSlope, ds.RescaleIntercept = 1, 0
+    ds.WindowCenter, ds.WindowWidth = 40, 400
+    return ds
+
+
+hu_p = ct_hu()
+FAKE_TS = generate_uid(prefix=None)  # 2.25.<UUID>: privada y única, no es de ningún fabricante
+
+# --- t60: GE privada: cabecera Implicit VR LE, Pixel Data en Big Endian (1.2.840.113619.5.2) -------------------
+save_private(ct_private(), "t60_ge_private_be_pixels.dcm", "1.2.840.113619.5.2", True, hu_p,
+             pixel_data=hu_p.astype(">i2").tobytes())
+expect("t60_ge_private_be_pixels.dcm", rows=R, cols=C, frames=1, windows=1, kind="ref")
+# --- t61: Philips CT-private-ELE: Explicit VR LE nativa (1.3.46.670589.33.1.4.1) ----------------------------------
+save_private(ct_private(), "t61_philips_ct_private_ele.dcm", "1.3.46.670589.33.1.4.1", False, hu_p,
+             pixel_data=hu_p.astype("<i2").tobytes())
+expect("t61_philips_ct_private_ele.dcm", rows=R, cols=C, frames=1, windows=1, kind="ref")
+# --- t62: Papyrus 3 Implicit VR Little Endian (retirada, 1.2.840.10008.1.20) --------------------------------------
+# pydicom la cree explícita: se graba como 1.2.840.10008.1.2 (+ relleno NUL = 18 bytes) y se parchea el UID.
+save_private(ct_private(), "t62_papyrus3_implicit.dcm", ImplicitVRLittleEndian, True, hu_p,
+             pixel_data=hu_p.astype("<i2").tobytes())
+_path = os.path.join(OUT, "t62_papyrus3_implicit.dcm")
+_raw = open(_path, "rb").read()
+assert _raw.count(b"1.2.840.10008.1.2\x00") >= 1
+open(_path, "wb").write(_raw.replace(b"1.2.840.10008.1.2\x00", b"1.2.840.10008.1.20", 1))
+expect("t62_papyrus3_implicit.dcm", rows=R, cols=C, frames=1, windows=1, kind="ref")
+# --- t63: PixelMed Encapsulated Raw LE (1.3.6.1.4.1.5962.300.2), 3 frames --------------------------------------
+frames3 = np.stack([hu_p, hu_p // 2, -hu_p]).astype(np.int16)
+ds = ct_private()
+ds.NumberOfFrames = 3
+save_private(ds, "t63_pixelmed_encaps_raw_3f.dcm", "1.3.6.1.4.1.5962.300.2", False, frames3,
+             fragments=[f.astype("<i2").tobytes() for f in frames3])
+expect("t63_pixelmed_encaps_raw_3f.dcm", rows=R, cols=C, frames=3, windows=1, kind="ref")
+
+# --- t64: Sectra Compression LS con un bitstream opaco: rechazo controlado y el motivo nombra a Sectra ---------
+rng = np.random.default_rng(64)
+save_private(ct_private(), "t64_sectra_ls_opaque.dcm", "1.2.752.24.3.7.7", False,
+             fragments=[rng.integers(0, 256, 3000, dtype=np.uint8).tobytes()])
+expect("t64_sectra_ls_opaque.dcm", rows=R, cols=C, frames=1, windows=1, kind="expect_fail", reason_contains="Sectra")
+# --- t65: TS desconocida con bitstream opaco: rechazo con el UID en el motivo ----------------------------------
+save_private(ct_private(), "t65_unknown_ts_opaque.dcm", FAKE_TS, False,
+             fragments=[rng.integers(0, 256, 3000, dtype=np.uint8).tobytes()])
+expect("t65_unknown_ts_opaque.dcm", rows=R, cols=C, frames=1, windows=1, kind="expect_fail", reason_contains=FAKE_TS)
+
+# --- t66-t73: códec estándar bajo una TS privada ficticia: se reconoce por el contenido -------------------------
+# t66: RLE 16 bits con signo
+rle_planes = [hu_p.view(np.uint16).astype(">u2").view(np.uint8).reshape(R, C, 2)[..., k].tobytes() for k in (0, 1)]
+save_private(ct_private(), "t66_sniff_rle.dcm", FAKE_TS, False, hu_p, fragments=[rle_frame(rle_planes)])
+expect("t66_sniff_rle.dcm", rows=R, cols=C, frames=1, windows=1, kind="ref", decoded_by="RLE")
+# t67: JPEG baseline RGB (con pérdida)
+rgb_p = np.zeros((R, C, 3), np.uint8)
+rgb_p[..., 0] = np.linspace(0, 255, C).astype(np.uint8)[None, :]
+rgb_p[..., 1] = 120
+rgb_p[..., 2] = np.linspace(255, 0, R).astype(np.uint8)[:, None]
+jb_p = jpeg_bytes(rgb_p, "RGB")
+ds = image_ds("XC", R, C, 3, "YBR_FULL_422", 8, 8, False)
+save_private(ds, "t67_sniff_jpeg_baseline_rgb.dcm", FAKE_TS, False, np.array(Image.open(io.BytesIO(jb_p)).convert("RGB")),
+             fragments=[jb_p])
+expect("t67_sniff_jpeg_baseline_rgb.dcm", rows=R, cols=C, frames=1, windows=0, kind="ref", decoded_by="JPEG baseline",
+       lossy=True)
+# t68: sin comprimir, nativo, Implicit VR (el parser tiene que detectar la VR sin conocer la TS)
+save_private(ct_private(), "t68_sniff_raw_implicit.dcm", FAKE_TS, True, hu_p, pixel_data=hu_p.astype("<i2").tobytes())
+expect("t68_sniff_raw_implicit.dcm", rows=R, cols=C, frames=1, windows=1, kind="ref", decoded_by="sin comprimir (nativo)")
+
+if ic is not None:
+    # t69: JPEG lossless (proceso 14, SV1), 16 bits con signo
+    cs = ic.jpeg8_encode(hu_p.view(np.uint16), lossless=True, predictor=1, bitspersample=16)
+    save_private(ct_private(), "t69_sniff_jpeg_lossless.dcm", FAKE_TS, False, hu_p, fragments=[cs])
+    expect("t69_sniff_jpeg_lossless.dcm", rows=R, cols=C, frames=1, windows=1, kind="ref", decoded_by="JPEG lossless")
+    # t70: JPEG-LS lossless, 16 bits con signo
+    cs = ic.jpegls_encode(hu_p.view(np.uint16), level=0)
+    save_private(ct_private(), "t70_sniff_jpegls.dcm", FAKE_TS, False, hu_p, fragments=[cs])
+    expect("t70_sniff_jpegls.dcm", rows=R, cols=C, frames=1, windows=1, kind="ref", decoded_by="JPEG-LS")
+    # t71: JPEG 2000 lossless, 16 bits con signo
+    cs = ic.jpeg2k_encode(hu_p, codecformat="j2k", reversible=True)
+    save_private(ct_private(), "t71_sniff_j2k.dcm", FAKE_TS, False, hu_p, fragments=[cs])
+    expect("t71_sniff_j2k.dcm", rows=R, cols=C, frames=1, windows=1, kind="ref", decoded_by="JPEG 2000")
+    # t72: HTJ2K lossless 12 bits
+    g12_p = np.tile(np.linspace(0, 4095, C).astype(np.uint16), (R, 1))
+    cs = ic.htj2k_encode(g12_p, reversible=True)
+    ds = image_ds("MR", R, C, 1, "MONOCHROME2", 16, 12, False)
+    ds.WindowCenter, ds.WindowWidth = 2048, 4096
+    save_private(ds, "t72_sniff_htj2k.dcm", FAKE_TS, False, g12_p, fragments=[cs])
+    expect("t72_sniff_htj2k.dcm", rows=R, cols=C, frames=1, windows=1, kind="ref", decoded_by="HTJ2K")
+else:
+    print("imagecodecs no instalado: se omiten t69-t72 (códec estándar bajo TS privada)")
+
+# t73: JPEG progresivo 8 bits (proceso retirado: libjpeg-turbo bajo demanda); lo codifica Pillow
+g8_p = np.tile(np.linspace(0, 255, C).astype(np.uint8), (R, 1))
+_b = io.BytesIO()
+Image.fromarray(g8_p, "L").save(_b, "JPEG", quality=95, progressive=True)
+ds = image_ds("XC", R, C, 1, "MONOCHROME2", 8, 8, False)
+save_private(ds, "t73_sniff_jpeg_progressive.dcm", FAKE_TS, False, np.array(Image.open(io.BytesIO(_b.getvalue()))),
+             fragments=[_b.getvalue()])
+expect("t73_sniff_jpeg_progressive.dcm", rows=R, cols=C, frames=1, windows=0, kind="ref",
+       decoded_by="JPEG progresivo", lossy=True)
+
 with open(os.path.join(OUT, "expected.json"), "w") as fh:
     json.dump(EXPECTED, fh, indent=1)
 print("generated", len(os.listdir(OUT)), "files in", OUT)

@@ -22,7 +22,7 @@ const here = path.dirname(fileURLToPath(import.meta.url));
 const root = path.resolve(here, '..', '..', '..');
 const outDir = path.resolve(here, '..', 'out');
 const dist = path.resolve(process.argv[2] || path.join(root, 'dist/ready-doctor-web'));
-const pattern = new RegExp(process.argv[3] || '^t(0[1-9]|[1-5][0-9])_.*\\.dcm$');
+const pattern = new RegExp(process.argv[3] || '^t\\d{2}[a-z]?_.*\\.dcm$');
 const require = createRequire(process.env.PLAYWRIGHT_MODULE || path.join(root, 'package.json'));
 const { chromium } = require('playwright');
 
@@ -91,7 +91,12 @@ for (const name of files) {
   } catch { /* sin imagen */ }
   let verdict;
   if (expectFail) {
-    verdict = pixels ? 'FAIL (se esperaba rechazo)' : 'PASS (rechazo controlado)';
+    // En vez de la imagen el visor pinta un cartel con el motivo (atributos data-unsupported y title del <img>)
+    const reason = await page.evaluate(() => [...document.querySelectorAll('basic-image-viewer img')]
+      .map((i) => i.getAttribute('data-unsupported')).find(Boolean) || '').catch(() => '');
+    const want = expected[name]?.reason_contains || '';
+    verdict = reason && reason.includes(want) ? `PASS (cartel: ${reason.slice(0, 60)}…)`
+      : `FAIL (se esperaba el cartel${want ? ' con "' + want + '"' : ''}; motivo: "${reason}")`;
   } else if (!pixels) {
     verdict = 'FAIL (no se pintó)';
   } else {

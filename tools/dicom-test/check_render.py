@@ -98,11 +98,16 @@ for key, meta in summary.items():
     name, _, w = key.partition("#w")
     win = int(w) if w else 0
     path = os.path.join(OUT, name)
-    if EXPECTED.get(name, {}).get("kind") == "expect_fail":
-        # Debe fallar de forma controlada: sin frames decodificados y sin excepción que tumbe el visor.
-        ok = meta["decodedFrames"] == 0 and not (meta.get("error") or "").startswith("THROW")
+    exp_meta = EXPECTED.get(name, {})
+    if exp_meta.get("kind") == "expect_fail":
+        # Debe fallar de forma controlada: sin frames decodificados y sin excepción que tumbe el visor. Con
+        # reason_contains, además, el motivo que enseña el visor tiene que mencionarlo (p. ej. "Sectra").
+        reason = meta.get("unsupportedReason") or ""
+        ok = meta["decodedFrames"] == 0 and not (meta.get("error") or "").startswith("THROW") \
+            and exp_meta.get("reason_contains", "") in reason
         fails += 0 if ok else 1
-        rows.append((key, "PASS" if ok else "FAIL", "fallo esperado y controlado" if ok else f"se esperaba rechazo: {meta}"))
+        rows.append((key, "PASS" if ok else "FAIL",
+                     ("rechazo controlado: " + reason)[:90] if ok else f"se esperaba rechazo: {meta}"))
         continue
     try:
         exp = expected_frames(path, win)
@@ -114,10 +119,14 @@ for key, meta in summary.items():
         if meta["rows"] and buf.size == meta["rows"] * meta["cols"] * 4:
             got.append(buf.reshape(meta["rows"], meta["cols"], 4)[..., :3])
     status, detail = "PASS", ""
-    lossy = (meta.get("ts") or "").split(".")[-1] in ("50", "51", "52", "53", "54", "55", "56", "81", "91", "93", "203")
+    lossy = exp_meta.get("lossy") or \
+        (meta.get("ts") or "").split(".")[-1] in ("50", "51", "52", "53", "54", "55", "56", "81", "91", "93", "203")
     tol_max, tol_mean = (60, 4.0) if lossy else (3, 0.6)
     if meta.get("error"):
         status, detail = "FAIL", "error: " + meta["error"]
+    elif exp_meta.get("decoded_by") and meta.get("decodedBy") != exp_meta["decoded_by"]:
+        # TS privada con códec estándar dentro: tiene que reconocerse por el contenido
+        status, detail = "FAIL", f"códec reconocido {meta.get('decodedBy')!r} != {exp_meta['decoded_by']!r}"
     elif len(got) != len(exp):
         status, detail = "FAIL", f"frames decodificados {len(got)} != {len(exp)}"
     else:

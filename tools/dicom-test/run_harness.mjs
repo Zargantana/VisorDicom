@@ -59,11 +59,12 @@ for (const f of files) {
     if (w > 0 && !(r.windows > w)) continue; // solo renderizamos ventanas que existen
     const key = w === 0 ? f : `${f}#w${w}`;
     summary[key] = { rows: r.rows, cols: r.cols, frames: r.frames, ts: r.ts, tsName: r.tsName,
-                     windows: r.windows, windowCount: r.windowCount, decodedFrames: r.rgba.length, error: r.error };
+                     windows: r.windows, windowCount: r.windowCount, decodedFrames: r.rgba.length, error: r.error,
+                     unsupportedReason: r.unsupportedReason, decodedBy: r.decodedBy };
     r.rgba.forEach((buf, k) => fs.writeFileSync(path.join(renderDir, `${key}.f${k}.rgba`), Buffer.from(buf.buffer)));
   }
 }
 fs.writeFileSync(path.join(renderDir, 'render.json'), JSON.stringify(summary, null, 1));
 for (const [k, v] of Object.entries(summary)) {
-  console.log(`${k.padEnd(38)} ${String(v.rows)}x${String(v.cols)} fr=${v.frames} dec=${v.decodedFrames} win=${v.windows} ${v.error ? 'ERR ' + v.error : ''}`);
+  console.log(`${k.padEnd(38)} ${String(v.rows)}x${String(v.cols)} fr=${v.frames} dec=${v.decodedFrames} win=${v.windows} ${v.decodedBy ? '[' + v.decodedBy + '] ' : ''}${v.error ? 'ERR ' + v.error : ''}`);
 }
