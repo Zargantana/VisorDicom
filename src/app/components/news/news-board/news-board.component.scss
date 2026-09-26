@@ -33,18 +33,27 @@
   }
   
 
-  .decreasingFont {
-    font-size: 1.2vw;
-  }
-  
-  @media (max-width: 900px) {
-    .decreasingFont {
-      font-size: 1.4vw;
-    }
+  // El panel: ancho de lectura (los puntos se parten en varias lineas, la letra no encoge), alto maximo y
+  // scroll propio; el centrado del overlay nunca deja la cabecera fuera de la pantalla.
+  .news-panel {
+    width: min(56rem, 96vw);
+    max-height: calc(100vh - 2rem);
+    margin: 1rem 0;
   }
 
-  @media (min-width: 1400px) {
+  .news-content {
+    min-height: 0;                 // deja que flex encoja el contenido y aparezca el scroll
+    overflow-y: auto;
+    overscroll-behavior: contain;  // el scroll no pasa a la pagina
+  }
+
+  .decreasingFont {
+    font-size: 1rem;
+    line-height: 1.4;
+  }
+
+  @media (max-width: 900px) {
     .decreasingFont {
-      font-size: 0.9vw;
+      font-size: 0.95rem;
     }
   }
