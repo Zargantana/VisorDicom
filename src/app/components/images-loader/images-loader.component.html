@@ -1,8 +1,11 @@
 <div class="loader-panel d-flex slab-flex-1 flex-column p-3 m-0">
   @if (totalFiles == 0) {
-    <div class="loader-empty d-flex flex-column align-items-center justify-content-center slab-flex-1 text-center">
+    <div class="loader-drop d-flex flex-column align-items-center justify-content-center slab-flex-1 text-center"
+      [class.dragging]="dragging"
+      (dragenter)="onDragOver($event)" (dragover)="onDragOver($event)" (dragleave)="onDragLeave($event)" (drop)="onDrop($event)">
       <i class="fa-solid fa-folder-open loader-empty-icon"></i>
-      <p class="m-0">Elige qué leer con el botón de arriba.<br>Todo se lee en tu navegador.</p>
+      <p class="m-0">Elige con el botón de arriba<br>o <b>arrastra aquí</b> los ficheros o la carpeta.</p>
+      <small class="loader-drop-hint">Todo se lee en tu navegador.</small>
     </div>
   } @else {
     <div class="loader-stats">

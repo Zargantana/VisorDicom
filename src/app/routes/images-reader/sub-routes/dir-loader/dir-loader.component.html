@@ -7,11 +7,11 @@
         }
         <input type="file" id="dirPicker" name="dirPicker" class="d-none" (change)="imgsLoader.onSelected($event)" #dirUpload webkitDirectory multiple/>
         <span class="loader-spacer"></span>
-        @if (!showViewer) {
+        @if (!showViewer && foundDCMFiles.length > 0) {
             <button type="button" class="btn btn-success loader-view" [disabled]="foundDCMFiles.length == 0" (click)="openViewer()">
                 <i class="fa-solid fa-eye"></i> Ver imágenes <span class="badge text-bg-light">{{foundDCMFiles.length}}</span>
             </button>
-        } @else {
+        } @else if (showViewer) {
             <button type="button" class="btn btn-outline-secondary loader-view" (click)="showViewer = false">
                 <i class="fa-solid fa-list-check"></i> Carga
             </button>

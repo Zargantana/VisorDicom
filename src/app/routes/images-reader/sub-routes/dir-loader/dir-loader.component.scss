@@ -22,8 +22,14 @@
         flex: 0 0 100%;
     }
 
+    // Los dos botones se reparten la fila a partes iguales; sin separador en medio
     .loader-choose,
     .loader-view {
-        flex: 1 1 auto;
+        flex: 1 1 0;
+        min-width: 0;
+    }
+
+    .loader-spacer {
+        display: none;
     }
 }
