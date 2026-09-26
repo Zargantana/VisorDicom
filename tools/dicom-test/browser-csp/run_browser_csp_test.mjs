@@ -22,7 +22,7 @@ const here = path.dirname(fileURLToPath(import.meta.url));
 const root = path.resolve(here, '..', '..', '..');
 const outDir = path.resolve(here, '..', 'out');
 const dist = path.resolve(process.argv[2] || path.join(root, 'dist/ready-doctor-web'));
-const pattern = new RegExp(process.argv[3] || '^t(0[1-9]|1[0-9]|2[0-9]|3[0-9]|4[0-9])_.*\\.dcm$');
+const pattern = new RegExp(process.argv[3] || '^t(0[1-9]|[1-5][0-9])_.*\\.dcm$');
 const require = createRequire(process.env.PLAYWRIGHT_MODULE || path.join(root, 'package.json'));
 const { chromium } = require('playwright');
 
