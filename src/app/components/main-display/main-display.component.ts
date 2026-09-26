@@ -1,6 +1,7 @@
 import { Component, OnInit } from '@angular/core';
 import { MenuService } from 'src/app/services/menu.service';
 import { ThemeService } from 'src/app/services/theme.service';
+import { ViewerFullscreen } from '../images-viewer/viewer-fullscreen';
 
 @Component({
     selector: 'main-display',
@@ -22,6 +23,11 @@ export class MainDisplayComponent implements OnInit {
 
   public isDark(): boolean {
     return (ThemeService.current === 'dark');
+  }
+
+  /** El visor está en pantalla completa: el menú desaparece y queda solo la pantalla del visor */
+  public viewerFullscreen(): boolean {
+    return ViewerFullscreen.active;
   }
 
   ngOnInit(): void {

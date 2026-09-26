@@ -3,6 +3,7 @@ import { LoginService } from './services/login.service';
 import { NewsService } from './services/news.service';
 import { SeoService } from './services/seo.service';
 import { ThemeService } from './services/theme.service';
+import { ViewerFullscreen } from './components/images-viewer/viewer-fullscreen';
 
 @Component({
     selector: 'app-root',
@@ -35,5 +36,10 @@ export class AppComponent {
 
   private showLogin(): boolean {
     return LoginService.floater_visible;
+  }
+
+  /** El visor está en pantalla completa: sin barra superior ni menú */
+  public viewerFullscreen(): boolean {
+    return ViewerFullscreen.active;
   }
 }
