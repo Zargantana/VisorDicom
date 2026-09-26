@@ -31,9 +31,10 @@ python3 tools/dicom-test/check_render.py      # → PASS/FAIL por caso + out/ren
 | `gen_test_dicoms.py` | Genera un caso por cada situación del estándar que ha dado guerra (ver la tabla) |
 | `harness-entry.ts` | Punto de entrada que se empaqueta con esbuild. Usa `ImageDCM.renderFrameRGBA()` (o el camino antiguo si no existe, para medir `main`) |
 | `run_harness.mjs` | Stubs mínimos de DOM (`FileReader`, `File`, `print` para CharLS), carga los codecs globales de `src/libs`, registra los códecs bajo demanda de `src/assets/codecs` como globales (en Node no hay `<script>`) y renderiza cada fichero con cada ventana VOI (`#w1`, `#w2`…). Llama a `ImageDCM.prepare()` antes de pintar |
-| `check_render.py` | Verdad con pydicom (`pixel_array`, `apply_color_lut`, fórmula VOI LINEAR) y tolerancias (±3 lossless; más holgada para JPEG con pérdida). Si existe `out/ref/<fichero>.npy`, esa es la verdad (TS que pydicom no decodifica). `kind="expect_fail"`: pasa si el visor no decodifica ningún frame y no lanza |
+| `check_render.py` | Verdad con pydicom (`pixel_array`, `apply_color_lut`, fórmula VOI LINEAR) y tolerancias (±3 lossless; más holgada para JPEG con pérdida). Si existe `out/ref/<fichero>.npy`, esa es la verdad (TS que pydicom no decodifica). `kind="expect_fail"`: pasa si el visor no decodifica ningún frame y no lanza (con `reason_contains`, además, el motivo que enseña el visor tiene que contenerlo). `decoded_by`: el códec que el visor tiene que reconocer por el contenido. `lossy`: tolerancia de compresión con pérdida |
 | `j2k-part2/j2k_part2_mct.c` | Genera un codestream J2K **Part 2** con MCT por matriz (`opj_set_MCT`) para t27 |
 | `browser-csp/run_browser_csp_test.mjs` | Prueba en Chromium del build de producción con la CSP de producción (ver abajo) |
+| `big-files/gen_big_files.py` + `big-files/measure_big_files.mjs` | Estudios sintéticos pesados (XA de 250 y 550 MB, CT de 600 cortes) y medidor de tiempos y memoria del renderer en Chromium: línea base para la carga por trozos. No forman parte de la batería (tardan y ocupan disco) |
 
 ## Casos
 
@@ -71,6 +72,9 @@ python3 tools/dicom-test/check_render.py      # → PASS/FAIL por caso + out/ren
 | t45 | **Supplemental Palette** (MONOCHROME2, Pixel Presentation MIXED, *first mapped* 1000) |
 | t46 | MONOCHROME2 con Presentation LUT Shape **INVERSE** |
 | t47 | CT con **Pixel Padding** −2000 sin ventana (negro y fuera de la auto-ventana) |
+| t60 / t61 / t62 / t63 | TS **privadas y retiradas** decodificables: GE Implicit VR LE con píxeles **Big Endian** (1.2.840.113619.5.2), Philips CT-private-ELE (1.3.46.670589.33.1.4.1), **Papyrus 3** (1.2.840.10008.1.20) y PixelMed Encapsulated Raw con 3 frames (1.3.6.1.4.1.5962.300.2) |
+| t64 / t65 | **Sectra Compression LS** (1.2.752.24.3.7.7) y una TS desconocida con un *bitstream* opaco: rechazo con motivo (`reason_contains`) |
+| t66-t73 | **Códec estándar bajo una TS privada ficticia** (raíz 2.25): RLE, JPEG baseline RGB, sin comprimir en Implicit VR (el parser detecta la VR), JPEG lossless, JPEG-LS, JPEG 2000, HTJ2K y JPEG progresivo. El visor lo reconoce por el contenido (`codec-sniffer.ts`, `decoded_by`) |
 
 Los casos encapsulados con TS que pydicom no sabe escribir (HTJ2K…) se guardan con un UID conocido de la misma longitud y luego se parchea el *meta header* (`save_encapsulated()`).
 
@@ -84,7 +88,8 @@ PLAYWRIGHT_MODULE=<package.json donde esté playwright> node tools/dicom-test/br
 Sirve el `dist` con las mismas cabeceras de seguridad que producción (CSP, `nosniff`, Referrer-Policy) y *fallback* SPA, carga cada `.dcm` de `out/` por la UI ("Encontrar imágenes" → "Unos ficheros."), y comprueba:
 - que la imagen se pinta y que sus píxeles son **iguales** a los del harness (`out/render/<fichero>.f0.rgba`);
 - que no hay violaciones de CSP ni errores de página;
-- qué códecs de `assets/codecs` se descargan y con qué `Content-Type`.
+- qué códecs de `assets/codecs` se descargan y con qué `Content-Type`;
+- en los rechazos (`expect_fail`), que el visor pinta el cartel "Imagen no disponible" con el motivo (atributo `data-unsupported` del `<img>`, que también va en `title`).
 
 Hay que pasarla si cambian los códecs, la forma de cargarlos o la CSP. Chromium: `CHROMIUM=<ruta>` (por defecto `/opt/pw-browsers/chromium`).
 

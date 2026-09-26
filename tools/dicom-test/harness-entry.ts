@@ -48,5 +48,7 @@ export async function renderBinaryString(bin: string, windowIndex: number = 0) {
   } catch (e: any) {
     result.error = String(e?.message ?? e);
   }
+  result.unsupportedReason = image.unsupportedReason ?? undefined; // por qué no se puede mostrar (si no se puede)
+  result.decodedBy = image.decodedBy ?? undefined;                 // códec reconocido por contenido (TS privadas)
   return result;
 }

@@ -1,5 +1,5 @@
 import { ElementRef } from "@angular/core";
-import { TRANSFER_SYNTAX, TX_Map } from "src/app/dictionaries/transfer-syntaxes";
+import { cleanUID, TRANSFER_SYNTAX, TX_Map, TXTranslator } from "src/app/dictionaries/transfer-syntaxes";
 import { ColorFactory } from "../Color/color-factory.class";
 import { DCMFileReader } from "../DCM/DCM-file-reader.class";
 import { DCMInterpreter } from "../DCM/DCM-interpreter.class";
@@ -8,6 +8,7 @@ import { EncapsulatedUncompressedDecoder } from "../Decoders/Encapsulated-Uncomp
 import { JPEG2000Decoder } from "../Decoders/JPEG-2000-decoder.class";
 import { JPEGBaselineDecoder, JPEGRetiredProcessesDecoder } from "../Decoders/JPEG-Baseline-decoder.class";
 import { CodecLoader, CodecRequiredError } from "../Decoders/codec-loader";
+import { SniffedCodec, sniffPixelData } from "../Decoders/codec-sniffer";
 import { JPEGLosslessDecoder } from "../Decoders/JPEG-Lossless-decoder.class";
 import { JPEGLSDecoder } from "../Decoders/JPEG-LS-decoder.class";
 import { RLEDecoder } from "../Decoders/RLE-decoder.class";
@@ -35,6 +36,13 @@ export class ImageDCM  {
     private preparing: Promise<void> | null = null;
     private decoderOutputIsRGB: boolean = false;
     private _windows: VOIWindowOption[] | null = null;
+    /** Por qué no se puede mostrar la imagen (TS sin soporte, compresión propietaria, error del códec). null si se puede. */
+    public unsupportedReason: string | null = null;
+    /** Con TS privada o desconocida: el códec reconocido por el contenido del Pixel Data (p. ej. 'JPEG-LS'). */
+    public decodedBy: string | null = null;
+    private placeholderURL: string | null = null;
+    /** Resultado del reconocimiento por contenido (undefined = aún no se ha mirado); se reutiliza en los reintentos. */
+    private sniffed: SniffedCodec | null | undefined = undefined;
 
     constructor(public reader: DCMFileReader) {
         this.frames = reader.Frames;
@@ -80,8 +88,14 @@ export class ImageDCM  {
             case TRANSFER_SYNTAX.Explicit_VR_Big_Endian:
             case TRANSFER_SYNTAX.Deflated_Explicit_VR_Little_Endian: // ya inflado al leer el fichero (DCMFile)
             case TRANSFER_SYNTAX.Implicit_VR_Endian:
+            // Retirada y privadas nativas: Papyrus 3 (Implicit VR LE), GE (Implicit VR LE con píxeles Big Endian,
+            // que invierte UncompressedDecoder) y Philips CT-private-ELE (Explicit VR LE)
+            case TRANSFER_SYNTAX.Papyrus_3_Implicit_VR_Little_Endian:
+            case TRANSFER_SYNTAX.GE_Private_Implicit_VR_LE_Big_Endian_Pixels:
+            case TRANSFER_SYNTAX.Philips_Private_CT_Explicit_VR_LE:
                 return new UncompressedDecoder(this.reader);
             case TRANSFER_SYNTAX.Encapsulated_Uncompressed_Explicit_VR_Little_Endian:
+            case TRANSFER_SYNTAX.PixelMed_Private_Encapsulated_Raw_LE: // la precursora privada de la 1.2.1.98
                 return new EncapsulatedUncompressedDecoder(this.reader);
             case TRANSFER_SYNTAX.RLE_Lossless:
                 return new RLEDecoder(this.reader);
@@ -112,8 +126,33 @@ export class ImageDCM  {
             case TRANSFER_SYNTAX.JPEG_LS_Lossy_Near_Lossless_Image_Compression:
                 return new JPEGLSDecoder(this.reader);
         }
-        console.warn('Transfer Syntax sin decoder: ' + this.reader.TransferSyntax + ' (' + this.reader.TransferSyntaxName + ')');
+        // TS privada, desconocida o sin decoder: se mira el contenido del Pixel Data (ver codec-sniffer).
+        const uid = cleanUID(this.reader.TransferSyntax);
+        const name = this.reader.TransferSyntaxName == 'Unknown TX' ? 'Transfer Syntax desconocida' : this.reader.TransferSyntaxName;
+        if (this.sniffed === undefined) {
+            this.sniffed = sniffPixelData(this.reader);
+            if (this.sniffed) {
+                this.decodedBy = this.sniffed.name;
+                console.info(name + ' (' + uid + '): el Pixel Data es ' + this.sniffed.name + '; se decodifica como tal.');
+            }
+        }
+        if (this.sniffed) {
+            return this.sniffed.decoder;
+        }
+        this.unsupportedReason = TXTranslator.proprietaryNote(uid) ?? (TXTranslator.isKnown(uid)
+            ? 'El visor aún no decodifica esta Transfer Syntax: ' + name + ' (' + uid + ').'
+            : 'Transfer Syntax desconocida (' + uid + ') y el Pixel Data no corresponde a ningún códec estándar.');
+        console.warn('Transfer Syntax sin decoder: ' + uid + ' (' + name + '). ' + this.unsupportedReason);
         return null;
+    }
+
+    /** Marca la imagen como no decodificable (una sola vez) y guarda el motivo para enseñarlo. */
+    private fail(error: any) {
+        this.decodeFailed = true;
+        const message = (error as any)?.message ?? String(error);
+        this.unsupportedReason = 'No se pudo decodificar (' + this.reader.TransferSyntaxName + '): ' + message;
+        console.warn('No se pudo decodificar ' + (this.reader.SOPInstanceUID || 'la imagen') +
+            ' (' + this.reader.TransferSyntaxName + '): ' + message);
     }
 
     /** Decodifica todos los frames. Puede lanzar CodecRequiredError si hace falta un códec aún no cargado. */
@@ -125,6 +164,12 @@ export class ImageDCM  {
         if (deco) {
             this.rawFrames = deco.Decode();
             this.decoderOutputIsRGB = deco.outputIsRGB;
+            if (this.rawFrames.length == 0) {
+                this.rawFrames = null;
+                this.fail(new Error('el Pixel Data no contiene ningún frame'));
+            }
+        } else {
+            this.decodeFailed = true; // sin decoder: no se reintenta en cada repintado (el motivo ya está guardado)
         }
     }
 
@@ -149,9 +194,7 @@ export class ImageDCM  {
                         continue;
                     }
                 }
-                this.decodeFailed = true;
-                console.warn('No se pudo decodificar ' + (this.reader.SOPInstanceUID || 'la imagen') +
-                    ' (' + this.reader.TransferSyntaxName + '): ' + ((error as any)?.message ?? error));
+                this.fail(error);
             }
         }
         return !!this.rawFrames && this.rawFrames.length > 0;
@@ -164,9 +207,7 @@ export class ImageDCM  {
                 this.preloadImageFrames();
             } catch (error) {
                 if (!(error instanceof CodecRequiredError)) {
-                    this.decodeFailed = true;
-                    console.warn('No se pudo decodificar ' + (this.reader.SOPInstanceUID || 'la imagen') +
-                        ' (' + this.reader.TransferSyntaxName + '): ' + ((error as any)?.message ?? error));
+                    this.fail(error);
                 }
                 return null;
             }
@@ -187,14 +228,78 @@ export class ImageDCM  {
         const rgba = this.renderFrameRGBA(this.currentFrame);
         if (rgba) {
             this.createImageData(rgba, imageDisplay.nativeElement);
+        } else if (this.decodeFailed) {
+            this.paintUnsupported(imageDisplay.nativeElement);
         } else if (!this.rawFrames && !this.decodeFailed && !this.preparing) {
             // Falta un códec bajo demanda: se carga y se repinta cuando esté (los visores no cambian).
             this.preparing = this.prepare().then((ok) => {
                 this.preparing = null;
-                if (ok) {
+                if (ok || this.decodeFailed) {
                     this.paintImage(imageDisplay);
                 }
             });
+        }
+    }
+
+    /**
+     * Cartel en lugar de la imagen cuando no se puede decodificar: el motivo (p. ej. "Compresión privada de Sectra…")
+     * y la TS. Mismas proporciones que la imagen para no descolocar el visor; se genera una vez y se reutiliza.
+     */
+    private paintUnsupported(imageDisplay: HTMLImageElement): void {
+        if (!this.placeholderURL && typeof document !== 'undefined') {
+            const cols = this.reader.Columns || 512, rows = this.reader.Rows || 512;
+            const scale = Math.max(1, 640 / cols);
+            const canvas = document.createElement('canvas');
+            canvas.width = Math.round(cols * scale);
+            canvas.height = Math.round(rows * scale);
+            const ctx = canvas.getContext('2d');
+            if (ctx) {
+                const w = canvas.width, h = canvas.height;
+                const font = Math.max(12, Math.round(w / 30));
+                ctx.fillStyle = '#1b1b1b';
+                ctx.fillRect(0, 0, w, h);
+                ctx.strokeStyle = '#8a8a8a';
+                ctx.lineWidth = 2;
+                ctx.strokeRect(1, 1, w - 2, h - 2);
+                const lines: [string, string, number][] = [];
+                const wrap = (text: string, color: string, size: number) => {
+                    ctx.font = size + 'px sans-serif';
+                    let line = '';
+                    for (const word of text.split(' ')) {
+                        const test = line ? line + ' ' + word : word;
+                        if (ctx.measureText(test).width > w * 0.86 && line) {
+                            lines.push([line, color, size]);
+                            line = word;
+                        } else {
+                            line = test;
+                        }
+                    }
+                    if (line) {
+                        lines.push([line, color, size]);
+                    }
+                };
+                wrap('Imagen no disponible', '#ffffff', Math.round(font * 1.3));
+                wrap(this.unsupportedReason ?? 'No se pudo decodificar la imagen.', '#e0e0e0', font);
+                wrap('Transfer Syntax: ' + cleanUID(this.reader.TransferSyntax), '#9a9a9a', Math.round(font * 0.8));
+                const lineHeight = (size: number) => Math.round(size * 1.45);
+                let y = (h - lines.reduce((sum, l) => sum + lineHeight(l[2]), 0)) / 2;
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'top';
+                for (const [text, color, size] of lines) {
+                    ctx.font = size + 'px sans-serif';
+                    ctx.fillStyle = color;
+                    ctx.fillText(text, w / 2, y);
+                    y += lineHeight(size);
+                }
+            }
+            this.placeholderURL = canvas.toDataURL('image/png');
+        }
+        if (this.placeholderURL) {
+            const reason = this.unsupportedReason ?? 'No se pudo decodificar la imagen.';
+            imageDisplay.src = this.placeholderURL;
+            imageDisplay.title = reason;                       // el motivo también al pasar el ratón
+            imageDisplay.alt = 'Imagen no disponible: ' + reason;
+            imageDisplay.setAttribute('data-unsupported', reason);
         }
     }
 
@@ -209,5 +314,10 @@ export class ImageDCM  {
             ctx.putImageData(result, 0, 0);
         }
         imageDisplay.src = canvas.toDataURL("image/png");
+        if (imageDisplay.hasAttribute('data-unsupported')) { // el mismo <img> antes enseñó un cartel
+            imageDisplay.removeAttribute('data-unsupported');
+            imageDisplay.removeAttribute('title');
+            imageDisplay.removeAttribute('alt');
+        }
     }
 }
