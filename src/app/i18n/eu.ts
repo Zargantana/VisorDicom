@@ -23,7 +23,7 @@ export const EU: Texts = {
   'loader.chooseFiles': 'Aukeratu fitxategiak',
   'loader.chooseFolder': 'Aukeratu unitatea edo karpeta',
   'loader.view': 'Irudiak ikusi',
-  'loader.back': 'Karga',
+  'loader.back': 'Aurkitutako azterketak',
   'loader.drop.1': 'Aukeratu goiko botoiarekin',
   'loader.drop.or': 'edo',
   'loader.drop.drag': 'arrastatu hona',

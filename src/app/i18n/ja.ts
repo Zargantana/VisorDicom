@@ -23,7 +23,7 @@ export const JA: Texts = {
   'loader.chooseFiles': 'ファイルを選択',
   'loader.chooseFolder': 'ドライブまたはフォルダーを選択',
   'loader.view': '画像を表示',
-  'loader.back': '読み込み',
+  'loader.back': '見つかった検査',
   'loader.drop.1': '上のボタンで選ぶか、',
   'loader.drop.or': 'または',
   'loader.drop.drag': 'ここにドラッグ',

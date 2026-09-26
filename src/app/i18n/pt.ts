@@ -23,7 +23,7 @@ export const PT: Texts = {
   'loader.chooseFiles': 'Selecione os ficheiros',
   'loader.chooseFolder': 'Selecione a unidade ou a pasta',
   'loader.view': 'Ver imagens',
-  'loader.back': 'Carregamento',
+  'loader.back': 'Estudos encontrados',
   'loader.drop.1': 'Escolha com o botão acima',
   'loader.drop.or': 'ou',
   'loader.drop.drag': 'arraste para aqui',

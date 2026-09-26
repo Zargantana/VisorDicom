@@ -23,7 +23,7 @@ export const CA: Texts = {
   'loader.chooseFiles': 'Selecciona els fitxers',
   'loader.chooseFolder': 'Selecciona la unitat o carpeta',
   'loader.view': 'Veure imatges',
-  'loader.back': 'Càrrega',
+  'loader.back': 'Estudis trobats',
   'loader.drop.1': 'Tria amb el botó de dalt',
   'loader.drop.or': 'o',
   'loader.drop.drag': 'arrossega aquí',

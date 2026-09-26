@@ -23,7 +23,7 @@ export const GL: Texts = {
   'loader.chooseFiles': 'Selecciona os ficheiros',
   'loader.chooseFolder': 'Selecciona a unidade ou o cartafol',
   'loader.view': 'Ver imaxes',
-  'loader.back': 'Carga',
+  'loader.back': 'Estudos atopados',
   'loader.drop.1': 'Escolle co botón de arriba',
   'loader.drop.or': 'ou',
   'loader.drop.drag': 'arrastra aquí',

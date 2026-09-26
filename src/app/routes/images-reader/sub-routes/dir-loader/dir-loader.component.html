@@ -11,8 +11,8 @@
                 <i class="fa-solid fa-eye"></i> {{'loader.view' | t}} <span class="badge text-bg-light">{{foundDCMFiles.length}}</span>
             </button>
         } @else if (showViewer) {
-            <button type="button" class="btn btn-outline-secondary loader-view" (click)="showViewer = false">
-                <i class="fa-solid fa-list-check"></i> {{'loader.back' | t}}
+            <button type="button" class="btn btn-primary loader-view" (click)="showViewer = false">
+                <i class="fa-solid fa-sitemap"></i> {{'loader.back' | t}} <span class="badge text-bg-light">{{imgsViewer.classifier.numberOfSeries}}</span>
             </button>
         }
     </div>
