@@ -1,15 +1,6 @@
-// Barra de la pantalla de carga: título, botón de elegir y, a la derecha, el botón de ir al visor
+// Barra de la pantalla de carga, centrada: botón de elegir antes de leer y, después, el de ir al visor (o volver)
 .loader-bar {
     gap: 0.5rem 0.75rem;
-}
-
-.loader-title {
-    font-size: 1.4rem;
-    margin-right: 0.5rem;
-}
-
-.loader-spacer {
-    flex: 1 1 auto;
 }
 
 .loader-view .badge {
@@ -17,19 +8,10 @@
 }
 
 @media (max-width: 575.98px) {
-    .loader-title {
-        font-size: 1.1rem;
-        flex: 0 0 100%;
-    }
-
-    // Los dos botones se reparten la fila a partes iguales; sin separador en medio
+    // En móvil el botón ocupa la fila entera
     .loader-choose,
     .loader-view {
         flex: 1 1 0;
         min-width: 0;
-    }
-
-    .loader-spacer {
-        display: none;
     }
 }
