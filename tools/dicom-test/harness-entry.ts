@@ -27,6 +27,9 @@ export async function renderBinaryString(bin: string, windowIndex: number = 0) {
   try {
     if (typeof image.renderFrameRGBA === 'function') {       // codigo nuevo
       image.selectedWindow = windowIndex;
+      if (typeof image.prepare === 'function') {
+        await image.prepare();                                  // carga códecs bajo demanda si hacen falta
+      }
       const first = image.renderFrameRGBA(0);
       const decoded: number = image.rawFrames?.length ?? 0;
       for (let f = 0; f < decoded; f++) {

@@ -3,7 +3,9 @@ import { PhotometricInterpretationType } from "../DCM/DCM-interpreter.class";
 import { BaseColor } from "./base-color.class";
 
 /**
- * Color "directo": RGB, YBR_FULL, YBR_FULL_422 (y, por compatibilidad, 1 muestra empaquetada 3-3-2 / 5-6-5).
+ * Color "directo": RGB, YBR_FULL, YBR_FULL_422, YBR_PARTIAL_422/420, YBR_ICT/RCT y los retirados HSV, ARGB y CMYK
+ * (y, por compatibilidad, 1 muestra empaquetada 3-3-2 / 5-6-5).
+ * YBR_RCT llega siempre convertido (la inversa reversible la aplica el decoder JPEG 2000); si no, se pinta tal cual.
  *
  * Los decoders entregan SIEMPRE las muestras entrelazadas (R G B R G B...): la Planar Configuration nativa
  * se normaliza en UncompressedDecoder y RLE se reentrelaza al decodificar.
@@ -32,33 +34,86 @@ export class RGBColor extends BaseColor {
             return;
         }
 
-        if (!this.colorAlreadyRGB && photometric == PhotometricInterpretationType.YBR_FULL_422
-            && samples.length < pixels * 3) {
+        const is422 = photometric == PhotometricInterpretationType.YBR_FULL_422 || photometric == PhotometricInterpretationType.YBR_PARTIAL_422;
+        if (!this.colorAlreadyRGB && is422 && samples.length < pixels * 3) {
             // Nativo 4:2:2 -> por cada 2 pixeles: Y1 Y2 Cb Cr
+            const partial = photometric == PhotometricInterpretationType.YBR_PARTIAL_422;
             for (let p = 0, i = 0, j = 0; p < pixels && i + 3 < samples.length; p += 2, i += 4) {
                 const cb = samples[i + 2] >> shift, cr = samples[i + 3] >> shift;
-                j = this.putYBR(data, j, samples[i] >> shift, cb, cr);
+                j = partial ? this.putYBRPartial(data, j, samples[i] >> shift, cb, cr) : this.putYBR(data, j, samples[i] >> shift, cb, cr);
                 if (p + 1 < pixels) {
-                    j = this.putYBR(data, j, samples[i + 1] >> shift, cb, cr);
+                    j = partial ? this.putYBRPartial(data, j, samples[i + 1] >> shift, cb, cr) : this.putYBR(data, j, samples[i + 1] >> shift, cb, cr);
                 }
             }
             return;
         }
 
-        const isYBR = !this.colorAlreadyRGB &&
-            (photometric == PhotometricInterpretationType.YBR_FULL || photometric == PhotometricInterpretationType.YBR_FULL_422);
-        const count = Math.min(pixels, Math.floor(samples.length / 3));
-        for (let p = 0, i = 0, j = 0; p < count; p++, i += 3) {
-            const a = samples[i] >> shift, b = samples[i + 1] >> shift, c = samples[i + 2] >> shift;
-            if (isYBR) {
-                j = this.putYBR(data, j, a, b, c);
-            } else {
-                data[j] = a;
-                data[j + 1] = b;
-                data[j + 2] = c;
-                j += 4;
+        // Conversión por píxel según el modelo (si el decoder no entregó ya RGB)
+        let convert: (data: Uint8ClampedArray, j: number, a: number, b: number, c: number, d: number) => number = this.putRGB;
+        if (!this.colorAlreadyRGB) {
+            switch (photometric) {
+                case PhotometricInterpretationType.YBR_FULL:
+                case PhotometricInterpretationType.YBR_FULL_422:
+                case PhotometricInterpretationType.YBR_ICT:   // ICT = mismos coeficientes que YBR_FULL (sin MCT aplicada)
+                    convert = (d, j, y, cb, cr) => this.putYBR(d, j, y, cb, cr);
+                    break;
+                case PhotometricInterpretationType.YBR_PARTIAL_422:
+                case PhotometricInterpretationType.YBR_PARTIAL_420:
+                    convert = (d, j, y, cb, cr) => this.putYBRPartial(d, j, y, cb, cr);
+                    break;
+                case PhotometricInterpretationType.HSV:
+                    convert = this.putHSV;
+                    break;
+                case PhotometricInterpretationType.CMYK:
+                    convert = this.putCMYK;
+                    break;
+                case PhotometricInterpretationType.ARGB:
+                    convert = (d, j, a, r, g, b) => this.putRGB(d, j, r, g, b, 0); // A se ignora (ver doc)
+                    break;
             }
         }
+        const spp = Math.max(3, this.reader.SamplesPerPixel || 3);
+        const count = Math.min(pixels, Math.floor(samples.length / spp));
+        for (let p = 0, i = 0, j = 0; p < count; p++, i += spp) {
+            j = convert(data, j, samples[i] >> shift, samples[i + 1] >> shift, samples[i + 2] >> shift,
+                        spp > 3 ? samples[i + 3] >> shift : 0);
+        }
+    }
+
+    private putRGB(data: Uint8ClampedArray, j: number, r: number, g: number, b: number, _unused: number): number {
+        data[j] = r;
+        data[j + 1] = g;
+        data[j + 2] = b;
+        return j + 4;
+    }
+
+    /** YBR_PARTIAL_4xx -> RGB (PS3.3 C.7.6.3.1.2): Y en [16,235], Cb/Cr en [16,240]. */
+    private putYBRPartial(data: Uint8ClampedArray, j: number, y: number, cb: number, cr: number): number {
+        const yy = 1.1644 * (y - 16);
+        data[j] = yy + 1.5960 * (cr - 128);
+        data[j + 1] = yy - 0.3918 * (cb - 128) - 0.8130 * (cr - 128);
+        data[j + 2] = yy + 2.0172 * (cb - 128);
+        return j + 4;
+    }
+
+    /** HSV (retirado) -> RGB. Muestras de 8 bits: H 0..255 = 0..360 grados, S y V 0..255. */
+    private putHSV(data: Uint8ClampedArray, j: number, h: number, s: number, v: number, _unused: number): number {
+        const hue = (h / 256) * 6, sat = s / 255;
+        const sector = Math.floor(hue) % 6, f = hue - Math.floor(hue);
+        const p = v * (1 - sat), q = v * (1 - sat * f), t = v * (1 - sat * (1 - f));
+        const rgb = [[v, t, p], [q, v, p], [p, v, t], [p, q, v], [t, p, v], [v, p, q]][sector];
+        data[j] = rgb[0];
+        data[j + 1] = rgb[1];
+        data[j + 2] = rgb[2];
+        return j + 4;
+    }
+
+    /** CMYK (retirado) -> RGB: R = (255 - C)(255 - K)/255, etc. */
+    private putCMYK(data: Uint8ClampedArray, j: number, c: number, m: number, y: number, k: number): number {
+        data[j] = (255 - c) * (255 - k) / 255;
+        data[j + 1] = (255 - m) * (255 - k) / 255;
+        data[j + 2] = (255 - y) * (255 - k) / 255;
+        return j + 4;
     }
 
     /** YBR_FULL -> RGB (PS3.3 C.7.6.3.1.2, coeficientes CCIR 601 de rango completo). */

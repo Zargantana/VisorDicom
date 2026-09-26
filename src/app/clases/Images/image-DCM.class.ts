@@ -6,7 +6,8 @@ import { DCMInterpreter } from "../DCM/DCM-interpreter.class";
 import { BaseDecoder } from "../Decoders/base-decoder-class";
 import { EncapsulatedUncompressedDecoder } from "../Decoders/Encapsulated-Uncompressed-decoder.class";
 import { JPEG2000Decoder } from "../Decoders/JPEG-2000-decoder.class";
-import { JPEGBaselineDecoder } from "../Decoders/JPEG-Baseline-decoder.class";
+import { JPEGBaselineDecoder, JPEGRetiredProcessesDecoder } from "../Decoders/JPEG-Baseline-decoder.class";
+import { CodecLoader, CodecRequiredError } from "../Decoders/codec-loader";
 import { JPEGLosslessDecoder } from "../Decoders/JPEG-Lossless-decoder.class";
 import { JPEGLSDecoder } from "../Decoders/JPEG-LS-decoder.class";
 import { RLEDecoder } from "../Decoders/RLE-decoder.class";
@@ -30,6 +31,8 @@ export class ImageDCM  {
     /** Indice de la ventana VOI a aplicar (0 = la primera definida en el fichero). */
     public selectedWindow: number = 0;
     private rawFrames: any[] | null = null;
+    private decodeFailed: boolean = false;
+    private preparing: Promise<void> | null = null;
     private decoderOutputIsRGB: boolean = false;
     private _windows: VOIWindowOption[] | null = null;
 
@@ -85,12 +88,26 @@ export class ImageDCM  {
             case TRANSFER_SYNTAX.JPEG_Baseline_Process_2_4:
             case TRANSFER_SYNTAX.JPEG_Baseline_Process_1:
                 return new JPEGBaselineDecoder(this.reader);
+            // Procesos JPEG retirados (aritmetico, progresivo, lossless aritmetico): libjpeg-turbo bajo demanda
+            case TRANSFER_SYNTAX.JPEG_Extended_Processes_3_5:
+            case TRANSFER_SYNTAX.JPEG_Spectral_Selection_Nonhierarchical_Processes_6_8:
+            case TRANSFER_SYNTAX.JPEG_Spectral_Selection_Nonhierarchical_Processes_7_9:
+            case TRANSFER_SYNTAX.JPEG_Full_Progression_Nonhierarchical_Processes_10_12:
+            case TRANSFER_SYNTAX.JPEG_Full_Progression_Nonhierarchical_Processes_11_13:
+            case TRANSFER_SYNTAX.JPEG_Lossless_Nonhierarchical_Processes_15:
+                return new JPEGRetiredProcessesDecoder(this.reader);
             case TRANSFER_SYNTAX.JPEG_Lossless_Nonhierarchical_First_Order_Prediction_Processes_14_Selection_Value_1:
             case TRANSFER_SYNTAX.JPEG_Lossless_Nonhierarchical_Processes_14:
                 return new JPEGLosslessDecoder(this.reader);
             case TRANSFER_SYNTAX.JPEG_2000_Image_Compression_Lossless_Only:
             case TRANSFER_SYNTAX.JPEG_2000_Image_Compression:
+            case TRANSFER_SYNTAX.JPEG_2000_Part_2_Multicomponent_Image_Compression_Lossless_Only:
+            case TRANSFER_SYNTAX.JPEG_2000_Part_2_Multicomponent_Image_Compression:
                 return new JPEG2000Decoder(this.reader);
+            case TRANSFER_SYNTAX.HTJ2K_Lossless_Only:
+            case TRANSFER_SYNTAX.HTJ2K_RPCL_Lossless_Only:
+            case TRANSFER_SYNTAX.HTJ2K:
+                return new JPEG2000Decoder(this.reader, true);
             case TRANSFER_SYNTAX.JPEG_LS_Lossless_Image_Compression:
             case TRANSFER_SYNTAX.JPEG_LS_Lossy_Near_Lossless_Image_Compression:
                 return new JPEGLSDecoder(this.reader);
@@ -99,7 +116,11 @@ export class ImageDCM  {
         return null;
     }
 
+    /** Decodifica todos los frames. Puede lanzar CodecRequiredError si hace falta un códec aún no cargado. */
     private preloadImageFrames() {
+        if (this.decodeFailed) {
+            return;
+        }
         const deco = this.createDecoder();
         if (deco) {
             this.rawFrames = deco.Decode();
@@ -107,10 +128,48 @@ export class ImageDCM  {
         }
     }
 
-    /** RGBA (Rows x Columns x 4) del frame indicado con la ventana seleccionada. null si no se puede decodificar. */
+    /**
+     * Deja la imagen decodificada, cargando antes (asíncrono) los códecs bajo demanda que pida el decoder
+     * (OpenJPEG para JPEG 2000/HTJ2K, libjpeg-turbo para procesos JPEG retirados). Devuelve false si no se puede.
+     */
+    public async prepare(): Promise<boolean> {
+        for (let attempt = 0; attempt < 3 && !this.rawFrames && !this.decodeFailed; attempt++) {
+            try {
+                this.preloadImageFrames();
+                if (!this.rawFrames) {
+                    break; // TS sin decoder
+                }
+            } catch (error) {
+                if (error instanceof CodecRequiredError && !CodecLoader.isUnavailable(error.codec)) {
+                    try {
+                        await CodecLoader.load(error.codec);
+                        continue;
+                    } catch {
+                        // el decoder usará su alternativa (si la tiene) en el siguiente intento
+                        continue;
+                    }
+                }
+                this.decodeFailed = true;
+                console.warn('No se pudo decodificar ' + (this.reader.SOPInstanceUID || 'la imagen') +
+                    ' (' + this.reader.TransferSyntaxName + '): ' + ((error as any)?.message ?? error));
+            }
+        }
+        return !!this.rawFrames && this.rawFrames.length > 0;
+    }
+
+    /** RGBA (Rows x Columns x 4) del frame indicado con la ventana seleccionada. null si no se puede decodificar (aún). */
     public renderFrameRGBA(frameIndex: number = this.currentFrame): Uint8ClampedArray | null {
         if (!this.rawFrames) {
-            this.preloadImageFrames();
+            try {
+                this.preloadImageFrames();
+            } catch (error) {
+                if (!(error instanceof CodecRequiredError)) {
+                    this.decodeFailed = true;
+                    console.warn('No se pudo decodificar ' + (this.reader.SOPInstanceUID || 'la imagen') +
+                        ' (' + this.reader.TransferSyntaxName + '): ' + ((error as any)?.message ?? error));
+                }
+                return null;
+            }
         }
         if (!this.rawFrames || this.rawFrames.length == 0) {
             return null;
@@ -128,6 +187,14 @@ export class ImageDCM  {
         const rgba = this.renderFrameRGBA(this.currentFrame);
         if (rgba) {
             this.createImageData(rgba, imageDisplay.nativeElement);
+        } else if (!this.rawFrames && !this.decodeFailed && !this.preparing) {
+            // Falta un códec bajo demanda: se carga y se repinta cuando esté (los visores no cambian).
+            this.preparing = this.prepare().then((ok) => {
+                this.preparing = null;
+                if (ok) {
+                    this.paintImage(imageDisplay);
+                }
+            });
         }
     }
 

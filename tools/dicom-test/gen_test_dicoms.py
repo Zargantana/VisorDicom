@@ -466,6 +466,288 @@ ds.PixelData = stored12.tobytes()
 save(ds, "t23_ct_signed12_in16.dcm", ExplicitVRLittleEndian)
 expect("t23_ct_signed12_in16.dcm", rows=R, cols=C, frames=1, windows=1, kind="ct")
 
+
+# =============================================================================================================
+# Transfer Syntaxes ampliadas (HTJ2K, JPEG 2000 Part 2, procesos JPEG retirados, lossless 12/16 bits, 12 bits).
+# Requieren `pip install imagecodecs` (y opcionalmente `cjpeg` de libjpeg-turbo, y gcc + libopenjp2-dev para t27).
+# La "verdad" se guarda en out/ref/<fichero>.npy: el array original si es sin pérdida, o lo que decodifica
+# imagecodecs (libjpeg-turbo/OpenJPEG/OpenJPH nativos) si es con pérdida. check_render.py la usa si existe.
+# =============================================================================================================
+import shutil
+import subprocess
+import tempfile
+
+REF = os.path.join(OUT, "ref")
+os.makedirs(REF, exist_ok=True)
+
+# UIDs conocidos por pydicom con la misma longitud, para guardar y parchear el meta header (como t15).
+_SAME_LENGTH_PLACEHOLDER = {22: "1.2.840.10008.1.2.4.50", 23: "1.2.840.10008.1.2.4.100"}
+
+
+def save_encapsulated(ds, name, ts_uid, codestreams, ref):
+    ds.PixelData = encapsulate(codestreams)
+    ds["PixelData"].is_undefined_length = True
+    ds["PixelData"].VR = "OB"
+    placeholder = _SAME_LENGTH_PLACEHOLDER[len(ts_uid)]
+    ds.file_meta.TransferSyntaxUID = UID(placeholder)
+    path = os.path.join(OUT, name)
+    ds.save_as(path, enforce_file_format=True, implicit_vr=False, little_endian=True)
+    if placeholder != ts_uid:
+        raw = open(path, "rb").read().replace(placeholder.encode(), ts_uid.encode(), 1)
+        open(path, "wb").write(raw)
+    np.save(os.path.join(REF, name + ".npy"), np.asarray(ref))
+
+
+def image_ds(modality, rows, cols, samples, photometric, bits, stored, signed, frames=1):
+    ds = base_ds(modality, "1.2.840.10008.5.1.4.1.1.7")
+    ds.SamplesPerPixel = samples
+    ds.PhotometricInterpretation = photometric
+    if samples == 3:
+        ds.PlanarConfiguration = 0
+    ds.Rows, ds.Columns = rows, cols
+    ds.BitsAllocated, ds.BitsStored, ds.HighBit = bits, stored, stored - 1
+    ds.PixelRepresentation = 1 if signed else 0
+    if frames > 1:
+        ds.NumberOfFrames = frames
+    return ds
+
+
+try:
+    import imagecodecs as ic
+except ImportError:  # pragma: no cover
+    ic = None
+    print("imagecodecs no instalado: se omiten los casos t24-t36 (pip install imagecodecs)")
+
+if ic is not None:
+    g12 = np.tile(np.linspace(0, 4095, C).astype(np.uint16), (R, 1))
+    g12[10:20, 10:30] = 3000
+    hu = ct_hu()
+
+    # --- t24: HTJ2K lossless 12 bits (.201) ---------------------------------------------------------------
+    cs = ic.htj2k_encode(g12, reversible=True)
+    ds = image_ds("MR", R, C, 1, "MONOCHROME2", 16, 12, False)
+    ds.WindowCenter, ds.WindowWidth = 2048, 4096
+    save_encapsulated(ds, "t24_htj2k_lossless_12.dcm", "1.2.840.10008.1.2.4.201", [cs], g12)
+    expect("t24_htj2k_lossless_12.dcm", rows=R, cols=C, frames=1, windows=1, kind="ref")
+
+    # --- t25: HTJ2K lossless RGB con RCT (.202 "RPCL") ------------------------------------------------------
+    cs = ic.htj2k_encode(rgb, reversible=True)
+    ds = image_ds("XC", R, C, 3, "YBR_RCT", 8, 8, False)
+    save_encapsulated(ds, "t25_htj2k_rpcl_rgb.dcm", "1.2.840.10008.1.2.4.202", [cs], rgb)
+    expect("t25_htj2k_rpcl_rgb.dcm", rows=R, cols=C, frames=1, windows=0, kind="ref")
+
+    # --- t26: HTJ2K con pérdida, CT 16 bits con 2 ventanas (.203) -------------------------------------------
+    stored = (hu + 1024).astype(np.uint16)
+    cs = ic.htj2k_encode(stored, reversible=False, level=40)
+    ds = image_ds("CT", R, C, 1, "MONOCHROME2", 16, 16, False)
+    ds.RescaleIntercept, ds.RescaleSlope = -1024, 1
+    ds.WindowCenter, ds.WindowWidth = [40, -600], [400, 1500]
+    save_encapsulated(ds, "t26_htj2k_lossy_ct.dcm", "1.2.840.10008.1.2.4.203", [cs], ic.htj2k_decode(cs))
+    expect("t26_htj2k_lossy_ct.dcm", rows=R, cols=C, frames=1, windows=2, kind="ref")
+
+    # --- t27: JPEG 2000 Part 2 con MCT por matriz (.93): FALLO ESPERADO -------------------------------------
+    # Ni OpenJPEG (2.5.0/2.5.4) ni jpx.js decodifican la MCT por matriz de Part 2. El visor debe rechazarlo
+    # con un aviso (sin colores falsos ni excepciones). El codestream lo genera j2k-part2/j2k_part2_mct.c
+    # (opj_set_MCT); el opj_compress de las distros no acepta -m.
+    part2_src = os.path.join(os.path.dirname(os.path.abspath(__file__)), "j2k-part2", "j2k_part2_mct.c")
+    if shutil.which("gcc") and os.path.exists("/usr/include/openjpeg-2.5/openjpeg.h"):
+        with tempfile.TemporaryDirectory() as tmp:
+            exe = os.path.join(tmp, "j2k_part2_mct")
+            subprocess.run(["gcc", "-O2", "-I/usr/include/openjpeg-2.5", part2_src, "-lopenjp2", "-o", exe],
+                           check=True, capture_output=True)
+            ppm = os.path.join(tmp, "in.ppm")
+            open(ppm, "wb").write(b"P6\n%d %d\n255\n" % (C, R) + rgb.tobytes())
+            j2k = os.path.join(tmp, "out.j2k")
+            subprocess.run([exe, ppm, j2k], check=True, capture_output=True)
+            cs = open(j2k, "rb").read()
+        ds = image_ds("XC", R, C, 3, "RGB", 8, 8, False)
+        save_encapsulated(ds, "t27_j2k_part2_mct.dcm", "1.2.840.10008.1.2.4.93", [cs], rgb)
+        expect("t27_j2k_part2_mct.dcm", rows=R, cols=C, frames=1, windows=0, kind="expect_fail")
+    else:
+        print("gcc/libopenjp2-dev no disponibles: se omite t27 (JPEG 2000 Part 2 MCT, fallo esperado)")
+
+    # --- t28: JPEG 2000 lossless RGB con RCT (.90) -----------------------------------------------------------
+    cs = ic.jpeg2k_encode(rgb, codecformat="j2k", reversible=True, mct=True)
+    ds = image_ds("XC", R, C, 3, "YBR_RCT", 8, 8, False)
+    save_encapsulated(ds, "t28_j2k_rgb_rct.dcm", "1.2.840.10008.1.2.4.90", [cs], rgb)
+    expect("t28_j2k_rgb_rct.dcm", rows=R, cols=C, frames=1, windows=0, kind="ref")
+
+    # --- t29: JPEG Lossless SV1 12 bits (.70) ----------------------------------------------------------------
+    cs = ic.jpeg8_encode(g12, lossless=True, predictor=1, bitspersample=12)
+    ds = image_ds("CR", R, C, 1, "MONOCHROME2", 16, 12, False)
+    ds.WindowCenter, ds.WindowWidth = 2048, 4096
+    save_encapsulated(ds, "t29_jpegll_sv1_12.dcm", "1.2.840.10008.1.2.4.70", [cs], g12)
+    expect("t29_jpegll_sv1_12.dcm", rows=R, cols=C, frames=1, windows=1, kind="ref")
+
+    # --- t30: JPEG Lossless proceso 14, predictor 6, 16 bits CON SIGNO (.57) -------------------------------
+    cs = ic.jpeg8_encode(hu.view(np.uint16), lossless=True, predictor=6, bitspersample=16)
+    ds = image_ds("CT", R, C, 1, "MONOCHROME2", 16, 16, True)
+    ds.WindowCenter, ds.WindowWidth = 40, 400
+    save_encapsulated(ds, "t30_jpegll_p6_16s.dcm", "1.2.840.10008.1.2.4.57", [cs], hu)
+    expect("t30_jpegll_p6_16s.dcm", rows=R, cols=C, frames=1, windows=1, kind="ref")
+
+    # --- t31: JPEG Extended 12 bits (.51) --------------------------------------------------------------------
+    cs = ic.jpeg8_encode(g12, level=95, bitspersample=12)
+    ds = image_ds("XA", R, C, 1, "MONOCHROME2", 16, 12, False)
+    ds.WindowCenter, ds.WindowWidth = 2048, 4096
+    save_encapsulated(ds, "t31_jpeg_ext12.dcm", "1.2.840.10008.1.2.4.51", [cs], ic.jpeg8_decode(cs))
+    expect("t31_jpeg_ext12.dcm", rows=R, cols=C, frames=1, windows=1, kind="ref")
+
+    # --- t32-t36: procesos JPEG retirados de 8 bits (cjpeg de libjpeg-turbo) ------------------------------------
+    if shutil.which("cjpeg"):
+        spectral = "0: 0-0, 0, 0;\n0: 1-9, 0, 0;\n0: 10-63, 0, 0;\n"   # spectral selection sin aproximación sucesiva
+        cases = [
+            ("t32_jpeg_arith_rgb.dcm", "1.2.840.10008.1.2.4.52", rgb, ["-arithmetic", "-sample", "2x1"]),
+            ("t33_jpeg_prog_rgb.dcm", "1.2.840.10008.1.2.4.55", rgb, ["-progressive", "-sample", "2x1"]),
+            ("t34_jpeg_prog_arith_gray.dcm", "1.2.840.10008.1.2.4.56", g8, ["-progressive", "-arithmetic"]),
+            ("t35_jpeg_spectral_gray.dcm", "1.2.840.10008.1.2.4.53", g8, ["-scans", "SCANS"]),
+            ("t36_jpeg_spectral_arith_gray.dcm", "1.2.840.10008.1.2.4.54", g8, ["-scans", "SCANS", "-arithmetic"]),
+        ]
+        with tempfile.TemporaryDirectory() as tmp:
+            scans = os.path.join(tmp, "scans.txt")
+            open(scans, "w").write(spectral)
+            for name, ts_uid, src, args in cases:
+                pnm = os.path.join(tmp, "in.pnm")
+                if src.ndim == 3:
+                    open(pnm, "wb").write(b"P6\n%d %d\n255\n" % (C, R) + src.tobytes())
+                else:
+                    open(pnm, "wb").write(b"P5\n%d %d\n255\n" % (C, R) + src.tobytes())
+                out_jpg = os.path.join(tmp, "out.jpg")
+                cmd = ["cjpeg", "-quality", "95"] + [scans if a == "SCANS" else a for a in args] + ["-outfile", out_jpg, pnm]
+                subprocess.run(cmd, check=True, capture_output=True)
+                cs = open(out_jpg, "rb").read()
+                if src.ndim == 3:
+                    ds = image_ds("XC", R, C, 3, "YBR_FULL_422", 8, 8, False)
+                else:
+                    ds = image_ds("XA", R, C, 1, "MONOCHROME2", 8, 8, False)
+                save_encapsulated(ds, name, ts_uid, [cs], ic.jpeg8_decode(cs))
+                expect(name, rows=R, cols=C, frames=1, windows=0, kind="ref")
+    else:
+        print("cjpeg no disponible: se omiten t32-t36 (procesos JPEG retirados)")
+
+
+# =============================================================================================================
+# Modelos de color y presentación de grises ampliados (t40-t47). La verdad de los modelos "a mano"
+# (YBR_PARTIAL, HSV, CMYK, ARGB) se calcula aquí de forma independiente (numpy/colorsys) y va a out/ref.
+# =============================================================================================================
+import colorsys
+
+
+def native_color(name, photometric, samples_array, spp, ref, planar=0, bits=8):
+    ds = base_ds("XC", "1.2.840.10008.5.1.4.1.1.7")
+    ds.SamplesPerPixel = spp
+    ds.PhotometricInterpretation = photometric
+    ds.PlanarConfiguration = planar
+    ds.Rows, ds.Columns = R, C
+    ds.BitsAllocated, ds.BitsStored, ds.HighBit, ds.PixelRepresentation = bits, bits, bits - 1, 0
+    ds.PixelData = samples_array.tobytes()
+    save(ds, name, ExplicitVRLittleEndian)
+    np.save(os.path.join(REF, name + ".npy"), np.asarray(ref))
+    expect(name, rows=R, cols=C, frames=1, windows=0, kind="ref")
+
+
+rgbf = rgb.astype(np.float64)
+# --- t40: YBR_PARTIAL_422 nativo (retirado): BT.601 rango parcial, croma promediada por pares -----------------
+Yp = 16 + (65.481 * rgbf[..., 0] + 128.553 * rgbf[..., 1] + 24.966 * rgbf[..., 2]) / 255
+Cbp = 128 + (-37.797 * rgbf[..., 0] - 74.203 * rgbf[..., 1] + 112.0 * rgbf[..., 2]) / 255
+Crp = 128 + (112.0 * rgbf[..., 0] - 93.786 * rgbf[..., 1] - 18.214 * rgbf[..., 2]) / 255
+Yq = np.clip(np.round(Yp), 0, 255).reshape(-1)
+cbq = np.clip(np.round((Cbp.reshape(-1)[0::2] + Cbp.reshape(-1)[1::2]) / 2), 0, 255)
+crq = np.clip(np.round((Crp.reshape(-1)[0::2] + Crp.reshape(-1)[1::2]) / 2), 0, 255)
+packed = np.stack([Yq[0::2], Yq[1::2], cbq, crq], axis=1).astype(np.uint8)
+yy = 1.1644 * (Yq - 16)
+cbf, crf = np.repeat(cbq, 2) - 128, np.repeat(crq, 2) - 128
+ref40 = np.stack([yy + 1.5960 * crf, yy - 0.3918 * cbf - 0.8130 * crf, yy + 2.0172 * cbf], axis=1)
+native_color("t40_native_ybr_partial_422.dcm", "YBR_PARTIAL_422", packed, 3,
+             np.clip(np.round(ref40), 0, 255).astype(np.uint8).reshape(R, C, 3))
+
+# --- t41: HSV nativo (retirado): H 0..255 = 0..360 grados ------------------------------------------------------
+hsv = np.zeros_like(rgb)
+for yy_ in range(R):
+    for xx_ in range(C):
+        h_, s_, v_ = colorsys.rgb_to_hsv(*(rgbf[yy_, xx_] / 255))
+        hsv[yy_, xx_] = [min(255, int(h_ * 256)), int(round(s_ * 255)), int(round(v_ * 255))]
+ref41 = np.zeros_like(rgb)
+for yy_ in range(R):
+    for xx_ in range(C):
+        r_, g_, b_ = colorsys.hsv_to_rgb(hsv[yy_, xx_, 0] / 256, hsv[yy_, xx_, 1] / 255, hsv[yy_, xx_, 2] / 255)
+        ref41[yy_, xx_] = np.clip(np.round(np.array([r_, g_, b_]) * 255), 0, 255)
+native_color("t41_native_hsv.dcm", "HSV", hsv, 3, ref41)
+
+# --- t42: CMYK nativo (retirado) --------------------------------------------------------------------------------
+cmy = 255 - rgb.astype(np.int32)
+k = cmy.min(axis=2, keepdims=True)
+cmyk = np.concatenate([cmy - k, k], axis=2).astype(np.uint8)
+ref42 = np.clip(np.round((255 - cmyk[..., :3].astype(np.float64)) * (255 - cmyk[..., 3:4].astype(np.float64)) / 255), 0, 255)
+native_color("t42_native_cmyk.dcm", "CMYK", cmyk, 4, ref42.astype(np.uint8))
+
+# --- t43: ARGB nativo (retirado) con Planar Configuration 1 (4 planos): A se ignora ---------------------------
+argb = np.concatenate([np.full((R, C, 1), 128, np.uint8), rgb], axis=2)
+native_color("t43_native_argb_planar.dcm", "ARGB", np.moveaxis(argb, -1, 0).copy(), 4, rgb, planar=1)
+
+# --- t44: PALETTE COLOR con LUT SEGMENTADA (discreto + lineal + indirecto) ------------------------------------
+ds = base_ds("NM", "1.2.840.10008.5.1.4.1.1.20")
+ds.SamplesPerPixel = 1
+ds.PhotometricInterpretation = "PALETTE COLOR"
+ds.Rows, ds.Columns = R, C
+ds.BitsAllocated, ds.BitsStored, ds.HighBit, ds.PixelRepresentation = 8, 8, 7, 0
+ds.PixelData = np.tile(np.linspace(0, 255, C).astype(np.uint8), (R, 1)).tobytes()
+# rojo: discreto [0], lineal hasta 65535 en 255 pasos -> 256 entradas
+red = [0, 1, 0, 1, 255, 65535]
+# verde: discreto [0, 30000], lineal 126 -> 65535, indirecto: copia 1 segmento desde la entrada 0 (discreto [0, 30000]),
+#        lineal 126 -> 0  => 2 + 126 + 2 + 126 = 256 entradas
+green = [0, 2, 0, 30000, 1, 126, 65535, 2, 1, 0, 0, 1, 126, 0]
+# azul: discreto de 256 valores decrecientes
+blue = [0, 256] + [int(v) for v in np.linspace(65535, 0, 256)]
+for tag_desc, tag_data, seg in [((0x0028, 0x1101), (0x0028, 0x1221), red), ((0x0028, 0x1102), (0x0028, 0x1222), green),
+                                ((0x0028, 0x1103), (0x0028, 0x1223), blue)]:
+    ds.add_new(tag_desc, "US", [256, 0, 16])
+    ds.add_new(tag_data, "OW", np.array(seg, "<u2").tobytes())
+save(ds, "t44_segmented_palette.dcm", ExplicitVRLittleEndian)
+expect("t44_segmented_palette.dcm", rows=R, cols=C, frames=1, windows=0, kind="palette_segmented")
+
+# --- t45: Supplemental Palette: MONOCHROME2 + Pixel Presentation MIXED + LUT desde el valor 1000 ------------------
+sup = np.tile(np.linspace(0, 999, C).astype(np.uint16), (R, 1))
+sup[20:44, 20:60] = (1000 + np.tile(np.linspace(0, 255, 40).astype(np.uint16), (24, 1)))
+ds = base_ds("MR", "1.2.840.10008.5.1.4.1.1.4")
+set_mono16(ds, sup, signed=False, slope=1.0, intercept=0.0)
+del ds.RescaleType
+ds.PixelPresentation = "MIXED"
+ds.WindowCenter, ds.WindowWidth = 500, 1000
+lut_hot_r = np.clip(np.arange(256) * 3, 0, 255).astype(np.uint16) * 257
+lut_hot_g = np.clip(np.arange(256) * 3 - 255, 0, 255).astype(np.uint16) * 257
+lut_hot_b = np.clip(np.arange(256) * 3 - 510, 0, 255).astype(np.uint16) * 257
+for d, t, lut in [((0x0028, 0x1101), (0x0028, 0x1201), lut_hot_r), ((0x0028, 0x1102), (0x0028, 0x1202), lut_hot_g),
+                  ((0x0028, 0x1103), (0x0028, 0x1203), lut_hot_b)]:
+    ds.add_new(d, "US", [256, 1000, 16])
+    ds.add_new(t, "OW", lut.astype("<u2").tobytes())
+ds.PixelData = sup.tobytes()
+save(ds, "t45_supplemental_palette.dcm", ExplicitVRLittleEndian)
+expect("t45_supplemental_palette.dcm", rows=R, cols=C, frames=1, windows=1, kind="supplemental")
+
+# --- t46: MONOCHROME2 con Presentation LUT Shape INVERSE ------------------------------------------------------
+ds = base_ds("DX", "1.2.840.10008.5.1.4.1.1.1.1")
+g12b = np.tile(np.linspace(0, 4095, C).astype(np.uint16), (R, 1))
+set_mono16(ds, g12b, signed=False, slope=1.0, intercept=0.0)
+del ds.RescaleType
+ds.BitsStored, ds.HighBit = 12, 11
+ds.PresentationLUTShape = "INVERSE"
+ds.WindowCenter, ds.WindowWidth = 2048, 4096
+ds.PixelData = g12b.tobytes()
+save(ds, "t46_mono2_presentation_inverse.dcm", ExplicitVRLittleEndian)
+expect("t46_mono2_presentation_inverse.dcm", rows=R, cols=C, frames=1, windows=1, kind="inverse")
+
+# --- t47: CT con Pixel Padding Value (-2000) y SIN ventana: el relleno no entra en la auto-ventana ------------------
+pad = ct_hu().astype(np.int16)
+yy_, xx_ = np.mgrid[0:R, 0:C]
+pad[(yy_ - R / 2) ** 2 / (R / 2) ** 2 + (xx_ - C / 2) ** 2 / (C / 2) ** 2 > 1] = -2000
+ds = base_ds("CT", "1.2.840.10008.5.1.4.1.1.2")
+set_mono16(ds, pad, signed=True, slope=1.0, intercept=0.0)
+ds.PixelPaddingValue = -2000
+ds.PixelData = pad.tobytes()
+save(ds, "t47_ct_pixel_padding_nowin.dcm", ExplicitVRLittleEndian)
+expect("t47_ct_pixel_padding_nowin.dcm", rows=R, cols=C, frames=1, windows=0, kind="padding")
+
 with open(os.path.join(OUT, "expected.json"), "w") as fh:
     json.dump(EXPECTED, fh, indent=1)
 print("generated", len(os.listdir(OUT)), "files in", OUT)
