@@ -4,6 +4,12 @@ export const DICOM_LABEL = "DICM";
 export const VR_UL = "UL";
 export const LITTLE_ENDIANT_FIRST_KNOWN_TAG_BYTE = 2; //BE = 0
 export const DEFLATED_EXPLICIT_VR_LITTLE_ENDIAN = '1.2.840.10008.1.2.1.99';
+/**
+ * Tope de FileReader.readAsBinaryString: la longitud maxima de un string en V8 (2^29 - 24 caracteres; Chrome y Edge).
+ * Por encima, result es null SIN evento de error. Firefox y Safari tienen otros limites, por eso se comprueba ademas el
+ * resultado vacio. Plan para superarlo: documentation/plan-carga-ficheros-grandes.md (lectura por trozos con File.slice).
+ */
+export const MAX_BINARY_STRING_BYTES = (1 << 29) - 24;
 
 export enum FILEREAD_STATUS {
     NONE = 0,
@@ -41,6 +47,10 @@ export class DCMFile {
     public isDCM: boolean | null = null;
     /** true si el dataset venia en Deflated Explicit VR LE y ya se ha inflado en rawData. */
     public inflated: boolean = false;
+    /** true desde que empieza la lectura (el cargador encola los ficheros y solo lee unos pocos a la vez). */
+    public started: boolean = false;
+    /** Motivo, para el usuario, cuando readStatus es ERROR (p. ej. fichero mayor que el tope del navegador). */
+    public readError: string = '';
     public isDCM$: Observable<boolean | null> = new Observable<boolean | null>((subscriber) =>  {
         this.isDCMSubscriber = subscriber;
         subscriber.next(this.isDCM);
@@ -63,8 +73,23 @@ export class DCMFile {
     
     public readContents(): void {
         this.resetReadResults();
+        this.started = true;
         let sliced = this.file.slice(0,132);
         this.freader.readAsBinaryString(sliced);
+    }
+
+    /** Fallo controlado: guarda el motivo, lo deja en la consola y avisa a los suscriptores con ERROR. */
+    private failRead(reason: string): void {
+        this.readError = `${this.file.name}: ${reason}`;
+        console.warn(this.readError);
+        this.rawData = '';
+        this.readStatus = FILEREAD_STATUS.ERROR;
+        this.readStatusSubscriber?.next(this.readStatus);
+        this.readStatusTrkSubscriber?.next(this.readStatus);
+    }
+
+    private get sizeMB(): number {
+        return Math.round(this.file.size / 1048576);
     }
 
     private readCompleteFile(): void {
@@ -86,6 +111,7 @@ export class DCMFile {
         this.readStatusSubscriber?.next(this.readStatus);
         this.readStatusTrkSubscriber?.next(this.readStatus);
         this.rawData = '';
+        this.readError = '';
         this.length = 0;
         this.lengthSubscriber?.next(this.length);
         this.isDCM = null;
@@ -116,6 +142,12 @@ export class DCMFile {
             this.length = this.rawData.length;
             this.lengthSubscriber?.next(this.length);
             if (this.isDCM) {
+                if (this.rawData.length == 0 && this.file.size > 0) {
+                    // El navegador no ha devuelto nada (ni error): el fichero no cabe en un string.
+                    this.failRead(`no se ha podido cargar entero en memoria (${this.sizeMB} MB); ` +
+                        'el navegador no admite ficheros tan grandes en esta versión del visor');
+                    return;
+                }
                 // DCMFile.HIGH_PRIOR--;
                 this.inflateIfDeflated()
                     .catch((error) => console.warn('No se pudo inflar ' + this.file.name + ': ' + error))
@@ -128,7 +160,13 @@ export class DCMFile {
                 this.isDCM = this.isDICOMFile();
                 if (this.isDCM) {
                     // DCMFile.HIGH_PRIOR++;
-                    this.readCompleteFile();
+                    if (this.file.size > MAX_BINARY_STRING_BYTES) {
+                        // Ni se intenta: en Chrome y Edge readAsBinaryString devolveria null tras leerlo entero.
+                        this.failRead(`${this.sizeMB} MB: demasiado grande para esta versión del visor ` +
+                            `(tope de ${Math.floor(MAX_BINARY_STRING_BYTES / 1048576)} MB por fichero)`);
+                    } else {
+                        this.readCompleteFile();
+                    }
                 } else {
                     this.readStatus = FILEREAD_STATUS.SUCCESS;
                     this.readStatusSubscriber?.next(this.readStatus);

@@ -13,7 +13,8 @@ import { fileURLToPath } from 'node:url';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const root = path.resolve(here, '..', '..');
-const outDir = path.join(here, 'out');
+// DICOM_TEST_OUT: otra carpeta de entrada/salida (p. ej. out_real, con ficheros reales de real/fetch_real_files.py)
+const outDir = process.env.DICOM_TEST_OUT ? path.resolve(process.env.DICOM_TEST_OUT) : path.join(here, 'out');
 const renderDir = path.join(outDir, 'render');
 fs.mkdirSync(renderDir, { recursive: true });
 
@@ -32,7 +33,7 @@ for (const lib of ['src/libs/lossless.js',
 {
   const { createRequire } = await import('node:module');
   const requireFromRoot = createRequire(path.join(root, 'package.json'));
-  for (const [file, globalName] of [['openjpegjs_decode.js', 'OpenJPEGJS'], ['libjpegturbojs_decode.js', 'libjpegturbojs_decode'], ['libjpegturbo12js.js', 'libjpegturbo12js']]) {
+  for (const [file, globalName] of [['openjpegjs_decode.js', 'OpenJPEGJS'], ['libjpegturbojs_decode.js', 'libjpegturbojs_decode'], ['libjpegturbo12js.js', 'libjpegturbo12js'], ['charlsjs_decode.js', 'CharLS']]) {
     const codec = path.join(root, 'src/assets/codecs', file);
     if (fs.existsSync(codec)) globalThis[globalName] = requireFromRoot(codec);
   }
@@ -48,8 +49,12 @@ const { createRequire } = await import('node:module');
 const { renderBinaryString } = createRequire(import.meta.url)(bundle);
 
 const summary = {};
-const files = fs.readdirSync(outDir).filter(f => f.endsWith('.dcm')).sort();
+// DICOM_TEST_FILTER: expresión regular para procesar solo algunos ficheros; DICOM_TEST_VERBOSE=1 avisa por stderr
+// antes de cada fichero (para saber cuál revienta si el proceso se queda sin memoria)
+const filter = process.env.DICOM_TEST_FILTER ? new RegExp(process.env.DICOM_TEST_FILTER) : null;
+const files = fs.readdirSync(outDir).filter(f => f.endsWith('.dcm') && (!filter || filter.test(f))).sort();
 for (const f of files) {
+  if (process.env.DICOM_TEST_VERBOSE) console.error(`> ${f}`);
   const bin = fs.readFileSync(path.join(outDir, f)).toString('latin1');
   const variants = [0, 1, 2];
   for (const w of variants) {

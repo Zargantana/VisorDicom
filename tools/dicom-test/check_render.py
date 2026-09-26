@@ -11,7 +11,8 @@ from pydicom.pixels import apply_color_lut
 from PIL import Image, ImageDraw
 
 HERE = os.path.dirname(__file__)
-OUT = os.path.join(HERE, "out")
+# DICOM_TEST_OUT: otra carpeta (p. ej. out_real, con ficheros reales); expected.json puede estar vacío
+OUT = os.path.abspath(os.environ.get("DICOM_TEST_OUT") or os.path.join(HERE, "out"))
 REN = os.path.join(OUT, "render")
 summary = json.load(open(os.path.join(REN, "render.json")))
 
@@ -40,6 +41,24 @@ def expected_frames(path, win):
     nf = int(getattr(ds, "NumberOfFrames", 1) or 1)
     pi = ds.PhotometricInterpretation
     frames = arr if nf > 1 else arr[None, ...]
+    # Multiframe mejorado: ventana y rescale en los Shared Functional Groups (el visor los encuentra con
+    # searchTopLevelFirst cuando no están en el dataset raíz; los per-frame no se aplican)
+    shared = ds.get("SharedFunctionalGroupsSequence")
+    shared = shared[0] if shared else None
+    if shared is not None and "WindowCenter" not in ds and "FrameVOILUTSequence" in shared:
+        ds.WindowCenter = shared.FrameVOILUTSequence[0].WindowCenter
+        ds.WindowWidth = shared.FrameVOILUTSequence[0].WindowWidth
+    if shared is not None and "RescaleSlope" not in ds and "PixelValueTransformationSequence" in shared:
+        ds.RescaleSlope = shared.PixelValueTransformationSequence[0].RescaleSlope
+        ds.RescaleIntercept = shared.PixelValueTransformationSequence[0].RescaleIntercept
+    # pydicom 3.0 lee la LUT de paleta no segmentada (OW) siempre en little endian; con Explicit VR Big Endian las
+    # palabras van al revés (PS3.3 C.7.6.3.1.6): se corrigen una vez, antes del bucle, para que la verdad siga el
+    # endian del dataset (la privada de GE solo tiene los píxeles en BE; la LUT va con la cabecera, LE).
+    if pi == "PALETTE COLOR" and ts == "1.2.840.10008.1.2.2":
+        for c in ("Red", "Green", "Blue", "Alpha"):
+            t = c + "PaletteColorLookupTableData"
+            if t in ds and int(ds[c + "PaletteColorLookupTableDescriptor"][2]) > 8:
+                ds[t].value = np.frombuffer(ds[t].value, ">u2").astype("<u2").tobytes()
     outs = []
     for fr in frames:
         if pi in ("MONOCHROME1", "MONOCHROME2"):
@@ -85,6 +104,8 @@ def expected_frames(path, win):
             rgb = fr.astype(np.float64)
             if ds.BitsAllocated == 16:
                 rgb = rgb / 257
+            elif ds.BitsAllocated == 32:
+                rgb = rgb / 16843009   # 2^32-1 -> 255
         outs.append(np.clip(np.round(rgb), 0, 255).astype(np.uint8))
     return outs
 
@@ -109,6 +130,9 @@ for key, meta in summary.items():
         rows.append((key, "PASS" if ok else "FAIL",
                      ("rechazo controlado: " + reason)[:90] if ok else f"se esperaba rechazo: {meta}"))
         continue
+    if not exp_meta and meta["decodedFrames"] == 0 and meta.get("unsupportedReason") and not (meta.get("error") or "").startswith("THROW"):
+        # Fichero real sin expectativa: el visor lo rechaza de forma controlada y explica por qué (p. ej. Float Pixel Data)
+        rows.append((key, "SKIP", ("rechazo controlado: " + meta["unsupportedReason"])[:90])); continue
     try:
         exp = expected_frames(path, win)
     except Exception as e:
@@ -121,7 +145,9 @@ for key, meta in summary.items():
     status, detail = "PASS", ""
     lossy = exp_meta.get("lossy") or \
         (meta.get("ts") or "").split(".")[-1] in ("50", "51", "52", "53", "54", "55", "56", "81", "91", "93", "203")
-    tol_max, tol_mean = (60, 4.0) if lossy else (3, 0.6)
+    # Con pérdida, el submuestreo de croma de cada decodificador (libjpeg "fancy upsampling" vs pdf.js) da picos de
+    # hasta ~80 en bordes de color aislados con una media casi nula; por eso el máximo es holgado y la media, estricta.
+    tol_max, tol_mean = (90, 4.0) if lossy else (3, 0.6)
     if meta.get("error"):
         status, detail = "FAIL", "error: " + meta["error"]
     elif exp_meta.get("decoded_by") and meta.get("decodedBy") != exp_meta["decoded_by"]:
@@ -142,6 +168,12 @@ for key, meta in summary.items():
     rows.append((key, status, detail))
     e0 = exp[0]
     g0 = got[0] if got and got[0].shape == e0.shape else np.zeros_like(e0)
+    # Los ficheros reales pueden ser grandes: en la hoja de contactos se reducen a 160 px de ancho
+    if e0.shape[1] > 160:
+        f = 160 / e0.shape[1]
+        size = (160, max(1, int(e0.shape[0] * f)))
+        e0 = np.asarray(Image.fromarray(e0).resize(size))
+        g0 = np.asarray(Image.fromarray(g0).resize(size))
     tiles.append((key, status, np.concatenate([e0, np.full((e0.shape[0], 4, 3), 128, np.uint8), g0], axis=1)))
 
 for r in rows:
@@ -150,6 +182,8 @@ print(f"\n{fails} FAIL / {len(rows)} casos")
 
 # contact sheet
 tiles = [t for t in tiles if "t01_ct_evle_2win_0" not in t[0] or t[0].startswith("t01_ct_evle_2win_01")]
+if not tiles:
+    sys.exit(1 if fails else 0)
 W = max(t[2].shape[1] for t in tiles) + 10
 H = sum(t[2].shape[0] + 18 for t in tiles) + 10
 sheet = Image.new("RGB", (W + 260, H), (40, 40, 40))

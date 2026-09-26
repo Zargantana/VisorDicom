@@ -21,7 +21,7 @@ export class RGBColor extends BaseColor {
     protected pixelDataBufferTo32BitBuffer(data: Uint8ClampedArray, buffer: any): void {
         const bits = this.reader.BitsAllocated || 8;
         const samples = this.toSamples(buffer, bits, false);
-        const shift = bits > 8 ? (this.reader.BitsStored || bits) - 8 : 0; // 16 bits -> 8 bits de mayor peso
+        const shift = bits > 8 ? (this.reader.BitsStored || bits) - 8 : 0; // 16 o 32 bits -> 8 bits de mayor peso
         const pixels = data.length >> 2;
         const photometric = this.interpret.getPhotometricInterpretation();
 
@@ -38,11 +38,12 @@ export class RGBColor extends BaseColor {
         if (!this.colorAlreadyRGB && is422 && samples.length < pixels * 3) {
             // Nativo 4:2:2 -> por cada 2 pixeles: Y1 Y2 Cb Cr
             const partial = photometric == PhotometricInterpretationType.YBR_PARTIAL_422;
+            // >>> y no >>: con 32 bits el bit alto haria negativa la muestra
             for (let p = 0, i = 0, j = 0; p < pixels && i + 3 < samples.length; p += 2, i += 4) {
-                const cb = samples[i + 2] >> shift, cr = samples[i + 3] >> shift;
-                j = partial ? this.putYBRPartial(data, j, samples[i] >> shift, cb, cr) : this.putYBR(data, j, samples[i] >> shift, cb, cr);
+                const cb = samples[i + 2] >>> shift, cr = samples[i + 3] >>> shift;
+                j = partial ? this.putYBRPartial(data, j, samples[i] >>> shift, cb, cr) : this.putYBR(data, j, samples[i] >>> shift, cb, cr);
                 if (p + 1 < pixels) {
-                    j = partial ? this.putYBRPartial(data, j, samples[i + 1] >> shift, cb, cr) : this.putYBR(data, j, samples[i + 1] >> shift, cb, cr);
+                    j = partial ? this.putYBRPartial(data, j, samples[i + 1] >>> shift, cb, cr) : this.putYBR(data, j, samples[i + 1] >>> shift, cb, cr);
                 }
             }
             return;
@@ -75,8 +76,8 @@ export class RGBColor extends BaseColor {
         const spp = Math.max(3, this.reader.SamplesPerPixel || 3);
         const count = Math.min(pixels, Math.floor(samples.length / spp));
         for (let p = 0, i = 0, j = 0; p < count; p++, i += spp) {
-            j = convert(data, j, samples[i] >> shift, samples[i + 1] >> shift, samples[i + 2] >> shift,
-                        spp > 3 ? samples[i + 3] >> shift : 0);
+            j = convert(data, j, samples[i] >>> shift, samples[i + 1] >>> shift, samples[i + 2] >>> shift,
+                        spp > 3 ? samples[i + 3] >>> shift : 0);
         }
     }
 

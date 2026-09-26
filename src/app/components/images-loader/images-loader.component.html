@@ -37,9 +37,17 @@
       @if (!AllDone) {
         Leyendo {{readEndedFiles}} de {{totalFiles}}…
       } @else {
-        Listo: {{foundDCMFiles?.length}} DICOM entre {{totalFiles}} ficheros. Pulsa <b>Ver imágenes</b>.
+        Listo: {{foundDCMFiles?.length}} DICOM entre {{totalFiles}} ficheros.
+        @if (foundDCMFiles?.length) { Pulsa <b>Ver imágenes</b>. }
       }
     </p>
+    @if (readErrors.length) {
+      <ul class="loader-errors m-0" role="alert">
+        @for (reason of readErrors; track $index) {
+          <li><i class="fa-solid fa-triangle-exclamation"></i> {{reason}}</li>
+        }
+      </ul>
+    }
     @if (activeFiles.length) {
       <div class="loader-files">
         @for (item of activeFiles; track item) {

@@ -34,7 +34,27 @@ python3 tools/dicom-test/check_render.py      # → PASS/FAIL por caso + out/ren
 | `check_render.py` | Verdad con pydicom (`pixel_array`, `apply_color_lut`, fórmula VOI LINEAR) y tolerancias (±3 lossless; más holgada para JPEG con pérdida). Si existe `out/ref/<fichero>.npy`, esa es la verdad (TS que pydicom no decodifica). `kind="expect_fail"`: pasa si el visor no decodifica ningún frame y no lanza (con `reason_contains`, además, el motivo que enseña el visor tiene que contenerlo). `decoded_by`: el códec que el visor tiene que reconocer por el contenido. `lossy`: tolerancia de compresión con pérdida |
 | `j2k-part2/j2k_part2_mct.c` | Genera un codestream J2K **Part 2** con MCT por matriz (`opj_set_MCT`) para t27 |
 | `browser-csp/run_browser_csp_test.mjs` | Prueba en Chromium del build de producción con la CSP de producción (ver abajo) |
-| `big-files/gen_big_files.py` + `big-files/measure_big_files.mjs` | Estudios sintéticos pesados (XA de 250 y 550 MB, CT de 600 cortes) y medidor de tiempos y memoria del renderer en Chromium: línea base para la carga por trozos. No forman parte de la batería (tardan y ocupan disco) |
+| `big-files/gen_big_files.py` + `big-files/measure_big_files.mjs` | Estudios sintéticos pesados (XA de 250 y 550 MB, CT de 600 cortes) y medidor de tiempos y memoria del renderer en Chromium (en Windows, canal `chrome` y memoria por WMI): línea base para la carga por trozos. No forman parte de la batería (tardan y ocupan disco). Con el XA de 550 MB imprime el `aviso:` del cargador (tope de ≈512 MiB por fichero) |
+| `real/fetch_real_files.py` | Ficheros DICOM **reales** (ver abajo) |
+
+## Ficheros reales (pydicom y pydicom-data)
+
+Los mismos harness y comprobación sirven para ficheros reales, sin expectativas escritas a mano: `check_render.py`
+compara con pydicom cuando pydicom sabe decodificarlos y marca `SKIP` (no `FAIL`) cuando el visor los rechaza de forma
+controlada con motivo (SR, RTSTRUCT, waveform, Float Pixel Data…) o cuando pydicom no puede dar la verdad.
+
+```bash
+python tools/dicom-test/real/fetch_real_files.py          # → tools/dicom-test/out_real/real_*.dcm (158 ficheros; descarga pydicom-data a ~/.pydicom/data)
+DICOM_TEST_OUT=tools/dicom-test/out_real node tools/dicom-test/run_harness.mjs
+DICOM_TEST_OUT=tools/dicom-test/out_real python tools/dicom-test/check_render.py
+```
+
+Otras variables del harness: `DICOM_TEST_FILTER=<regex>` (solo esos ficheros) y `DICOM_TEST_VERBOSE=1` (traza de cada
+fichero). El juego trae muestras NEMA WG04 (US1/RG1/RG3/MR2/693 en J2K y HTJ2K), Big Endian de todos los tipos (SC
+8/16/32 bits, paleta, RLE), JPEG de DCMTK y GDCM, Siemens con overlays, Aloka US, multiframe mejorado (`eCT_Supplemental`),
+mapas paramétricos en coma flotante, etc. Estado el 2026-09-26: **0 FAIL, 132 PASS, 29 SKIP** de 163 casos. Sigue sin
+haber muestras públicas de las TS privadas (GE DLX, Papyrus, Sectra): `gdcmData` de SourceForge no se deja descargar en
+crudo (403), hay que bajarlo a mano.
 
 ## Casos
 
@@ -75,6 +95,8 @@ python3 tools/dicom-test/check_render.py      # → PASS/FAIL por caso + out/ren
 | t60 / t61 / t62 / t63 | TS **privadas y retiradas** decodificables: GE Implicit VR LE con píxeles **Big Endian** (1.2.840.113619.5.2), Philips CT-private-ELE (1.3.46.670589.33.1.4.1), **Papyrus 3** (1.2.840.10008.1.20) y PixelMed Encapsulated Raw con 3 frames (1.3.6.1.4.1.5962.300.2) |
 | t64 / t65 | **Sectra Compression LS** (1.2.752.24.3.7.7) y una TS desconocida con un *bitstream* opaco: rechazo con motivo (`reason_contains`) |
 | t66-t73 | **Códec estándar bajo una TS privada ficticia** (raíz 2.25): RLE, JPEG baseline RGB, sin comprimir en Implicit VR (el parser detecta la VR), JPEG lossless, JPEG-LS, JPEG 2000, HTJ2K y JPEG progresivo. El visor lo reconoce por el contenido (`codec-sniffer.ts`, `decoded_by`) |
+| t74 | CT **Explicit VR Big Endian** con una secuencia de longitud definida y un OB privado antes del Pixel Data (las longitudes de 4 bytes en BE se leían con las mitades cambiadas) |
+| t75 | J2K con la **cabecera SIZ corrupta** (bytes de un delimitador FFFE,E0DD dentro del codestream, como en pydicom-data): rechazo con motivo; jpx.js no debe reservar memoria según un Xsiz absurdo |
 
 Los casos encapsulados con TS que pydicom no sabe escribir (HTJ2K…) se guardan con un UID conocido de la misma longitud y luego se parchea el *meta header* (`save_encapsulated()`).
 
@@ -91,7 +113,9 @@ Sirve el `dist` con las mismas cabeceras de seguridad que producción (CSP, `nos
 - qué códecs de `assets/codecs` se descargan y con qué `Content-Type`;
 - en los rechazos (`expect_fail`), que el visor pinta el cartel "Imagen no disponible" con el motivo (atributo `data-unsupported` del `<img>`, que también va en `title`).
 
-Hay que pasarla si cambian los códecs, la forma de cargarlos o la CSP. Chromium: `CHROMIUM=<ruta>` (por defecto `/opt/pw-browsers/chromium`).
+Hay que pasarla si cambian los códecs, la forma de cargarlos o la CSP. Chromium: `CHROMIUM=<ruta>` (por defecto `/opt/pw-browsers/chromium`; en Windows sirve el `chrome.exe` de Chrome o el `msedge.exe` de Edge: la prueba se pasa en los dos).
+
+`browser-csp/check_production.mjs` hace lo mismo contra la web desplegada (`https://visordicom.es`, cabeceras reales de CloudFront) con los ficheros de `out/` que se le indiquen.
 
 ## Añadir un caso
 

@@ -43,3 +43,4 @@ Thumbs.db
 
 # Salida de la bateria de regresion DICOM (se regenera)
 /tools/dicom-test/out/
+/tools/dicom-test/out_real/

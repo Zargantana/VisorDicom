@@ -7,6 +7,22 @@ import { BaseDecoder } from "./base-decoder-class";
  */
 export class UncompressedDecoder extends BaseDecoder {
     public Decode(): any[] {
+        if (this.reader.BitsAllocated == 1 && (this.reader.Frames || 1) > 1) {
+            // 1 bit por pixel y varios frames: los frames van seguidos a nivel de BIT (PS3.5 8.2: sin relleno a byte
+            // entre frames), asi que no se puede trocear por bytes; se desempaqueta todo y se corta por pixeles.
+            const all = this.interpret.getPixelDatas()[0] ?? '';
+            const bytes = BaseDecoder.toBytes(all);
+            const pixels = this.reader.Rows * this.reader.Columns * (this.reader.SamplesPerPixel || 1);
+            const frames: ArrayBuffer[] = [];
+            for (let f = 0; f < this.reader.Frames; f++) {
+                const unpacked = new Uint8Array(pixels);
+                for (let p = 0, bit = f * pixels; p < pixels; p++, bit++) {
+                    unpacked[p] = (bytes[bit >> 3] >> (bit & 7)) & 1;
+                }
+                frames.push(unpacked.buffer);
+            }
+            return frames;
+        }
         // Nativo: getFramesData ya trocea por FrameSize; TODOS los frames son imagen (no hay BOT que saltar).
         return this.interpret.getFramesData().map(frame => this.normalize(BaseDecoder.toBytes(frame)).buffer);
     }
@@ -15,7 +31,10 @@ export class UncompressedDecoder extends BaseDecoder {
     protected normalize(bytes: Uint8Array): Uint8Array {
         const bitsAllocated = this.reader.BitsAllocated;
         // Explicit VR Big Endian y privada de GE (1.2.840.113619.5.2): palabras de 16/32 bits en orden inverso.
-        if (!this.reader.isPixelDataLittleEndian && bitsAllocated > 8) {
+        // Con 8 bits y VR OW (PS3.5 8.1.1: muestras de 8 bits empaquetadas en palabras de 16) las parejas de bytes
+        // tambien van al reves.
+        const swapPairs8 = bitsAllocated == 8 && this.interpret.getPixelDataVR() == 'OW';
+        if (!this.reader.isPixelDataLittleEndian && (bitsAllocated > 8 || swapPairs8)) {
             const size = bitsAllocated > 16 ? 4 : 2;
             for (let i = 0; i + size <= bytes.length; i += size) {
                 for (let a = i, b = i + size - 1; a < b; a++, b--) {

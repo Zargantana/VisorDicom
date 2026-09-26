@@ -9,6 +9,7 @@ declare var JpegImage: any;
  * (JpegImage, derivado de pdf.js; con 3 componentes convierte YCbCr -> RGB).
  * Si JpegImage no puede con un frame (marcadores raros, aritmetico mal etiquetado...), se reintenta con libjpeg-turbo
  * (asm.js, carga bajo demanda): el build de 8 bits o el de 12 bits segun BitsAllocated. Los dos entregan RGB.
+ * Con 12 bits se prefiere libjpeg-turbo (misma IDCT que las referencias) y JpegImage queda de reserva.
  */
 export class JPEGBaselineDecoder extends BaseDecoder {
     public override outputIsRGB: boolean = true;
@@ -16,9 +17,13 @@ export class JPEGBaselineDecoder extends BaseDecoder {
     public Decode(): any[] {
         return this.interpret.getEncapsulatedFrames().map(frame => {
             const bytes = BaseDecoder.toBytes(frame);
+            if (this.reader.BitsAllocated > 8 && !CodecLoader.isUnavailable('libjpeg-turbo-12')) {
+                return decodeWithEmscripten('libjpeg-turbo-12', 'JPEGDecoder', bytes).data; // lanza CodecRequiredError hasta cargarse
+            }
             try {
                 const decoder = new JpegImage();
                 decoder.parse(bytes);
+                decoder.colorTransform = JPEGBaselineDecoder.wantsColorTransform(decoder, this.reader.PhotometricInterpretation);
                 return (this.reader.BitsAllocated > 8)
                     ? decoder.getData16(decoder.width, decoder.height)
                     : decoder.getData(decoder.width, decoder.height);
@@ -27,6 +32,24 @@ export class JPEGBaselineDecoder extends BaseDecoder {
                 return decodeWithEmscripten(codec, 'JPEGDecoder', bytes).data;
             }
         });
+    }
+
+    /**
+     * Si hay que deshacer la transformacion YCbCr de un JPEG de 3 componentes (PS3.5 8.2.1 y la nota tecnica de
+     * Adobe): manda el APP14 de Adobe (transform 0 = RGB tal cual, 1 = YCbCr); sin el, un APP0 JFIF implica YCbCr;
+     * y sin marcadores decide la Photometric Interpretation del DICOM: RGB = sin transformar, YBR_* = YCbCr.
+     * JpegImage por defecto transforma siempre, y eso tenia los JPEG RGB de DCMTK/GDCM en colores falsos.
+     */
+    public static wantsColorTransform(decoder: any, photometric: string): boolean {
+        // Un APP14 recortado (sin el byte de transformacion) no dice nada: se ignora, como hace libjpeg
+        if (decoder.adobe && typeof decoder.adobe.transformCode === 'number') {
+            return decoder.adobe.transformCode != 0;
+        }
+        if (decoder.jfif) {
+            return true;
+        }
+        const pi = (photometric || '').replace(/\0/g, '').trim().toUpperCase();
+        return !pi.startsWith('RGB');
     }
 }
 
@@ -53,6 +76,7 @@ export class JPEGRetiredProcessesDecoder extends BaseDecoder {
             }
             const decoder = new JpegImage();
             decoder.parse(bytes);
+            decoder.colorTransform = JPEGBaselineDecoder.wantsColorTransform(decoder, this.reader.PhotometricInterpretation);
             return decoder.getData16(decoder.width, decoder.height);
         });
     }

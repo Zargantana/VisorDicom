@@ -423,6 +423,11 @@ export class DCMInterpreter {
      * Se prefiere el (7FE0,0010) del dataset raiz; si no lo hay (fichero raro) se usa la heuristica antigua:
      * de los dos primeros (p.ej. el de la Icon Image Sequence y el real) el mas grande.
      */
+    /** VR del Pixel Data del dataset raíz ('OB', 'OW' o '' si no hay o es implícita). */
+    public getPixelDataVR(): string {
+        return (this.findTopLevel(0x7FE0, 0x0010)?.VR ?? '').trim();
+    }
+
     public getPixelDatas(): string[] {
         const topLevel = this.findTopLevel(0x7FE0, 0x0010);
         if (topLevel) {
