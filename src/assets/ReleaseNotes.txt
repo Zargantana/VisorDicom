@@ -14,7 +14,9 @@
 - Transfer Syntax privadas de fabricante: GE (píxeles Big Endian), Philips CT y PixelMed, y la Papyrus 3 retirada. Si la Transfer Syntax es privada o desconocida pero dentro hay un códec estándar (JPEG, JPEG-LS, JPEG 2000, HTJ2K, RLE o sin comprimir), se reconoce por el contenido y se abre igualmente.
 - Compresiones propietarias sin decodificador público (Sectra, ALI, Algotec, PACS de GE): en lugar de una imagen negra, un aviso con el motivo y qué pedir al PACS.
 - Deflate: corregido el inflado en Chrome cuando el fichero lleva un byte de relleno.
-- Batería de regresión de 92 casos sintéticos y prueba en navegador con la CSP de producción.
+- Probado con 158 ficheros reales (juego NEMA WG04, GDCM, DCMTK, Siemens, Aloka…). Corregidos: Explicit VR Big Endian con secuencias (el visor se perdía tras la primera), colores de los JPEG RGB de DCMTK y GDCM, RGB de 32 bits, imágenes de 1 bit multiframe, 8 bits en OW con Big Endian, JPEG-LS de 7 bits (CharLS 2.x bajo demanda) y ficheros con cabecera explícita y dataset implícito. Los mapas paramétricos en coma flotante y los JPEG 2000 con la cabecera dañada avisan de que no se pueden mostrar (antes, un codestream corrupto podía agotar la memoria de la pestaña).
+- Ficheros de más de 511 MB: aviso con el motivo en lugar de un fallo silencioso. El cargador lee 8 ficheros a la vez, para que un CD de miles de ficheros no dispare la memoria.
+- Batería de regresión de 94 casos sintéticos, prueba en navegador con la CSP de producción (Chrome y Edge) y harness de ficheros reales.
 - Conformance statement actualizado.
 - Angular 21.
 
