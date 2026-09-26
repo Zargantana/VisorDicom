@@ -89,7 +89,6 @@ export const CA: Texts = {
   'news.soon.1': 'Demanar imatges al teu metge',
   'news.soon.2': 'Avisos per correu',
   'news.soon.3': 'Clíniques i organitzacions',
-  'news.soon.4': 'Comprovació dels fitxers en pujar',
   'news.soon.5': 'Contrast amb el ratolí',
   'news.soon.6': 'Vídeos i seqüències',
   'news.soon.7': 'Visor tàctil',

@@ -89,7 +89,6 @@ export const ES: Texts = {
   'news.soon.1': 'Pedir imágenes a tu médico',
   'news.soon.2': 'Avisos por correo',
   'news.soon.3': 'Clínicas y organizaciones',
-  'news.soon.4': 'Comprobación de los ficheros al subir',
   'news.soon.5': 'Contraste con el ratón',
   'news.soon.6': 'Vídeos y secuencias',
   'news.soon.7': 'Visor táctil',

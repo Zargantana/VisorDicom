@@ -109,7 +109,6 @@ export interface Texts {
   'news.soon.1': string;
   'news.soon.2': string;
   'news.soon.3': string;
-  'news.soon.4': string;
   'news.soon.5': string;
   'news.soon.6': string;
   'news.soon.7': string;

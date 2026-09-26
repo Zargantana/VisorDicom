@@ -89,7 +89,6 @@ export const EU: Texts = {
   'news.soon.1': 'Zure medikuari irudiak eskatzea',
   'news.soon.2': 'Abisuak posta elektronikoz',
   'news.soon.3': 'Klinikak eta erakundeak',
-  'news.soon.4': 'Fitxategien egiaztapena igotzean',
   'news.soon.5': 'Kontrastea saguarekin',
   'news.soon.6': 'Bideoak eta sekuentziak',
   'news.soon.7': 'Ukipen-ikustailea',

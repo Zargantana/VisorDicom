@@ -89,7 +89,6 @@ export const GL: Texts = {
   'news.soon.1': 'Pedir imaxes ao teu médico',
   'news.soon.2': 'Avisos por correo',
   'news.soon.3': 'Clínicas e organizacións',
-  'news.soon.4': 'Comprobación dos ficheiros ao subir',
   'news.soon.5': 'Contraste co rato',
   'news.soon.6': 'Vídeos e secuencias',
   'news.soon.7': 'Visor táctil',

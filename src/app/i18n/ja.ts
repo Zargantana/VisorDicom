@@ -89,7 +89,6 @@ export const JA: Texts = {
   'news.soon.1': '主治医に画像を依頼',
   'news.soon.2': 'メール通知',
   'news.soon.3': 'クリニックと組織',
-  'news.soon.4': 'アップロード時のファイル検証',
   'news.soon.5': 'マウスでコントラスト調整',
   'news.soon.6': '動画とシーケンス',
   'news.soon.7': 'タッチ操作のビューアー',

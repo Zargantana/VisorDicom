@@ -89,7 +89,6 @@ export const EN: Texts = {
   'news.soon.1': 'Ask your doctor for images',
   'news.soon.2': 'Email notifications',
   'news.soon.3': 'Clinics and organisations',
-  'news.soon.4': 'File checks when uploading',
   'news.soon.5': 'Contrast with the mouse',
   'news.soon.6': 'Videos and sequences',
   'news.soon.7': 'Touch viewer',
