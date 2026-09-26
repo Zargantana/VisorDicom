@@ -21,8 +21,18 @@ export class ImagesLoaderComponent {
   public totalFiles: number = 0;
   public readingFiles: number = 0;
   public readEndedFiles: number = 0;
+  /** Motivos de los ficheros que no se han podido leer (DCMFile.readError), para enseñarlos bajo el progreso. */
+  public readErrors: string[] = [];
 
   public AllDone = true;
+
+  /**
+   * Lecturas simultáneas como máximo. Un CD trae miles de ficheros: abrirlos todos a la vez dispara la memoria y la
+   * E/S del navegador (plan-carga-ficheros-grandes, F0). El resto espera en cola y entra según terminan los demás.
+   */
+  private static readonly MAX_CONCURRENT_READS = 8;
+  private queue: DCMFile[] = [];
+  private inFlight: number = 0;
 
   constructor() { }
 
@@ -40,11 +50,11 @@ export class ImagesLoaderComponent {
     return this.totalFiles ? Math.round(100 * this.readEndedFiles / this.totalFiles) : 0;
   }
 
-  /** Los últimos ficheros que se están leyendo ahora mismo (para no listar cientos) */
+  /** Los últimos ficheros que se están leyendo ahora mismo (para no listar cientos ni los que esperan en cola) */
   public get activeFiles(): DCMFile[] {
     const active: DCMFile[] = [];
     for (let i = this.foundFiles.length - 1; i >= 0 && active.length < 6; i--) {
-      if (this.foundFiles[i].readStatus == FILEREAD_STATUS.NONE) active.unshift(this.foundFiles[i]);
+      if (this.foundFiles[i].started && this.foundFiles[i].readStatus == FILEREAD_STATUS.NONE) active.unshift(this.foundFiles[i]);
     }
     return active;
   }
@@ -110,27 +120,34 @@ export class ImagesLoaderComponent {
     this.resetReadStatus();
     this.totalFiles = files.length;
 
-    for (let numFile = 0; numFile < files.length; numFile++) {
-      const file: File = files[numFile];
-      setTimeout(() => {
-        if (file) {
-          //console.log('File: ' + file.webkitRelativePath);
-          const theDCMFile = new DCMFile(file);
-          const numFile = this.foundFiles.length;
-          this.foundFiles.push(theDCMFile);
-          this.foundFilesSubscriptions.push(
-            theDCMFile.readStatus$.subscribe({
-              next: (status: FILEREAD_STATUS) => {
-                this.checkReadyToInterpretDCMTags(status, numFile);
-              }
-            })
-          );
-          this.readingNewFile.emit(true);
-          this.readingFiles++;
-          theDCMFile.readContents();
-        }
-      }, 100);
-    }    
+    for (const file of files) {
+      if (!file) continue;
+      //console.log('File: ' + file.webkitRelativePath);
+      const theDCMFile = new DCMFile(file);
+      const numFile = this.foundFiles.length;
+      this.foundFiles.push(theDCMFile);
+      this.foundFilesSubscriptions.push(
+        theDCMFile.readStatus$.subscribe({
+          next: (status: FILEREAD_STATUS) => {
+            this.checkReadyToInterpretDCMTags(status, numFile);
+          }
+        })
+      );
+      this.queue.push(theDCMFile);
+    }
+    // Fuera del evento de selección, para que la UI pinte primero las cifras
+    setTimeout(() => this.pump(), 50);
+  }
+
+  /** Arranca lecturas hasta el tope de simultáneas; se vuelve a llamar cada vez que termina una. */
+  private pump(): void {
+    while (this.inFlight < ImagesLoaderComponent.MAX_CONCURRENT_READS && this.queue.length) {
+      const theDCMFile = this.queue.shift()!;
+      this.inFlight++;
+      this.readingNewFile.emit(true);
+      this.readingFiles++;
+      theDCMFile.readContents();
+    }
   }
 
   private resetReadStatus() {
@@ -140,6 +157,9 @@ export class ImagesLoaderComponent {
     this.AllDone = false;
     this.readingFiles = 0;
     this.readEndedFiles = 0;
+    this.readErrors = [];
+    this.queue = [];
+    this.inFlight = 0;
     this.foundFilesSubscriptions = [];
     this.foundFiles = [];
     if (this.foundDCMFiles) {
@@ -151,18 +171,24 @@ export class ImagesLoaderComponent {
     if (status == FILEREAD_STATUS.SUCCESS) {
       this.fileReadEnd.emit(status);
       this.readEndedFiles++;
-      if (this.foundFiles[imageNumber].isDCM) {        
+      if (this.foundFiles[imageNumber].isDCM) {
         this.foundDCMFiles?.push(this.foundFiles[imageNumber]);
         this.someDCMFound.emit(true);
-      } 
+      }
     } else if (status == FILEREAD_STATUS.ABORT || status == FILEREAD_STATUS.ERROR) {
       this.fileReadEnd.emit(status);
       this.readEndedFiles++;
+      const reason = this.foundFiles[imageNumber].readError;
+      if (reason) this.readErrors.push(reason);
+    } else {
+      return; // NONE: la lectura sigue
     }
+    if (this.inFlight > 0) this.inFlight--;
     if (this.totalFiles == this.readEndedFiles) {
       this.AllDone = true;
       this.allFilesReaded.emit(true);
     }
+    this.pump();
   }
 }
 

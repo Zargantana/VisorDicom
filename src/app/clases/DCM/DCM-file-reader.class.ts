@@ -247,11 +247,17 @@ export class DCMFileReader {
             if (this.forceLittleEndianForHeaderActive && tag.TagHigh != 0x02) {
                 this.forceLittleEndianForHeaderActive = false;
                 tag.setTag(raw.substring(pos, pos + 4), this.isLittleEndian);
+                const looksExplicit = ALL_VRS.includes(raw.substring(pos + 4, pos + 6));
                 if (this.detectVR) {
                     // TS desconocida: explícita si tras el tag vienen dos letras que forman una VR. En implícita esos
                     // bytes son la parte baja de la longitud, y el primer elemento (grupo 0008) nunca mide tanto.
-                    this.isVRExplicit = ALL_VRS.includes(raw.substring(pos + 4, pos + 6));
+                    this.isVRExplicit = looksExplicit;
                     this.detectVR = false;
+                } else if (this.isVRExplicit && !looksExplicit) {
+                    // La cabecera dice Explicit VR pero el dataset va en Implicit VR (ficheros mal escritos que
+                    // pydicom y DCMTK también toleran): se lee como implícita.
+                    console.warn('La Transfer Syntax es Explicit VR pero el dataset es Implicit VR: se lee como Implicit VR.');
+                    this.isVRExplicit = false;
                 }
             }
 

@@ -152,6 +152,27 @@ try:
 except Exception as e:  # pragma: no cover
     print("t05 skipped:", e)
 
+# --- t74: Big Endian con una secuencia de longitud definida y un OB privado antes del Pixel Data --------------
+#     Las longitudes de 4 bytes en BE se leían con las mitades intercambiadas (0x00000188 -> 0x01880000), así que el
+#     lector se saltaba el resto del fichero. t05 no lo veía porque su único elemento largo era el Pixel Data final.
+ds = base_ds("CT", "1.2.840.10008.5.1.4.1.1.2")
+set_mono16(ds, stored, signed=False)
+ds.WindowCenter = 40
+ds.WindowWidth = 400
+ref = Dataset()
+ref.ReferencedSOPClassUID = "1.2.840.10008.5.1.4.1.1.2"
+ref.ReferencedSOPInstanceUID = "1.2.826.0.1.3680043.8.498.1.2.3.4.5.6.7.8.9"
+ds.SourceImageSequence = Sequence([ref])
+ds.SourceImageSequence.is_undefined_length = False
+ds.add_new((0x0009, 0x0010), "LO", "VISORDICOM TEST")
+ds.add_new((0x0009, 0x1001), "OB", bytes(range(256)) + bytes(44))   # 300 = 0x12C bytes
+ds.PixelData = stored.astype(">u2").tobytes()
+try:
+    save(ds, "t74_ct_evbe_sq_defined.dcm", ExplicitVRBigEndian)
+    expect("t74_ct_evbe_sq_defined.dcm", rows=R, cols=C, frames=1, windows=1, kind="ct")
+except Exception as e:  # pragma: no cover
+    print("t74 skipped:", e)
+
 # --- t06: US RGB nativo multiframe (5 frames, planar 0) ---------------------------------
 frames = []
 for f in range(5):
@@ -331,6 +352,19 @@ ds["PixelData"].is_undefined_length = True
 ds["PixelData"].VR = "OB"
 save(ds, "t14_j2k_lossless_16.dcm", JPEG2000Lossless)
 expect("t14_j2k_lossless_16.dcm", rows=R, cols=C, frames=1, windows=1, kind="ramp16_win")
+
+# --- t75: el mismo J2K con la cabecera SIZ corrupta: los bytes de un delimitador de secuencia (FFFE,E0DD) dentro del
+# codestream, como JPEG2000-embedded-sequence-delimiter.dcm de pydicom-data (Rsiz = FEFF, Xsiz = DDE00100). OpenJPEG
+# rechaza la cabecera y jpx.js NO debe reservar memoria según un Xsiz de 3.700 millones (tumbaba el proceso con 4 GB):
+# rechazo controlado con motivo.
+cs = bytearray(b.getvalue())
+assert cs[:4] == b"\xff\x4f\xff\x51"
+cs[6:10] = b"\xfe\xff\xdd\xe0"
+ds.PixelData = encapsulate([bytes(cs)])
+ds["PixelData"].is_undefined_length = True
+ds["PixelData"].VR = "OB"
+save(ds, "t75_j2k_bad_siz.dcm", JPEG2000Lossless)
+expect("t75_j2k_bad_siz.dcm", rows=R, cols=C, frames=1, windows=1, kind="expect_fail", reason_contains="JPEG 2000: ")
 
 # --- t15: Encapsulated Uncompressed Explicit VR LE (1.2.840.10008.1.2.1.98) -------------
 ds = base_ds("CT", "1.2.840.10008.5.1.4.1.1.2")

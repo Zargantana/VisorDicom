@@ -26,7 +26,8 @@ if (!args.length) {
   args = fs.existsSync(big) ? fs.readdirSync(big).map((x) => path.join(big, x)) : [];
 }
 const require = createRequire(process.env.PLAYWRIGHT_MODULE || path.join(root, 'package.json'));
-const { chromium } = require('playwright');
+let chromium;
+for (const name of ['playwright', 'playwright-core']) { try { chromium = require(name).chromium; break; } catch { /* siguiente */ } }
 
 const types = { '.js': 'application/javascript', '.html': 'text/html', '.css': 'text/css', '.png': 'image/png',
   '.svg': 'image/svg+xml', '.json': 'application/json', '.webmanifest': 'application/manifest+json', '.woff2': 'font/woff2' };
@@ -37,11 +38,19 @@ const server = http.createServer((req, res) => {
   res.end(fs.readFileSync(file));
 }).listen(0);
 const origin = 'http://127.0.0.1:' + server.address().port;
-const browser = await chromium.launch({ executablePath: process.env.CHROMIUM || '/opt/pw-browsers/chromium' });
+// CHROMIUM=<ruta> (Linux: /opt/pw-browsers/chromium por defecto); en Windows sin CHROMIUM se usa el Chrome instalado
+const browser = process.env.CHROMIUM || process.platform !== 'win32'
+  ? await chromium.launch({ executablePath: process.env.CHROMIUM || '/opt/pw-browsers/chromium' })
+  : await chromium.launch({ channel: 'chrome' });
 const MB = (bytes) => Math.round(bytes / 2 ** 20);
 
-/** Memoria residente (MB) de los procesos renderer de Chromium. */
+/** Memoria residente (MB) de los procesos renderer de Chromium (ps en Linux/macOS, WMI en Windows). */
 function rendererRSS() {
+  if (process.platform === 'win32') {
+    const ps = 'Get-CimInstance Win32_Process | Where-Object { $_.CommandLine -like \'*--type=renderer*\' -and ($_.Name -eq \'chrome.exe\' -or $_.Name -like \'*chrom*\' -or $_.Name -eq \'msedge.exe\') } | Measure-Object -Property WorkingSetSize -Sum | Select-Object -ExpandProperty Sum';
+    const out = execSync(`powershell -NoProfile -Command "${ps}"`).toString().trim();
+    return Math.round((+out || 0) / 2 ** 20);
+  }
   let kb = 0;
   for (const line of execSync('ps -eo rss,args').toString().split('\n')) {
     const m = line.trim().match(/^(\d+)\s+(.*)$/);
@@ -88,6 +97,9 @@ for (const f of args) {
     null, { timeout: 180000 }).then(() => true).catch(() => false);
   const msRead = Date.now() - t0;
   const rss1 = rendererRSS();
+  // Aviso del cargador (F0 del plan): con más de ≈512 MiB tiene que salir un motivo, no un TypeError
+  const notice = read ? '' : await page.locator('.loader-errors').innerText({ timeout: 2000 }).catch(() => '');
+  if (notice) errors.unshift('aviso: ' + notice.replace(/\s+/g, ' ').trim().slice(0, 160));
   if (read) await page.locator('button.loader-view').click().catch(() => {});
   const painted = read && await page.waitForFunction(() => [...document.querySelectorAll('basic-image-viewer img')]
     .some((i) => i.src.startsWith('data:image') && !i.hasAttribute('data-unsupported')), null, { timeout: 180000 })

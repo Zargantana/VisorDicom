@@ -166,7 +166,11 @@ export class ImageDCM  {
             this.decoderOutputIsRGB = deco.outputIsRGB;
             if (this.rawFrames.length == 0) {
                 this.rawFrames = null;
-                this.fail(new Error('el Pixel Data no contiene ningún frame'));
+                // Mapas paramétricos: Float Pixel Data (7FE0,0008) o Double Float Pixel Data (7FE0,0009) en vez de (7FE0,0010)
+                const floatPixels = this.reader.readed_tags.some(t => t.TagHigh == 0x7FE0 && (t.TagLow == 0x0008 || t.TagLow == 0x0009) && t.depth == 0);
+                this.fail(new Error(floatPixels
+                    ? 'la imagen usa Float o Double Float Pixel Data (mapa paramétrico en coma flotante), que el visor no soporta'
+                    : 'el Pixel Data no contiene ningún frame'));
             }
         } else {
             this.decodeFailed = true; // sin decoder: no se reintenta en cada repintado (el motivo ya está guardado)

@@ -10,8 +10,11 @@ solo cuando un fichero los necesita (`src/app/clases/Decoders/codec-loader.ts`).
 | `libjpegturbojs_decode.js` | `@cornerstonejs/codec-libjpeg-turbo-8bit` 1.2.8 (`dist/libjpegturbojs_decode.js`) | ISC | libjpeg-turbo (JPEG 8 bits: *baseline*, extendido, progresivo y aritmético; solo decodificador) | IJG License + BSD 3-Clause (Modified) + zlib | `eab3a9b2e1e802679006715f85a7b0ae74c369e392cb12579d2aab6c13fc491f` |
 | `libjpegturbo12js.js` | `@cornerstonejs/codec-libjpeg-turbo-12bit` 0.4.7 (`dist/libjpegturbo12js.js`) | ISC | libjpeg-turbo compilado con `WITH12BIT=ON` (JPEG de 12 bits: extendido, progresivo y aritmético; solo decodificador; no decodifica JPEG de 8 bits) | IJG License + BSD 3-Clause (Modified) + zlib | `e09190a00d8ba884ec1b997486898bcc6641d2930e1b2c0d5bc2dc32aa439957` |
 
+| `charlsjs_decode.js` | `@cornerstonejs/codec-charls` 1.2.7 (`dist/charlsjs_decode.js`) | MIT | CharLS 2.x (JPEG-LS lossless y near-lossless, solo decodificador; de reserva del CharLS 1.x de `src/libs/jpeg-ls.js`) | BSD 3-Clause | `180ea0504397f580c76ce81c7e98e264cbbca1cbcfdf098f1f57dfe5ba0233c5` |
+
 Proyectos de origen:
 - Cornerstone codecs: https://github.com/cornerstonejs/codecs
+- CharLS: https://github.com/team-charls/charls
 - OpenJPEG: https://github.com/uclouvain/openjpeg
 - libjpeg-turbo: https://github.com/libjpeg-turbo/libjpeg-turbo
 
