@@ -2,7 +2,7 @@
 *   26/09/2026 v15  *
 *********************
 - Selector de ventana (VOI) cuando el estudio trae varias.
-- Pantalla de carga nueva: contadores, barra de progreso y arrastrar y soltar ficheros o carpetas. El visor se abre con el botón 'Ver imágenes' cuando tú quieras, en vez de saltar solo.
+- Pantalla de carga nueva: contadores, barra de progreso y arrastrar y soltar ficheros o carpetas. El visor se abre con 'Ver imágenes' cuando tú quieras, en vez de saltar solo. Debajo, el selector de estudios se va montando en vivo mientras se leen los ficheros (paciente, estudio, modalidad, serie e imágenes): pulsa una serie y el visor se abre en ella.
 - Compatible con Windows, Linux y Mac, Android e iOS; en PC, tableta y móvil (Chrome y Edge recomendados). Portada y barra superior adaptadas a móvil y tableta.
 - Créditos y agradecimientos (códecs, estándar DICOM, librerías) en el panel de información, junto a estas notas y el conformance statement.
 - La web se presenta a los buscadores y a los asistentes de IA: título y descripción en español, datos estructurados, portada legible sin JavaScript y sitemap.
