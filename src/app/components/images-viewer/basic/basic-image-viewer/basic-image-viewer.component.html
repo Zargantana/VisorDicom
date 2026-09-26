@@ -25,16 +25,16 @@
             }
           </div>
         </div>
-        <div class="d-flex flex-row text-center p-0 m-0"> <small class="m-0 p-1 text-light">Patient Id: {{reader?.PatientId}} Date: {{reader?.StudyDate}} Series: #{{reader?.SeriesNumber}} Image: #{{reader?.InstanceNumber}}</small></div>
+        <div class="d-flex flex-row text-center p-0 m-0"> <small class="m-0 p-1 text-light">{{'viewer.patientId' | t}} {{reader?.PatientId}} {{'viewer.studyDate' | t}} {{reader?.StudyDate}} {{'viewer.seriesNumber' | t}} #{{reader?.SeriesNumber}} {{'viewer.image' | t}} #{{reader?.InstanceNumber}}</small></div>
         <!-- Selector de ventana VOI (0028,1050/1051/1055): una posicion por ventana; oculto si hay 0 o 1 -->
         @if (windows.length > 1) {
           <div class="d-flex flex-row align-items-center p-0 m-0 px-2 user-select-none window-selector"
-            [title]="'Ventana ' + (effectiveWindow + 1) + '/' + windows.length + ': ' + windowLabel(effectiveWindow)">
+            [title]="('viewer.window' | t) + ' ' + (effectiveWindow + 1) + '/' + windows.length + ': ' + windowLabel(effectiveWindow)">
             <i class="fa-solid fa-circle-half-stroke fa-1x text-light me-1"></i>
             <small class="m-0 p-1 text-light text-nowrap">{{effectiveWindow + 1}}/{{windows.length}}</small>
             <input type="range" class="form-range window-range" min="0" [max]="windows.length - 1" step="1"
               [value]="effectiveWindow" (input)="onWindowSelected($any($event.target).value)"
-              [attr.aria-label]="'Ventana VOI'" [attr.aria-valuetext]="windowLabel(effectiveWindow)"/>
+              [attr.aria-label]="'viewer.windowVOI' | t" [attr.aria-valuetext]="windowLabel(effectiveWindow)"/>
               <small class="m-0 ms-1 p-1 text-light text-nowrap window-label">{{windowLabel(effectiveWindow)}}</small>
             </div>
           }

@@ -4,8 +4,8 @@
       [class.dragging]="dragging"
       (dragenter)="onDragOver($event)" (dragover)="onDragOver($event)" (dragleave)="onDragLeave($event)" (drop)="onDrop($event)">
       <i class="fa-solid fa-folder-open loader-empty-icon"></i>
-      <p class="m-0">Elige con el botón de arriba<br>o <b>arrastra aquí</b> los ficheros o la carpeta.</p>
-      <small class="loader-drop-hint">Todo se lee en tu navegador.</small>
+      <p class="m-0">{{'loader.drop.1' | t}}<br>{{'loader.drop.or' | t}} <b>{{'loader.drop.drag' | t}}</b> {{'loader.drop.2' | t}}</p>
+      <small class="loader-drop-hint">{{'loader.local' | t}}</small>
     </div>
   } @else {
     <!-- Columna centrada: contadores, progreso, estado y el selector de estudios en vivo -->
@@ -14,22 +14,22 @@
         <div class="loader-stat">
           <i class="fa-solid fa-file"></i>
           <span class="loader-num">{{totalFiles}}</span>
-          <span class="loader-lbl">ficheros</span>
+          <span class="loader-lbl">{{'loader.files' | t}}</span>
         </div>
         <div class="loader-stat" [class.active]="!AllDone">
           <i class="fa-solid fa-hourglass-half"></i>
           <span class="loader-num">{{pendingFiles}}</span>
-          <span class="loader-lbl">pendientes</span>
+          <span class="loader-lbl">{{'loader.pending' | t}}</span>
         </div>
         <div class="loader-stat">
           <i class="fa-solid fa-check"></i>
           <span class="loader-num">{{readEndedFiles}}</span>
-          <span class="loader-lbl">leídos</span>
+          <span class="loader-lbl">{{'loader.read' | t}}</span>
         </div>
         <div class="loader-stat dicom">
           <i class="fa-solid fa-x-ray"></i>
           <span class="loader-num">{{foundDCMFiles?.length}}</span>
-          <span class="loader-lbl">DICOM</span>
+          <span class="loader-lbl">{{'loader.dicom' | t}}</span>
         </div>
       </div>
       <div class="progress loader-progress" role="progressbar" [attr.aria-valuenow]="progressPct" aria-valuemin="0" aria-valuemax="100">
@@ -37,14 +37,14 @@
       </div>
       <p class="loader-status m-0 text-center">
         @if (!AllDone) {
-          Leyendo {{readEndedFiles}} de {{totalFiles}}…
+          {{'loader.reading' | t:readEndedFiles:totalFiles}}
           @if (foundDCMFiles?.length) {
-            Ya puedes <button type="button" class="btn btn-link loader-open" (click)="openViewer.emit()">ver imágenes</button>.
+            {{'loader.canView.before' | t}}<button type="button" class="btn btn-link loader-open" (click)="openViewer.emit()">{{'loader.canView.link' | t}}</button>{{'loader.canView.after' | t}}
           }
         } @else {
-          Listo: {{foundDCMFiles?.length}} DICOM entre {{totalFiles}} ficheros.
+          {{'loader.done' | t:(foundDCMFiles?.length ?? 0):totalFiles}}
           @if (foundDCMFiles?.length) {
-            <button type="button" class="btn btn-link loader-open" (click)="openViewer.emit()"><i class="fa-solid fa-eye"></i> Ver imágenes</button>
+            <button type="button" class="btn btn-link loader-open" (click)="openViewer.emit()"><i class="fa-solid fa-eye"></i> {{'loader.view' | t}}</button>
           }
         }
       </p>
@@ -59,8 +59,8 @@
         <!-- Selector de estudios en vivo: el árbol crece según se leen los DICOM; pulsar abre el visor ahí -->
         <div class="loader-tree">
           <div class="loader-tree-title">
-            <i class="fa-solid fa-sitemap"></i> Encontrado hasta ahora
-            <small>{{seriesFound}} {{seriesFound == 1 ? 'serie' : 'series'}} · pulsa una para verla</small>
+            <i class="fa-solid fa-sitemap"></i> {{'loader.found' | t}}
+            <small>{{seriesFound}} {{(seriesFound == 1 ? 'loader.series.one' : 'loader.series.many') | t}} · {{'loader.pressOne' | t}}</small>
           </div>
           <div class="loader-tree-scroll">
             <findings-table class="loader-tree-table" [classifier]="classifier"

@@ -1,0 +1,24 @@
+<div class="lang-switcher user-select-none">
+  <button type="button" class="topbar-btn lang-btn border rounded px-2 py-2 mx-1 mx-md-2 my-2 clickable d-flex flex-column align-items-center justify-content-center"
+    [class.border-dark]="!isDark()" [class.border-light]="isDark()"
+    [class.bg-dark]="isDark()" [class.bg-white]="!isDark()" [class.text-light]="isDark()"
+    [title]="'topbar.language' | t" [attr.aria-label]="'topbar.language' | t" [attr.aria-expanded]="open"
+    (click)="toggle()">
+    <i class="fa-solid fa-globe"></i>
+    <span class="lang-code">{{currentLabel}}</span>
+  </button>
+  @if (open) {
+    <ul class="lang-list list-unstyled border rounded shadow m-0 p-1" role="listbox"
+      [style.top.px]="listTop" [style.right.px]="listRight"
+      [class.border-dark]="!isDark()" [class.border-light]="isDark()"
+      [class.bg-dark]="isDark()" [class.bg-white]="!isDark()" [class.text-light]="isDark()">
+      @for (l of langs; track l.code) {
+        <li role="option" class="lang-item rounded px-2 py-1 clickable" [class.active]="l.code == current"
+          [attr.aria-selected]="l.code == current" (click)="choose(l.code)">
+          <span class="lang-item-code">{{l.label}}</span>
+          <span class="lang-item-name">{{l.name}}</span>
+        </li>
+      }
+    </ul>
+  }
+</div>

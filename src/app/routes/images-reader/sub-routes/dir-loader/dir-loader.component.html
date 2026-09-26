@@ -3,16 +3,16 @@
     <!-- A la izquierda: el botón de elegir antes de leer; después, "Ver imágenes" o "Carga" -->
     <div class="loader-bar d-flex align-items-center justify-content-start flex-wrap px-3 py-2 border-bottom" [class.border-dark]="!isDark()" [class.border-light]="isDark()">
         @if (imgsLoader.totalFiles == 0) {
-            <label for="dirPicker" class="btn btn-primary loader-choose m-0"><i class="fa-solid fa-folder-open"></i> Selecciona la unidad o carpeta</label>
+            <label for="dirPicker" class="btn btn-primary loader-choose m-0"><i class="fa-solid fa-folder-open"></i> {{'loader.chooseFolder' | t}}</label>
         }
         <input type="file" id="dirPicker" name="dirPicker" class="d-none" (change)="imgsLoader.onSelected($event)" #dirUpload webkitDirectory multiple/>
         @if (!showViewer && foundDCMFiles.length > 0) {
             <button type="button" class="btn btn-success loader-view" [disabled]="foundDCMFiles.length == 0" (click)="openViewer()">
-                <i class="fa-solid fa-eye"></i> Ver imágenes <span class="badge text-bg-light">{{foundDCMFiles.length}}</span>
+                <i class="fa-solid fa-eye"></i> {{'loader.view' | t}} <span class="badge text-bg-light">{{foundDCMFiles.length}}</span>
             </button>
         } @else if (showViewer) {
             <button type="button" class="btn btn-outline-secondary loader-view" (click)="showViewer = false">
-                <i class="fa-solid fa-list-check"></i> Carga
+                <i class="fa-solid fa-list-check"></i> {{'loader.back' | t}}
             </button>
         }
     </div>

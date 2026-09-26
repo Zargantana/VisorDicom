@@ -33,7 +33,7 @@
         [class.fa-caret-up]="!colapsed" [class.fa-caret-down]="colapsed"></i>
       </div>
     </div>
-    <div class="d-flex flex-row m-2 p-2 blink_me" [class.d-none]="readEnded"><i class="fa-solid fa-3x fa-truck-loading"></i> <h2>Loading...</h2></div>
+    <div class="d-flex flex-row m-2 p-2 blink_me" [class.d-none]="readEnded"><i class="fa-solid fa-3x fa-truck-loading"></i> <h2>{{'viewer.loading' | t}}</h2></div>
   </div>
   @if (selectedClassifier && listviewerSelected()) {
     <list-image-viewer class="d-flex flex-row slab-flex-1 m-0 p-0" #listviewer [classifier]="selectedClassifier"></list-image-viewer>

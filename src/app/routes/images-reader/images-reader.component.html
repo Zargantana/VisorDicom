@@ -1,18 +1,18 @@
 <div class="reader-home d-flex flex-column slab-flex-1 align-items-center justify-content-center m-0 p-3 user-select-none">
-  <h1 class="reader-title text-center">¿Qué buscamos?</h1>
-  <p class="reader-hint text-center">Todo se lee en tu navegador.</p>
+  <h1 class="reader-title text-center">{{'home.title' | t}}</h1>
+  <p class="reader-hint text-center">{{'home.hint' | t}}</p>
   <div class="reader-options d-flex flex-wrap justify-content-center">
     <a routerLink="/dir-loader" class="reader-option">
       <span class="reader-circle"><i class="fa-solid fa-compact-disc"></i></span>
-      <span class="reader-label">Un CD, DVD o USB</span>
+      <span class="reader-label">{{'home.cd' | t}}</span>
     </a>
     <a routerLink="/dir-loader" class="reader-option">
       <span class="reader-circle"><i class="fa-solid fa-folder"></i></span>
-      <span class="reader-label">Una carpeta</span>
+      <span class="reader-label">{{'home.folder' | t}}</span>
     </a>
     <a routerLink="/file-loader" class="reader-option">
       <span class="reader-circle"><i class="fa-solid fa-file"></i></span>
-      <span class="reader-label">Unos ficheros</span>
+      <span class="reader-label">{{'home.files' | t}}</span>
     </a>
     @if (!production) {
       <a routerLink="/test-screen" class="reader-option">

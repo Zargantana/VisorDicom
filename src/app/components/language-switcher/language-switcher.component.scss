@@ -1,0 +1,70 @@
+.clickable:hover {
+    cursor: pointer;
+}
+
+.lang-switcher {
+    position: relative;
+}
+
+// Mismo tamaño que los demás botones cuadrados de la barra (55 px de alto; icono y código apilados)
+.lang-btn {
+    min-height: 55px;
+    min-width: 55px;
+    font: inherit;
+    line-height: 1;
+
+    i {
+        font-size: 1.25rem;
+    }
+}
+
+.lang-code {
+    font-size: 0.7rem;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    margin-top: 0.2rem;
+}
+
+// Lista desplegada bajo el botón, por encima de lo demás. Fija respecto a la ventana (top/right los pone el
+// componente): el host de la barra superior lleva overflow hidden y recortaría una lista absoluta.
+.lang-list {
+    position: fixed;
+    min-width: 10rem;
+    z-index: 1100;
+}
+
+.lang-item {
+    display: flex;
+    align-items: baseline;
+    gap: 0.5rem;
+    white-space: nowrap;
+
+    &:hover {
+        background: rgba(13, 110, 253, 0.12);
+    }
+
+    &.active {
+        font-weight: 700;
+    }
+}
+
+.lang-item-code {
+    font-size: 0.75rem;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    min-width: 1.75rem;
+}
+
+.lang-item-name {
+    font-size: 0.9rem;
+}
+
+// Teléfonos: los botones de la barra son de 48 px
+@media (max-width: 575.98px) {
+    .lang-btn {
+        min-width: 48px;
+        min-height: 48px;
+        padding-left: 0.25rem !important;
+        padding-right: 0.25rem !important;
+    }
+}

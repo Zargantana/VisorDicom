@@ -1,6 +1,7 @@
 import { Component, EventEmitter, Input, Output } from '@angular/core';
 import { classifierDCM } from 'src/app/clases/Images/classifier-DCM.class';
 import { DCMFileReader } from 'src/app/clases/DCM/DCM-file-reader.class';
+import { I18n } from 'src/app/i18n/i18n';
 import { ThemeService } from 'src/app/services/theme.service';
 
 /** Una fila de la tabla = una serie. Los spans agrupan visualmente paciente, estudio y modalidad (rowspan). */
@@ -57,7 +58,8 @@ export class FindingsTableComponent {
     if (!c) {
       return [];
     }
-    const key = `${c.studySplit.length}/${c.numberOfSeries}/${c.numberOfImages}`;
+    // El idioma forma parte de la clave: los tooltips ("Serie 3 · 12 imágenes") se rehacen al cambiarlo
+    const key = `${c.studySplit.length}/${c.numberOfSeries}/${c.numberOfImages}/${I18n.current}`;
     if (key === this.cacheKey) {
       return this.cachedRows;
     }
@@ -96,7 +98,7 @@ export class FindingsTableComponent {
       key: img.SOPInstanceUID || `fila-${index}`,
       uid: img.SOPInstanceUID,
       patientSpan, studySpan, modalitySpan,
-      patientId: patientId || '(sin identificador)',
+      patientId: patientId || I18n.t('table.noId'),
       patientName,
       patientTitle: [patientId, patientName].filter(Boolean).join(' · '),
       studyDate: FindingsTableComponent.formatDate(img.StudyDate),
@@ -104,7 +106,8 @@ export class FindingsTableComponent {
       modality: FindingsTableComponent.clean(img.Modality),
       seriesNumber,
       seriesDescription,
-      seriesTitle: [seriesNumber ? 'Serie ' + seriesNumber : '', seriesDescription, `${count} ${count == 1 ? 'imagen' : 'imágenes'}`].filter(Boolean).join(' · '),
+      seriesTitle: [seriesNumber ? I18n.t('table.seriesWord') + ' ' + seriesNumber : '', seriesDescription,
+        `${count} ${I18n.t(count == 1 ? 'table.image.one' : 'table.image.many')}`].filter(Boolean).join(' · '),
       count,
     };
   }
