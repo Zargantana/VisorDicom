@@ -20,21 +20,22 @@ export class ColorFactory {
     /**
      * @param windowIndex     ventana VOI (Window Center/Width) a usar en imagenes monocromo. 0 = la primera.
      * @param colorAlreadyRGB el decoder ya entrega RGB (JPEG baseline / JPEG 2000): no convertir YBR otra vez.
+     * @param frameIndex      indice del frame (multiframe mejorado: ventana y rescale propios del frame).
      */
-    public pixelDataTo32BitBuffer(data: Uint8ClampedArray, frame: any, windowIndex: number = 0, colorAlreadyRGB: boolean = false): void {
+    public pixelDataTo32BitBuffer(data: Uint8ClampedArray, frame: any, windowIndex: number = 0, colorAlreadyRGB: boolean = false, frameIndex?: number): void {
         switch (this.interpret.getPhotometricInterpretation()) {
           case PhotometricInterpretationType.PALETTE_COLOR: {
-            new PaletteColor(this.reader, windowIndex).pixelDataTo32BitBuffer(data, frame);
+            new PaletteColor(this.reader, windowIndex, frameIndex).pixelDataTo32BitBuffer(data, frame);
             break;
           }
           case PhotometricInterpretationType.MONOCHROME1:
           case PhotometricInterpretationType.MONOCHROME2: {
-            new Monochorme2Color(this.reader, windowIndex).pixelDataTo32BitBuffer(data, frame);
+            new Monochorme2Color(this.reader, windowIndex, frameIndex).pixelDataTo32BitBuffer(data, frame);
             break;
           }
           default: {
-            new RGBColor(this.reader, windowIndex, colorAlreadyRGB).pixelDataTo32BitBuffer(data, frame);
+            new RGBColor(this.reader, windowIndex, colorAlreadyRGB, frameIndex).pixelDataTo32BitBuffer(data, frame);
           }
-        } 
+        }
     }
 }

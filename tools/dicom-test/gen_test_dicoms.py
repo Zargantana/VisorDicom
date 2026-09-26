@@ -385,6 +385,59 @@ for i, date in enumerate(("19991117", "20000627")):
     save(ds, f"t76_same_study_dates_{i + 1}.dcm", ExplicitVRLittleEndian)
     expect(f"t76_same_study_dates_{i + 1}.dcm", rows=R, cols=C, frames=1, windows=1, kind="ct")
 
+# --- t78: multiframe mejorado con functional groups de LONGITUD DEFINIDA (Siemens, Toshiba): rescale compartido y
+#     ventana distinta en cada frame (Philips RM mejorada), con SIGMOID y LINEAR_EXACT. Antes el lector no entraba en
+#     las secuencias de longitud definida (la ventana era invisible) y la del primer frame se aplicaba a todos.
+frames78 = np.stack([(ct_hu(shift=i) + 1024).astype(np.uint16) for i in range(3)])
+ds = base_ds("MR", "1.2.840.10008.5.1.4.1.1.4.1")   # Enhanced MR Image Storage
+set_mono16(ds, frames78[0], signed=False)
+for k in ("RescaleSlope", "RescaleIntercept", "RescaleType", "WindowCenter", "WindowWidth"):
+    if k in ds:
+        del ds[k]
+ds.NumberOfFrames = 3
+ds.PixelData = frames78.tobytes()
+pvt = Dataset()
+pvt.RescaleSlope, pvt.RescaleIntercept, pvt.RescaleType = "2", "-100", "US"
+shared78 = Dataset()
+shared78.PixelValueTransformationSequence = Sequence([pvt])
+ds.SharedFunctionalGroupsSequence = Sequence([shared78])
+items78 = []
+for c, w, f in ((1200, 800, None), (1600, 400, "SIGMOID"), (900, 1500, "LINEAR_EXACT")):
+    voi = Dataset()
+    voi.WindowCenter, voi.WindowWidth = str(c), str(w)
+    if f:
+        voi.VOILUTFunction = f
+    g = Dataset()
+    g.FrameVOILUTSequence = Sequence([voi])
+    items78.append(g)
+ds.PerFrameFunctionalGroupsSequence = Sequence(items78)
+for seq in [ds.SharedFunctionalGroupsSequence, ds.PerFrameFunctionalGroupsSequence, shared78.PixelValueTransformationSequence] + \
+        [g.FrameVOILUTSequence for g in items78]:
+    seq.is_undefined_length = False
+save(ds, "t78_enhanced_perframe_voi.dcm", ExplicitVRLittleEndian)
+expect("t78_enhanced_perframe_voi.dcm", rows=R, cols=C, frames=3, windows=1, kind="enhanced")
+
+# --- t79: VOI LUT Sequence (0028,3010) de longitud definida en una CR MONOCHROME1 de 12 bits (Agfa, Fuji): sin
+#     ventana, el visor aplica la LUT normalizada por su mínimo y máximo y luego invierte por MONOCHROME1. La LUT
+#     se busca DENTRO de (0028,3010) (la Modality LUT Sequence también lleva un descriptor 0028,3002).
+stored79 = np.tile(np.linspace(0, 4095, C).astype(np.uint16), (R, 1))
+ds = base_ds("CR", "1.2.840.10008.5.1.4.1.1.1")
+set_mono16(ds, stored79, signed=False, slope=1.0, intercept=0.0)
+ds.PhotometricInterpretation = "MONOCHROME1"
+ds.BitsStored, ds.HighBit = 12, 11
+for k in ("WindowCenter", "WindowWidth", "RescaleType"):
+    if k in ds:
+        del ds[k]
+lut79 = Dataset()
+lut79.add_new((0x0028, 0x3002), "US", [1024, 1024, 16])   # 1024 entradas desde el valor 1024
+lut79.LUTExplanation = "E25"
+lut79.add_new((0x0028, 0x3006), "OW", (np.linspace(0, 1, 1024) ** 2 * 60000).astype("<u2").tobytes())   # gamma
+ds.VOILUTSequence = Sequence([lut79])
+ds.VOILUTSequence.is_undefined_length = False
+ds.PixelData = stored79.tobytes()
+save(ds, "t79_voi_lut_sequence.dcm", ExplicitVRLittleEndian)
+expect("t79_voi_lut_sequence.dcm", rows=R, cols=C, frames=1, windows=0, kind="voi_lut")
+
 # --- t75: el mismo J2K con la cabecera SIZ corrupta: los bytes de un delimitador de secuencia (FFFE,E0DD) dentro del
 # codestream, como JPEG2000-embedded-sequence-delimiter.dcm de pydicom-data (Rsiz = FEFF, Xsiz = DDE00100). OpenJPEG
 # rechaza la cabecera y jpx.js NO debe reservar memoria según un Xsiz de 3.700 millones (tumbaba el proceso con 4 GB):

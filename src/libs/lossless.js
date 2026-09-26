@@ -720,7 +720,8 @@ jpeg.lossless.Decoder.prototype.getHuffmanValue = function (table, temp, index) 
         throw new Error("index=" + index[0] + " temp=" + temp[0] + " code=" + code + " in HuffmanValue()");
     }
 
-    if (index[0] < this.markerIndex) {
+    // VisorDICOM: como en getn(), el marcador (EOI) no debe robar los bits del ultimo pixel (SuperSonic, PVRG)
+    if ((index[0] < this.markerIndex) && !this.isLastPixel()) {
         this.markerIndex = 0;
         return 0xFF00 | this.marker;
     }
@@ -799,7 +800,7 @@ jpeg.lossless.Decoder.prototype.getn = function (PRED, n, temp, index) {
             throw new Error("index=" + index[0] + " in getn()");
         }
 
-        if (index[0] < this.markerIndex) {
+        if ((index[0] < this.markerIndex) && !this.isLastPixel()) { // VisorDICOM: idem, ultimo pixel
             this.markerIndex = 0;
             return (0xFF00 | this.marker) << 8;
         }

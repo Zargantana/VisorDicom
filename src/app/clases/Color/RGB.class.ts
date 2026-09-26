@@ -14,8 +14,8 @@ import { BaseColor } from "./base-color.class";
  */
 export class RGBColor extends BaseColor {
 
-    constructor(reader: DCMFileReader, windowIndex: number = 0, private colorAlreadyRGB: boolean = false) {
-        super(reader, windowIndex);
+    constructor(reader: DCMFileReader, windowIndex: number = 0, private colorAlreadyRGB: boolean = false, frameIndex?: number) {
+        super(reader, windowIndex, frameIndex);
     }
 
     protected pixelDataBufferTo32BitBuffer(data: Uint8ClampedArray, buffer: any): void {

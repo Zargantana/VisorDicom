@@ -32,8 +32,9 @@ def main():
             return "BIG", meta.get("unsupportedReason", "")
         if meta.get("skippedTiles"):
             return "TILES", meta.get("unsupportedReason", "")
-        # Sin preámbulo "DICM" (ACR-NEMA, datasets crudos): el cargador del visor ni los reconoce; no cuentan
-        if not inv.get("part10", True) and not meta.get("decodedFrames"):
+        # Sin preámbulo "DICM" (ACR-NEMA, datasets crudos): el cargador del visor ni los reconoce; no cuentan aunque
+        # el harness los haya decodificado (pydicom tampoco da verdad sin meta header)
+        if not inv.get("part10", True):
             return "SIN_META", "sin preámbulo DICM: el cargador no lo reconoce como DICOM"
         if not keys:
             return "PENDIENTE", "sin comparar"

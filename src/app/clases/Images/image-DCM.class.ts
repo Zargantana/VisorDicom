@@ -223,8 +223,9 @@ export class ImageDCM  {
         for (let i = 3; i < data.length; i += 4) {
             data[i] = 255; // opaco (antes: fillRect negro)
         }
+        const frame = frameIndex % this.rawFrames.length;
         new ColorFactory(this.reader).pixelDataTo32BitBuffer(
-            data, this.rawFrames[frameIndex % this.rawFrames.length], this.selectedWindow, this.decoderOutputIsRGB);
+            data, this.rawFrames[frame], this.selectedWindow, this.decoderOutputIsRGB, frame);
         return data;
     }
 

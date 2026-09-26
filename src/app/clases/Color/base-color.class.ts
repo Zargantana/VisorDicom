@@ -20,12 +20,41 @@ export abstract class BaseColor {
 
     /**
      * @param windowIndex ventana VOI a aplicar (0028,1050/1051 son multivalor). Por defecto la primera.
+     * @param frameIndex  frame que se pinta: en los multiframe mejorados, su ventana y rescale propios
+     *                    (Per-Frame Functional Groups) si el dataset raiz no trae ventana.
      */
-    constructor(protected reader: DCMFileReader, protected windowIndex: number = 0) {
+    constructor(protected reader: DCMFileReader, protected windowIndex: number = 0, frameIndex?: number) {
         this.bytesPerPixel = reader.BitsAllocated / 8;
         this.interpret = new DCMInterpreter(reader);
         this.RescaleParams = this.interpret.getRescaleParameters();
         this.VOIwindow = this.interpret.getVOIData();
+        if (frameIndex !== undefined) {
+            this.applyFrameGroup(frameIndex);
+        }
+    }
+
+    /**
+     * Multiframe mejorado (PS3.3 C.7.6.16): Frame VOI LUT y Pixel Value Transformation del frame, que pueden cambiar
+     * de un frame a otro (Philips RM mejorada, mapas paramétricos). Los valores compartidos ya los encuentra
+     * getVOIData() por searchTopLevelFirst; los de la raiz del dataset, si existen, mandan sobre los del frame.
+     */
+    private applyFrameGroup(frameIndex: number): void {
+        const group = this.interpret.getPerFrameGroups()?.[frameIndex];
+        if (!group) {
+            return;
+        }
+        if (group.WindowCenter.length && group.WindowWidth.length && !this.interpret.hasRootWindow()) {
+            this.VOIwindow.WindowCenter = group.WindowCenter;
+            this.VOIwindow.WindowWidth = group.WindowWidth;
+            // La funcion del frame o, si no la trae, la compartida/raiz (no la de otro frame)
+            this.VOIwindow.VOIfunction = group.VOIfunction ?? this.interpret.getSharedVOIFunction();
+        }
+        if (group.Slope !== undefined && group.Slope !== 0) {
+            this.RescaleParams.Slope = group.Slope;
+        }
+        if (group.Intercept !== undefined) {
+            this.RescaleParams.Intercept = group.Intercept;
+        }
     }
 
     /** Numero de ventanas VOI utilizables (pares Center/Width). */

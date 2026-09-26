@@ -125,6 +125,15 @@ export class RescaleParameters {
     public Type: string = '';
 }
 
+/** Ventana y rescale de UN frame de un multiframe mejorado (Per-Frame Functional Groups, PS3.3 C.7.6.16). */
+export class FrameGroup {
+    public WindowCenter: number[] = [];
+    public WindowWidth: number[] = [];
+    public VOIfunction?: VOIFunction;
+    public Slope?: number;
+    public Intercept?: number;
+}
+
 export class DCMInterpreter {
     private isLittleEndian: boolean;
 
@@ -301,18 +310,78 @@ export class DCMInterpreter {
     }
 
     private getWindowVOIFunction(): VOIFunction {
-        let result = VOIFunction.LINEAR;
-        let tag = this.searchTopLevelFirst(0x0028,0x1056);
-        if (tag && tag.Value) {
-            // LINEAR_EXACT contiene "LINEAR": hay que mirarlo antes.
-            if (tag.Value.includes(VOI_FUNC_LINEAR_EXACT)) {
-                result = VOIFunction.LINEAR_EXACT;
-            } else if (tag.Value.includes(VOI_FUNC_SIGMOID)) {
-                result = VOIFunction.SIGMOID;
-            } else if (tag.Value.includes(VOI_FUNC_LINEAR)) {
-                result = VOIFunction.LINEAR;
+        return DCMInterpreter.parseVOIFunction(this.searchTopLevelFirst(0x0028,0x1056)?.Value) ?? VOIFunction.LINEAR;
+    }
+
+    /** (0028,1056) VOI LUT Function. LINEAR_EXACT contiene "LINEAR": hay que mirarlo antes. undefined si no hay valor. */
+    private static parseVOIFunction(value: string | undefined): VOIFunction | undefined {
+        if (!value) {
+            return undefined;
+        }
+        if (value.includes(VOI_FUNC_LINEAR_EXACT)) {
+            return VOIFunction.LINEAR_EXACT;
+        }
+        if (value.includes(VOI_FUNC_SIGMOID)) {
+            return VOIFunction.SIGMOID;
+        }
+        if (value.includes(VOI_FUNC_LINEAR)) {
+            return VOIFunction.LINEAR;
+        }
+        return undefined;
+    }
+
+    /** true si la ventana (0028,1050) esta en la raiz del dataset (manda sobre las de los functional groups). */
+    public hasRootWindow(): boolean {
+        return !!this.findTopLevel(0x0028, 0x1050);
+    }
+
+    /**
+     * VOI LUT Function que hereda un frame sin la suya: la de la raiz o la de los Shared Functional Groups; nunca la
+     * de otro frame (searchTopLevelFirst la cogeria del primer per-frame que la lleve). Por defecto LINEAR.
+     */
+    public getSharedVOIFunction(): VOIFunction {
+        const tag = this.findTopLevel(0x0028, 0x1056) ?? this.searchInSequence(0x5200, 0x9229, 0x0028, 0x1056);
+        return DCMInterpreter.parseVOIFunction(tag?.Value) ?? VOIFunction.LINEAR;
+    }
+
+    /**
+     * Per-Frame Functional Groups (5200,9230): ventana (Frame VOI LUT) y rescale (Pixel Value Transformation) de cada
+     * frame, en el orden de los items. null si el fichero no los trae. Se cachea en el lector: se consulta al pintar
+     * cada frame.
+     */
+    public getPerFrameGroups(): FrameGroup[] | null {
+        if (this.reader.perFrameGroupsCache !== undefined) {
+            return this.reader.perFrameGroupsCache;
+        }
+        const tags = this.reader.readed_tags;
+        let result: FrameGroup[] | null = null;
+        const start = tags.findIndex(t => t.TagHigh == 0x5200 && t.TagLow == 0x9230 && t.depth == 0);
+        if (start >= 0) {
+            result = [];
+            let current: FrameGroup | null = null;
+            for (let i = start + 1; i < tags.length && tags[i].depth > 0; i++) {
+                const t = tags[i];
+                if (t.TagHigh == 0xFFFE && t.TagLow == 0xE000 && t.depth == 1) { // item = un frame
+                    current = new FrameGroup();
+                    result.push(current);
+                    continue;
+                }
+                if (!current || t.TagHigh != 0x0028) {
+                    continue;
+                }
+                switch (t.TagLow) {
+                    case 0x1050: current.WindowCenter = this.parseDS(t.Value); break;
+                    case 0x1051: current.WindowWidth = this.parseDS(t.Value); break;
+                    case 0x1056: current.VOIfunction = DCMInterpreter.parseVOIFunction(t.Value); break;
+                    case 0x1052: current.Intercept = this.parseDS(t.Value)[0]; break;
+                    case 0x1053: current.Slope = this.parseDS(t.Value)[0]; break;
+                }
+            }
+            if (!result.length) {
+                result = null;
             }
         }
+        this.reader.perFrameGroupsCache = result;
         return result;
     }
 
@@ -326,8 +395,17 @@ export class DCMInterpreter {
             .filter(v => !isNaN(v));
     }
 
+    /**
+     * Descriptor y datos de la VOI LUT: dentro de la VOI LUT Sequence (0028,3010). Antes se buscaba (0028,3002) a
+     * cualquier profundidad y, ahora que el lector entra en las secuencias de longitud definida, cogeria el de la
+     * Modality LUT Sequence (0028,3000). Sin secuencia, se admite el descriptor suelto en la raiz (ficheros antiguos).
+     */
+    private voiLUTTag(low: number): FoundDCMTag | undefined {
+        return this.searchInSequence(0x0028, 0x3010, 0x0028, low) ?? this.findTopLevel(0x0028, low);
+    }
+
     private getLUTDescription(LUT: LUTInformation) {
-        let tag = this.searchTopLevelFirst(0x0028,0x3002);
+        let tag = this.voiLUTTag(0x3002);
         if (tag && tag.Value) {
             LUT.entries = Functions.getValueAs2ByteNumber(tag.Value.substring(0,2), this.reader.isLittleEndian);
             LUT.firstStoredPixelValueMapped = Functions.getValueAs2ByteNumber(tag.Value.substring(2,4), this.reader.isLittleEndian);
@@ -337,7 +415,7 @@ export class DCMInterpreter {
 
     private getLUTData(): string {
         let result: string = '';
-        let tag = this.searchTopLevelFirst(0x0028,0x3006);
+        let tag = this.voiLUTTag(0x3006);
         if (tag && tag.Value) {
             result = tag.Value;
         }
@@ -579,6 +657,21 @@ export class DCMInterpreter {
     /** Busca primero en el dataset raiz y, si no esta, en cualquier nivel (p.ej. functional groups de Enhanced). */
     private searchTopLevelFirst(High: number, Low: number): FoundDCMTag | undefined {
         return this.findTopLevel(High, Low) ?? this.searchDCMTag(High, Low);
+    }
+
+    /** Primer tag (High,Low) dentro de la secuencia (seqHigh,seqLow) del dataset raiz, a cualquier profundidad. */
+    private searchInSequence(seqHigh: number, seqLow: number, High: number, Low: number): FoundDCMTag | undefined {
+        const tags = this.reader.readed_tags;
+        const start = tags.findIndex(t => t.TagHigh == seqHigh && t.TagLow == seqLow && t.depth == 0);
+        if (start < 0) {
+            return undefined;
+        }
+        for (let i = start + 1; i < tags.length && tags[i].depth > 0; i++) {
+            if (tags[i].TagHigh == High && tags[i].TagLow == Low) {
+                return { ...tags[i], DS_tag_position: i };
+            }
+        }
+        return undefined;
     }
 
     private searchDCMTag(High: number, Low: number, from: number = -1): FoundDCMTag | undefined {

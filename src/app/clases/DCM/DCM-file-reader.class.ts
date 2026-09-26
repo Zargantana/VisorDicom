@@ -80,9 +80,17 @@ export class DCMFileReader {
     }
 
     private current_position: number = 132;
-    /** Profundidad de anidamiento (secuencias / Pixel Data encapsulado de longitud indefinida). 0 = dataset raiz. */
+    /** Profundidad de anidamiento (secuencias e items, Pixel Data encapsulado). 0 = dataset raiz. */
     private depth: number = 0;
-    
+    /**
+     * Contenedores abiertos: secuencias e items (de longitud definida, con `end` = posicion donde acaban, o
+     * indefinida, `end` = Infinity, que cierra su delimitador) y el Pixel Data encapsulado (sus items son fragmentos
+     * binarios, no datasets).
+     */
+    private containers: { end: number; kind: 'sq' | 'item' | 'pixel' }[] = [];
+    /** Cache de los Per-Frame Functional Groups (DCMInterpreter.getPerFrameGroups). undefined = sin calcular. */
+    public perFrameGroupsCache: any = undefined;
+
 
     public last_readed_tag: DCMTag | undefined;
 
@@ -231,8 +239,10 @@ export class DCMFileReader {
      *
      * VL = 0xFFFFFFFF (longitud indefinida) en CUALQUIER elemento (SQ, UN, secuencia privada, Pixel Data encapsulado):
      * se deja VL = 0 y se "entra" (depth++), de modo que los items/fragmentos siguientes se leen como tags
-     * consecutivos. (FFFE,E0DD) cierra ese nivel (depth--). Los SQ/items de longitud DEFINIDA se saltan enteros
-     * (su contenido queda en Value).
+     * consecutivos. (FFFE,E0DD) cierra ese nivel (depth--). Las SQ y los items de longitud DEFINIDA tambien se
+     * recorren por dentro (antes se saltaban enteros y los functional groups de los multiframe mejorados de Siemens
+     * o Toshiba, que van con longitud definida, eran invisibles): se apuntan en `containers` con la posicion donde
+     * acaban y se cierran al llegar a ella. Excepcion: los items del Pixel Data encapsulado son fragmentos binarios.
      */
     private readTag(): void{
         try {
@@ -287,11 +297,19 @@ export class DCMFileReader {
                 headerLength = 8;
             }
 
+            const isItem = tag.TagHigh == 0xFFFE && tag.TagLow == 0xE000;
+            const isPixelData = tag.TagHigh == 0x7FE0 && tag.TagLow == 0x10;
+            const top = this.containers.length ? this.containers[this.containers.length - 1] : undefined;
             let undefinedLength = false;
+            let descend = false; // contenedor de longitud definida: su contenido se lee como tags anidados
             if (tag.VL == UNDEFINED_LENGTH) {
                 tag.VL = 0;
                 undefinedLength = true;
-            } else if (tag.TagHigh == 0x7FE0 && tag.TagLow == 0x10 && this.depth == 0) {
+            } else if (isItem) {
+                descend = (tag.VL ?? 0) > 0 && top?.kind != 'pixel'; // dentro del Pixel Data, un item es un fragmento
+            } else if (tag.TagHigh != 0xFFFE && tag.VR == VR_SQ && (tag.VL ?? 0) > 0) {
+                descend = true;
+            } else if (isPixelData && this.depth == 0) {
                 const suposedVL = (this.Rows * this.Columns * this.BitsAllocated * this.Frames * this.SamplesPerPixel) / 8;
                 if (tag.VL != suposedVL) {
                     tag.WarningFlag = true;
@@ -299,21 +317,51 @@ export class DCMFileReader {
             }
 
             //Read Value
-            tag.Value = raw.substring(pos + headerLength, pos + headerLength + (tag.VL ?? 0));
+            if (descend) {
+                this.containers.push({ end: pos + headerLength + (tag.VL ?? 0), kind: isItem ? 'item' : 'sq' });
+                tag.Value = '';
+                tag.VL = 0; // solo se avanza la cabecera: lo de dentro son Data Elements
+            } else {
+                tag.Value = raw.substring(pos + headerLength, pos + headerLength + (tag.VL ?? 0));
+            }
 
             //Nesting depth
             if (tag.TagHigh == 0xFFFE && tag.TagLow == 0xE0DD) {
-                this.depth = Math.max(0, this.depth - 1);
+                this.closeUndefinedContainer();
             }
             tag.depth = this.depth;
             if (undefinedLength && tag.TagHigh != 0xFFFE) {
                 this.depth++;
+                this.containers.push({ end: Infinity, kind: isPixelData ? 'pixel' : 'sq' });
+            } else if (descend && !isItem) {
+                this.depth++;
             }
 
             this.updateCurrentPosition(headerLength - 6);
+
+            // Contenedores de longitud definida ya consumidos
+            while (this.containers.length && this.containers[this.containers.length - 1].end <= this.current_position) {
+                if (this.containers.pop()!.kind == 'sq') {
+                    this.depth = Math.max(0, this.depth - 1);
+                }
+            }
         } catch (error) {
             this.last_readed_tag = undefined;
         }
+    }
+
+    /** (FFFE,E0DD): cierra la secuencia (o el Pixel Data encapsulado) de longitud indefinida abierta mas cercana. */
+    private closeUndefinedContainer(): void {
+        while (this.containers.length) {
+            const c = this.containers.pop()!;
+            if (c.kind != 'item') {
+                this.depth = Math.max(0, this.depth - 1);
+            }
+            if (c.end === Infinity) {
+                return;
+            }
+        }
+        this.depth = Math.max(0, this.depth - 1); // delimitador suelto (fichero mal escrito): como antes
     }
 
     private updateCurrentPosition(offset: number) {

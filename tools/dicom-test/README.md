@@ -121,6 +121,8 @@ crudo (403), hay que bajarlo a mano.
 | t66-t73 | **Códec estándar bajo una TS privada ficticia** (raíz 2.25): RLE, JPEG baseline RGB, sin comprimir en Implicit VR (el parser detecta la VR), JPEG lossless, JPEG-LS, JPEG 2000, HTJ2K y JPEG progresivo. El visor lo reconoce por el contenido (`codec-sniffer.ts`, `decoded_by`) |
 | t74 | CT **Explicit VR Big Endian** con una secuencia de longitud definida y un OB privado antes del Pixel Data (las longitudes de 4 bytes en BE se leían con las mitades cambiadas) |
 | t75 | J2K con la **cabecera SIZ corrupta** (bytes de un delimitador FFFE,E0DD dentro del codestream, como en pydicom-data): rechazo con motivo; jpx.js no debe reservar memoria según un Xsiz absurdo |
+| t78 | **Multiframe mejorado** con functional groups de **longitud definida** (Siemens, Toshiba): rescale compartido y ventana distinta en cada frame (SIGMOID, LINEAR_EXACT). El lector entra en las secuencias de longitud definida y el pintado usa la ventana y el rescale del frame |
+| t79 | **VOI LUT Sequence** (0028,3010) de longitud definida en una CR MONOCHROME1 de 12 bits: LUT normalizada por su mínimo y máximo, buscada dentro de la secuencia (no en la Modality LUT) |
 | t77 | JPEG Baseline con **bytes de relleno 0xFF** delante de SOS y EOI (ISO 10918-1 B.1.1.2; las miniaturas "DicomObjects" de las láminas 3DHISTECH): el decoder los quita antes de JpegImage/libjpeg-turbo |
 | t76 (×2) | **Mismo estudio con dos Study Date distintas** (pasa en CD reales): el clasificador agrupa por Study Instance UID. Lo comprueba `real/classify_corpus.mjs tools/dicom-test/out` (árbol del visor frente a pydicom), que conviene pasar tras tocar `classifier-DCM.class.ts` |
 
