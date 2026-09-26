@@ -16,7 +16,8 @@ interface SeoEntry {
 const SITE = 'https://visordicom.es';
 const HOME: SeoEntry = {
   title: 'VisorDICOM: visor DICOM online gratis, 100 % en tu navegador',
-  description: 'Abre estudios DICOM (TAC, resonancia, PET, ecografía, radiografía…) desde un CD, USB o carpeta sin instalar nada y sin subir tus imágenes: todo se lee en tu navegador. Gratis y open source. Windows, Linux, Mac, Android e iOS.',
+  // Descripciones de 25-160 caracteres: Bing marca error si son más largas
+  description: 'Visor DICOM gratis en tu navegador: abre TAC, resonancia, PET o ecografía desde un CD, USB o carpeta sin instalar nada ni subir imágenes. Open source.',
   canonical: SITE + '/'
 };
 const ROUTES: { [path: string]: SeoEntry } = {
@@ -24,12 +25,12 @@ const ROUTES: { [path: string]: SeoEntry } = {
   '/reader': HOME,   // misma portada que /: canonical a la raíz para no duplicar
   '/file-loader': {
     title: 'Abrir ficheros DICOM en el navegador | VisorDICOM',
-    description: 'Elige o arrastra unos ficheros DICOM y míralos al momento en tu navegador, sin subirlos a ningún sitio: CT, MR, PET, ecografía, radiografía y más.',
+    description: 'Elige o arrastra unos ficheros DICOM y míralos al momento en tu navegador, sin subirlos a ningún sitio: TAC, resonancia, PET, ecografía y más.',
     canonical: SITE + '/file-loader'
   },
   '/dir-loader': {
     title: 'Abrir un CD, DVD, USB o carpeta DICOM | VisorDICOM',
-    description: 'Mete el CD o el USB del hospital, elige la unidad o carpeta y VisorDICOM encuentra y organiza los estudios por paciente, estudio y serie. Todo se lee en tu navegador.',
+    description: 'Mete el CD o el USB del hospital, elige la unidad o carpeta y VisorDICOM organiza los estudios por paciente, estudio y serie. Todo se lee en tu navegador.',
     canonical: SITE + '/dir-loader'
   },
   '/test-screen': { title: 'VisorDICOM: pruebas', description: 'Pantalla de pruebas.', noindex: true }
