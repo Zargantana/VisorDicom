@@ -59,9 +59,9 @@ The Web DICOM Viewer is a \textbf{VIEWER} application that does not establish ne
     \item Explicit VR Big Endian, retired (1.2.840.10008.1.2.2)
     \item JPEG Baseline, Process 1 (1.2.840.10008.1.2.4.50)
     \item JPEG Extended, Process 2 \& 4, 8 and 12 bit (1.2.840.10008.1.2.4.51)
-    \item JPEG Extended, Process 3 \& 5, arithmetic coding, 8 bit, retired (1.2.840.10008.1.2.4.52)
-    \item JPEG Spectral Selection, Non-Hierarchical, Process 6 \& 8 and 7 \& 9, 8 bit, retired (1.2.840.10008.1.2.4.53, .54)
-    \item JPEG Full Progression, Non-Hierarchical, Process 10 \& 12 and 11 \& 13, 8 bit, retired (1.2.840.10008.1.2.4.55, .56)
+    \item JPEG Extended, Process 3 \& 5, arithmetic coding, 8 and 12 bit, retired (1.2.840.10008.1.2.4.52)
+    \item JPEG Spectral Selection, Non-Hierarchical, Process 6 \& 8 and 7 \& 9, 8 and 12 bit, retired (1.2.840.10008.1.2.4.53, .54)
+    \item JPEG Full Progression, Non-Hierarchical, Process 10 \& 12 and 11 \& 13, 8 and 12 bit, retired (1.2.840.10008.1.2.4.55, .56)
     \item JPEG Lossless, Non-Hierarchical, Process 14, any predictor, 2--16 bit (1.2.840.10008.1.2.4.57)
     \item JPEG Lossless, Non-Hierarchical, First-Order Prediction, Process 14 Selection Value 1 (1.2.840.10008.1.2.4.70)
     \item JPEG-LS Lossless and Near-Lossless (1.2.840.10008.1.2.4.80, .81)
@@ -123,7 +123,7 @@ MR & Magnetic Resonance (if uploaded) \\
 \section*{6. Limitations}
 
 \begin{itemize}
-  \item Not supported: JPEG 2000 Part 2 array-based multi-component transformations, hierarchical JPEG (processes 16--29), 12-bit JPEG with arithmetic coding or progression, JPEG XL, MPEG-2, MPEG-4 AVC/H.264 and HEVC/H.265 video, JPIP referenced pixel data, Float and Double Float Pixel Data, and ICC profile color management.
+  \item Not supported: JPEG 2000 Part 2 array-based multi-component transformations, hierarchical JPEG (processes 16--29), JPEG XL, MPEG-2, MPEG-4 AVC/H.264 and HEVC/H.265 video, JPIP referenced pixel data, Float and Double Float Pixel Data, and ICC profile color management.
   \item JPEG Lossless with arithmetic coding (Process 15, 1.2.840.10008.1.2.4.58) is decoded on a best-effort basis for 8-bit images and has not been verified.
   \item Non-linear Modality LUT Sequences and per-frame functional group windows of enhanced multi-frame images are not applied.
   \item No support for DICOM C-FIND, C-MOVE, or other DICOM services.
