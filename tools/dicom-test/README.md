@@ -121,6 +121,7 @@ crudo (403), hay que bajarlo a mano.
 | t66-t73 | **Códec estándar bajo una TS privada ficticia** (raíz 2.25): RLE, JPEG baseline RGB, sin comprimir en Implicit VR (el parser detecta la VR), JPEG lossless, JPEG-LS, JPEG 2000, HTJ2K y JPEG progresivo. El visor lo reconoce por el contenido (`codec-sniffer.ts`, `decoded_by`) |
 | t74 | CT **Explicit VR Big Endian** con una secuencia de longitud definida y un OB privado antes del Pixel Data (las longitudes de 4 bytes en BE se leían con las mitades cambiadas) |
 | t75 | J2K con la **cabecera SIZ corrupta** (bytes de un delimitador FFFE,E0DD dentro del codestream, como en pydicom-data): rechazo con motivo; jpx.js no debe reservar memoria según un Xsiz absurdo |
+| t77 | JPEG Baseline con **bytes de relleno 0xFF** delante de SOS y EOI (ISO 10918-1 B.1.1.2; las miniaturas "DicomObjects" de las láminas 3DHISTECH): el decoder los quita antes de JpegImage/libjpeg-turbo |
 | t76 (×2) | **Mismo estudio con dos Study Date distintas** (pasa en CD reales): el clasificador agrupa por Study Instance UID. Lo comprueba `real/classify_corpus.mjs tools/dicom-test/out` (árbol del visor frente a pydicom), que conviene pasar tras tocar `classifier-DCM.class.ts` |
 
 Los casos encapsulados con TS que pydicom no sabe escribir (HTJ2K…) se guardan con un UID conocido de la misma longitud y luego se parchea el *meta header* (`save_encapsulated()`).

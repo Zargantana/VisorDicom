@@ -20,9 +20,10 @@ def main():
     by_rel = {r["rel"]: r for r in inventory}
 
     def status_of(key):
-        """Estado final de un fichero (clave sin #w): FAIL manda; luego CRASH, BIG, SKIP, PASS, PENDIENTE."""
+        """Estado final de un fichero (clave sin #w): FAIL manda; luego CRASH, BIG, TILES, SIN_META, SKIP, PASS, PENDIENTE."""
         keys = [k for k in check if k.split("#w")[0] == key]
         meta = render.get(key)
+        inv = by_rel.get(manifest[key]["rel"], {})
         if meta is None:
             return "PENDIENTE", "sin procesar"
         if (meta.get("error") or "").startswith("CRASH"):
@@ -31,6 +32,9 @@ def main():
             return "BIG", meta.get("unsupportedReason", "")
         if meta.get("skippedTiles"):
             return "TILES", meta.get("unsupportedReason", "")
+        # Sin preámbulo "DICM" (ACR-NEMA, datasets crudos): el cargador del visor ni los reconoce; no cuentan
+        if not inv.get("part10", True) and not meta.get("decodedFrames"):
+            return "SIN_META", "sin preámbulo DICM: el cargador no lo reconoce como DICOM"
         if not keys:
             return "PENDIENTE", "sin comparar"
         sts = [check[k]["status"] for k in keys]
@@ -49,13 +53,14 @@ def main():
         rows.append({"key": key, "rel": m["rel"], "top": top, "mb": m["mb"], "ts": inv.get("ts_name", m.get("ts", "")),
                      "modality": m.get("modality", ""), "frames": m.get("frames", 1), "status": st, "detail": det,
                      "ms": (render.get(key) or {}).get("ms"), "decodedBy": (render.get(key) or {}).get("decodedBy")})
-    order = ["PASS", "SKIP", "BIG", "TILES", "CRASH", "FAIL", "PENDIENTE"]
+    order = ["PASS", "SKIP", "SIN_META", "BIG", "TILES", "CRASH", "FAIL", "PENDIENTE"]
     tot = Counter(r["status"] for r in rows)
     lines = ["# Corpus de imágenes reales: resultado del visor", "",
              f"Imágenes: {len(rows)} · " + " · ".join(f"{s}: {tot.get(s, 0)}" for s in order), "",
              "PASS = píxeles iguales a pydicom (±3, o tolerancia de compresión con pérdida). SKIP = rechazo controlado con motivo o sin verdad "
-             "de pydicom. BIG = mayor que el tope de la versión actual (string del navegador). TILES = lámina de patología por tiles "
-             "(miles de frames), fuera del alcance. CRASH = tumbó el proceso de Node. FAIL = se pinta pero distinto de pydicom, o error.", ""]
+             "de pydicom. SIN_META = sin preámbulo DICM (el cargador del visor no los reconoce). BIG = mayor que el tope de la versión actual "
+             "(string del navegador). TILES = lámina de patología por tiles (miles de frames), fuera del alcance. CRASH = tumbó el proceso de "
+             "Node. FAIL = se pinta pero distinto de pydicom, o error.", ""]
 
     def table(title, group):
         lines.extend([f"## {title}", "", "| Grupo | Imágenes | " + " | ".join(order) + " |", "|---|---|" + "---|" * len(order)])

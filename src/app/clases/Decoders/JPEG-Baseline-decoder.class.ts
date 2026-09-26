@@ -5,6 +5,33 @@ import { decodeWithEmscripten } from "./emscripten-codecs";
 declare var JpegImage: any;
 
 /**
+ * Bytes de relleno 0xFF delante de un marcador (ISO/IEC 10918-1 B.1.1.2: "FF FF ... FF D9"), que algunos equipos
+ * escriben (las miniaturas "Compressed by DicomObjects" de las laminas 3DHISTECH): JpegImage los rechaza ("unknown JPEG
+ * marker ffff") y el build asm.js de libjpeg-turbo tambien. Dentro de los datos entropicos un FF va siempre seguido de
+ * 00 o de un RSTn, asi que colapsar cada racha de FF en uno solo es seguro en todo el codestream.
+ */
+export function stripJpegFillBytes(bytes: Uint8Array): Uint8Array {
+    let runs = 0;
+    for (let i = 0; i + 1 < bytes.length; i++) {
+        if (bytes[i] == 0xFF && bytes[i + 1] == 0xFF) {
+            runs++;
+        }
+    }
+    if (runs == 0) {
+        return bytes;
+    }
+    const out = new Uint8Array(bytes.length - runs);
+    let o = 0;
+    for (let i = 0; i < bytes.length; i++) {
+        if (bytes[i] == 0xFF && i + 1 < bytes.length && bytes[i + 1] == 0xFF) {
+            continue;
+        }
+        out[o++] = bytes[i];
+    }
+    return out;
+}
+
+/**
  * JPEG Baseline (Process 1, 8 bits) y JPEG Extended (Process 2 & 4, 8/12 bits) con src/libs/jpeg-baseline.js
  * (JpegImage, derivado de pdf.js; con 3 componentes convierte YCbCr -> RGB).
  * Si JpegImage no puede con un frame (marcadores raros, aritmetico mal etiquetado...), se reintenta con libjpeg-turbo
@@ -16,7 +43,7 @@ export class JPEGBaselineDecoder extends BaseDecoder {
 
     public Decode(): any[] {
         return this.interpret.getEncapsulatedFrames().map(frame => {
-            const bytes = BaseDecoder.toBytes(frame);
+            const bytes = stripJpegFillBytes(BaseDecoder.toBytes(frame));
             if (this.reader.BitsAllocated > 8 && !CodecLoader.isUnavailable('libjpeg-turbo-12')) {
                 return decodeWithEmscripten('libjpeg-turbo-12', 'JPEGDecoder', bytes).data; // lanza CodecRequiredError hasta cargarse
             }
@@ -66,7 +93,7 @@ export class JPEGRetiredProcessesDecoder extends BaseDecoder {
 
     public Decode(): any[] {
         return this.interpret.getEncapsulatedFrames().map(frame => {
-            const bytes = BaseDecoder.toBytes(frame);
+            const bytes = stripJpegFillBytes(BaseDecoder.toBytes(frame));
             if (this.reader.BitsAllocated <= 8) {
                 return decodeWithEmscripten('libjpeg-turbo', 'JPEGDecoder', bytes).data;
             }

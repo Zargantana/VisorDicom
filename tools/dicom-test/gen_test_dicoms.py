@@ -236,6 +236,24 @@ ds["PixelData"].VR = "OB"
 save(ds, "t08_jpeg_baseline_3frag.dcm", JPEGBaseline8Bit)
 expect("t08_jpeg_baseline_3frag.dcm", rows=R, cols=C, frames=1, windows=0, kind="rgb_const_r", r=200)
 
+# --- t77: JPEG Baseline con bytes de relleno 0xFF delante de los marcadores SOS y EOI (ISO 10918-1 B.1.1.2), como
+#     escriben las miniaturas "Compressed by DicomObjects" de las láminas 3DHISTECH: JpegImage y libjpeg-turbo los
+#     rechazaban; el decoder los quita antes. Misma imagen que t08.
+jb77 = jb.replace(b"\xff\xda", b"\xff\xff\xff\xda", 1)
+assert jb77.endswith(b"\xff\xd9")
+jb77 = jb77[:-2] + b"\xff\xff\xff\xd9"
+ds = base_ds("XC", "1.2.840.10008.5.1.4.1.1.77.1.4")
+ds.SamplesPerPixel = 3
+ds.PhotometricInterpretation = "YBR_FULL_422"
+ds.PlanarConfiguration = 0
+ds.Rows, ds.Columns = R, C
+ds.BitsAllocated, ds.BitsStored, ds.HighBit, ds.PixelRepresentation = 8, 8, 7, 0
+ds.PixelData = encapsulate([jb77])
+ds["PixelData"].is_undefined_length = True
+ds["PixelData"].VR = "OB"
+save(ds, "t77_jpeg_fill_bytes.dcm", JPEGBaseline8Bit)
+expect("t77_jpeg_fill_bytes.dcm", rows=R, cols=C, frames=1, windows=0, kind="rgb_const_r", r=200)
+
 # --- t09: JPEG Baseline multiframe gris, 4 frames, cada frame en 2 fragmentos + BOT -------
 fr_bytes = []
 for f in range(4):

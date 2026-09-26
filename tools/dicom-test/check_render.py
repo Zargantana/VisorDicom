@@ -127,6 +127,10 @@ def expected_frames(path, win, indices=None):
 
 
 EXPECTED = json.load(open(os.path.join(OUT, "expected.json")))
+# DICOM_TEST_FILTER: solo esas claves; el resultado se fusiona con el check.json anterior (para repetir unos pocos
+# ficheros de un corpus sin volver a comparar los miles restantes)
+import re
+FILTER = re.compile(os.environ["DICOM_TEST_FILTER"]) if os.environ.get("DICOM_TEST_FILTER") else None
 
 rows = []
 tiles = []
@@ -134,6 +138,8 @@ fails = 0
 for key, meta in summary.items():
     name, _, w = key.partition("#w")
     win = int(w) if w else 0
+    if FILTER and not FILTER.search(name):
+        continue
     path = source_path(name)
     exp_meta = EXPECTED.get(name, {})
     if exp_meta.get("kind") == "expect_fail":
@@ -198,8 +204,14 @@ for key, meta in summary.items():
 for r in rows:
     print(f"{r[1]:5s} {r[0]:40s} {r[2]}")
 print(f"\n{fails} FAIL / {len(rows)} casos")
-# Resultado por caso, para informes (real/report_corpus.py)
-json.dump({r[0]: {"status": r[1], "detail": r[2]} for r in rows}, open(os.path.join(REN, "check.json"), "w", encoding="utf-8"), indent=1, ensure_ascii=False)
+# Resultado por caso, para informes (real/report_corpus.py); con filtro se fusiona con lo anterior
+check_path = os.path.join(REN, "check.json")
+results = {r[0]: {"status": r[1], "detail": r[2]} for r in rows}
+if FILTER and os.path.exists(check_path):
+    previous = json.load(open(check_path, encoding="utf-8"))
+    previous.update(results)
+    results = previous
+json.dump(results, open(check_path, "w", encoding="utf-8"), indent=1, ensure_ascii=False)
 
 # contact sheet (con un corpus grande, solo los fallos)
 tiles = [t for t in tiles if "t01_ct_evle_2win_0" not in t[0] or t[0].startswith("t01_ct_evle_2win_01")]
