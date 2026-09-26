@@ -24,9 +24,13 @@ import { MailSenderComponent } from './components/mail-sender/mail-sender/mail-s
 import { ProductInformationComponent } from './components/product-information/product-information.component';
 import { LoginFloaterComponent } from './components/login/login-floater/login-floater.component';
 import { LoginFormComponent } from './components/login/login-form/login-form.component';
+import { LanguageSwitcherComponent } from './components/language-switcher/language-switcher.component';
+import { TPipe } from './i18n/t.pipe';
 import { ReactiveFormsModule } from '@angular/forms';
 
 @NgModule({ declarations: [
+        TPipe,
+        LanguageSwitcherComponent,
         AppComponent,
         MainMenuComponent,
         ImagesReaderComponent,
