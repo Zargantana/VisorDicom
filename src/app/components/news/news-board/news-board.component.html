@@ -1,5 +1,5 @@
-<div class="d-flex flex-column fixed-top justify-content-center align-items-center p-0 m-0 overflow-auto" [class.bg-dark-transparent]="isDark()" [class.bg-light-transparent]="!isDark()" style="height: 100vh; max-height: 100vh;" (click)="changeBannerVisibility()">
-    <div class="d-flex flex-column border rounded-top p-0 m-0"  [class.border-dark]="!isDark()" [class.border-light]="isDark()" [class.bg-dark]="isDark()" [class.bg-light]="!isDark()" (click)="$event.stopPropagation()">
+<div class="d-flex flex-column fixed-top justify-content-center align-items-center p-0 m-0" [class.bg-dark-transparent]="isDark()" [class.bg-light-transparent]="!isDark()" style="height: 100vh; max-height: 100vh;" (click)="changeBannerVisibility()">
+    <div class="news-panel d-flex flex-column border rounded-top p-0 m-0"  [class.border-dark]="!isDark()" [class.border-light]="isDark()" [class.bg-dark]="isDark()" [class.bg-light]="!isDark()" (click)="$event.stopPropagation()">
         <div class="d-flex slab-flex-1 flex-row bg-infoPlata border-bottom text-center p-0 m-0 user-select-none"  [class.border-dark]="!isDark()" [class.border-light]="isDark()">
             <div class="d-flex flex-column justify-content-center px-1 m-0 clickable" (click)="changeBannerVisibility()">
                 <span class="dot m-1 p-1"></span>
@@ -11,7 +11,7 @@
                 <span class="p-0 m-0">&nbsp;</span>
             </div>
         </div>
-        <div class="d-flex flex-column p-4 decreasingFont">
+        <div class="news-content d-flex flex-column p-4 decreasingFont">
             <div class="d-flex slab-flex-1 flex-row justify-content-center text-center p-0 m-0">
                 <h3 class="p-0 m-0">Proyecto Open Source.</h3>
             </div>
