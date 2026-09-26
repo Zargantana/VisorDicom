@@ -2,7 +2,10 @@
 *   26/09/2026 v15  *
 *********************
 - Selector de ventana (VOI) cuando el estudio trae varias.
-- Pantalla de carga nueva con contadores y barra de progreso; el visor se abre con el botÃ³n 'Ver imÃ¡genes' en vez de saltar solo. Portada adaptada a mÃ³vil y tableta.
+- Pantalla de carga nueva: contadores, barra de progreso y arrastrar y soltar ficheros o carpetas. El visor se abre con el botón 'Ver imágenes' cuando tú quieras, en vez de saltar solo.
+- Compatible con Windows, Linux y Mac, Android e iOS; en PC, tableta y móvil (Chrome y Edge recomendados). Portada y barra superior adaptadas a móvil y tableta.
+- Créditos y agradecimientos (códecs, estándar DICOM, librerías) en el panel de información, junto a estas notas y el conformance statement.
+- La web se presenta a los buscadores y a los asistentes de IA: título y descripción en español, datos estructurados, portada legible sin JavaScript y sitemap.
 - Nuevas Transfer Syntax: Deflated Explicit VR LE, Encapsulated Uncompressed, JPEG 2000 Part 2, HTJ2K (lossless, RPCL y con pérdida) y los procesos JPEG retirados (aritmético, progresivo y selección espectral).
 - Verificadas JPEG Lossless SV1 y Process 14, JPEG Extended de 12 bits, JPEG-LS de 16 bits con signo y RLE Lossless de 16 bits y color.
 - Nuevos modelos de color: YBR_PARTIAL_422, HSV, ARGB, CMYK, paletas segmentadas y paleta suplementaria (mapas de color sobre MR).

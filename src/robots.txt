@@ -1,14 +1,6 @@
+# visordicom.es: visor DICOM 100 % en el navegador. Todo lo público se puede indexar.
+# Los rastreadores de IA (búsqueda y entrenamiento) están permitidos a propósito.
 User-agent: *
-Allow: /
-Allow: /index.html
-Allow: /reader
-Allow: /reader/
-Allow: /file-loader
-Allow: /file-loader/
-Allow: /dir-loader
-Allow: /dir-loader/
-Allow: /assets/
-Allow: /assets/ReleaseNotes.txt
-Allow: /assets/ConformanceStatement.pdf
+Disallow: /test-screen
 
 Sitemap: https://visordicom.es/sitemap.xml

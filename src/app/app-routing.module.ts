@@ -10,7 +10,9 @@ const routes: Routes = [
   { path:'file-loader', component: FileLoaderComponent },
   { path:'dir-loader', component: DirLoaderComponent },
   { path:'test-screen', component: TestScreenComponent },
-  { path: '', redirectTo: '/reader', pathMatch: 'full' }
+  // La raíz es la portada (sin redirección: es la URL canónica para los buscadores); /reader es la misma pantalla
+  { path: '', component: ImagesReaderComponent, pathMatch: 'full' },
+  { path: '**', redirectTo: '' }
 ];
 
 @NgModule({

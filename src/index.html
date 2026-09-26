@@ -1,34 +1,112 @@
 <!doctype html>
-<html lang="en" style="height: 100%; margin: 0; padding: 0;">
+<html lang="es" style="height: 100%; margin: 0; padding: 0;">
   <head>
     <meta charset="utf-8">
-    <title>VisorDICOM.es</title>
+    <title>VisorDICOM: visor DICOM online gratis, 100 % en tu navegador</title>
     <base href="/">
-    <meta name="viewport" content="width=device-width, initial-scale=1">    
-    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
-    <meta http-equiv="Pragma" content="no-cache" />
-    <meta http-equiv="Expires" content="0" />
-    <meta http-equiv="Last-Modified" content="0">
-    <link rel="icon" type="image/x-icon" href="favicon.ico">
-    <meta name="description" content="Free Online DICOM Viewer Demo">
-    <meta name="keywords" content="DICOM, Viewer, Online, Free, Demo">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <!-- SEO: el título, la descripción y el canonical los actualiza SeoService por ruta; estos son los de la portada -->
+    <meta name="description" content="Abre estudios DICOM (TAC, resonancia, PET, ecografía, radiografía…) desde un CD, USB o carpeta sin instalar nada y sin subir tus imágenes: todo se lee en tu navegador. Gratis y open source. Windows, Linux, Mac, Android e iOS.">
     <meta name="author" content="VisorDICOM.es">
-    <meta name="robots" content="index, follow">
-    <meta name="googlebot" content="index, follow">
-    <meta name="google" content="notranslate">
+    <meta name="robots" content="index, follow, max-image-preview:large">
+    <link rel="canonical" href="https://visordicom.es/">
+    <meta property="og:type" content="website">
+    <meta property="og:site_name" content="VisorDICOM">
+    <meta property="og:locale" content="es_ES">
+    <meta property="og:url" content="https://visordicom.es/">
+    <meta property="og:title" content="VisorDICOM: visor DICOM online gratis, 100 % en tu navegador">
+    <meta property="og:description" content="Abre estudios DICOM desde un CD, USB o carpeta sin instalar nada y sin subir tus imágenes. Gratis y open source. Windows, Linux, Mac, Android e iOS.">
+    <meta property="og:image" content="https://visordicom.es/assets/og-image.png">
+    <meta property="og:image:width" content="1200">
+    <meta property="og:image:height" content="630">
+    <meta property="og:image:alt" content="VisorDICOM: visor DICOM online gratis, 100 % en tu navegador">
+    <meta name="twitter:card" content="summary_large_image">
+    <!-- PWA e iconos -->
+    <link rel="icon" type="image/x-icon" href="favicon.ico">
+    <link rel="icon" type="image/png" sizes="192x192" href="assets/icons/icon-192x192.png">
+    <link rel="icon" type="image/png" sizes="512x512" href="assets/icons/icon-512x512.png">
+    <link rel="apple-touch-icon" href="assets/icons/icon-192x192.png">
+    <link rel="apple-touch-icon" sizes="192x192" href="assets/icons/icon-192x192.png">
+    <link rel="apple-touch-icon" sizes="512x512" href="assets/icons/icon-512x512.png">
+    <link rel="manifest" href="assets/manifest.webmanifest">
     <meta name="theme-color" content="#ffffff">
     <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="VisorDICOM.es">
-    <link rel="apple-touch-icon" href="assets/icons/icon-192x192.png">
-    <link rel="apple-touch-icon" sizes="192x192" href="assets/icons/icon-192x192.png">
-    <link rel="apple-touch-icon" sizes="512x512" href="assets/icons/icon-512x512.png">
-    <link rel="icon" type="image/png" sizes="192x192" href="assets/icons/icon-192x192.png">
-    <link rel="icon" type="image/png" sizes="512x512" href="assets/icons/icon-512x512.png">
-    <link rel="manifest" href="assets/manifest.webmanifest">    
+    <!-- Datos estructurados (schema.org). No se ejecuta: una CSP estricta no lo bloquea. Sin valoraciones: Google penaliza las inventadas -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@graph": [
+        {
+          "@type": "Organization",
+          "@id": "https://visordicom.es/#org",
+          "name": "VisorDICOM",
+          "url": "https://visordicom.es/",
+          "logo": "https://visordicom.es/assets/icons/icon-512x512.png",
+          "sameAs": ["https://github.com/Zargantana/VisorDicom"]
+        },
+        {
+          "@type": "WebSite",
+          "@id": "https://visordicom.es/#site",
+          "name": "VisorDICOM",
+          "url": "https://visordicom.es/",
+          "inLanguage": "es",
+          "publisher": { "@id": "https://visordicom.es/#org" }
+        },
+        {
+          "@type": "WebApplication",
+          "@id": "https://visordicom.es/#app",
+          "name": "VisorDICOM",
+          "url": "https://visordicom.es/",
+          "description": "Visor DICOM gratuito que funciona completamente en el navegador: abre estudios de TAC, resonancia, PET, ecografía y radiografía desde un CD, USB o carpeta sin subir las imágenes a ningún servidor.",
+          "applicationCategory": "MedicalApplication",
+          "operatingSystem": "Web: Windows, Linux, macOS, Android, iOS",
+          "browserRequirements": "Requiere JavaScript. Chrome o Edge recomendados.",
+          "inLanguage": "es",
+          "isAccessibleForFree": true,
+          "offers": { "@type": "Offer", "price": "0", "priceCurrency": "EUR" },
+          "featureList": "Lectura local de DICOM sin subir nada; CT, MR, PT, US, XA, CR, DX y multiframe; JPEG, JPEG-LS, JPEG 2000, HTJ2K, RLE y Deflate; ventanas VOI; paletas y color",
+          "publisher": { "@id": "https://visordicom.es/#org" }
+        },
+        {
+          "@type": "MedicalWebPage",
+          "@id": "https://visordicom.es/#page",
+          "url": "https://visordicom.es/",
+          "name": "VisorDICOM: visor DICOM online gratis, 100 % en tu navegador",
+          "inLanguage": "es",
+          "isPartOf": { "@id": "https://visordicom.es/#site" },
+          "about": { "@id": "https://visordicom.es/#app" },
+          "medicalAudience": [
+            { "@type": "MedicalAudience", "audienceType": "Patient" },
+            { "@type": "MedicalAudience", "audienceType": "Clinician" }
+          ],
+          "lastReviewed": "2026-09-26",
+          "reviewedBy": { "@id": "https://visordicom.es/#org" }
+        }
+      ]
+    }
+    </script>
   </head>
-
   <body style="height: 100%; margin: 0; padding: 0;">
-      <app-root style="height: 100%; margin: 0; padding: 0;"></app-root>
+      <app-root style="height: 100%; margin: 0; padding: 0;">
+        <!-- Contenido de portada para los rastreadores que no ejecutan JavaScript (los de IA, sobre todo) y mientras
+             Angular arranca. Angular lo sustituye por la aplicación. Mismo contenido que la app: no es cloaking. -->
+        <main style="max-width: 44rem; margin: 0 auto; padding: 2rem 1rem; font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif; line-height: 1.5; color: #212529;">
+          <h1 style="font-size: 1.6rem;">VisorDICOM: visor DICOM online gratis, 100 % en tu navegador</h1>
+          <p>Abre las imágenes médicas de un <strong>CD, DVD, USB o carpeta</strong> (TAC, resonancia magnética, PET, ecografía, radiografía, angiografía, mamografía…) sin instalar nada y <strong>sin subir tus imágenes a ningún servidor</strong>: los ficheros se leen en tu propio navegador.</p>
+          <h2 style="font-size: 1.2rem;">Qué puedes hacer</h2>
+          <ul>
+            <li>Ver estudios DICOM organizados por paciente, estudio, modalidad y serie, con pila de cortes, cine para ecografía y multiframe, y selector de ventana.</li>
+            <li>Leer las compresiones habituales: JPEG, JPEG Lossless, JPEG-LS, JPEG 2000, HTJ2K, RLE y Deflate, en gris y en color.</li>
+          </ul>
+          <h2 style="font-size: 1.2rem;">Compatible con</h2>
+          <p>Windows, Linux y Mac; Android e iOS. En PC, tableta y móvil. Chrome y Edge recomendados.</p>
+          <h2 style="font-size: 1.2rem;">Privacidad</h2>
+          <p>Nada sale de tu equipo. El visor es <a href="https://github.com/Zargantana/VisorDicom">software libre (Apache 2.0)</a>.</p>
+          <p><a href="/reader">Empezar: abrir un CD, una carpeta o unos ficheros</a> · <a href="/assets/ReleaseNotes.txt">Notas de la versión</a> · <a href="/assets/ConformanceStatement.pdf">DICOM Conformance Statement</a></p>
+          <noscript><p><strong>VisorDICOM necesita JavaScript</strong> para leer los ficheros DICOM en tu navegador.</p></noscript>
+        </main>
+      </app-root>
   </body>
 </html>
