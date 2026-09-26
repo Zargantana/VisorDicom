@@ -12,7 +12,7 @@
  *   ImageDCM lo carga (asíncrono) y reintenta. Si la carga falla, isUnavailable() lo indica y el decoder usa
  *   su alternativa (si la tiene).
  */
-export type CodecName = 'openjpeg' | 'libjpeg-turbo';
+export type CodecName = 'openjpeg' | 'libjpeg-turbo' | 'libjpeg-turbo-12';
 
 interface CodecSpec {
     file: string;
@@ -22,6 +22,8 @@ interface CodecSpec {
 const CODECS: Record<CodecName, CodecSpec> = {
     'openjpeg': { file: 'openjpegjs_decode.js', globalName: 'OpenJPEGJS' },
     'libjpeg-turbo': { file: 'libjpegturbojs_decode.js', globalName: 'libjpegturbojs_decode' },
+    // Build de 12 bits (WITH12BIT): solo decodifica JPEG de 12 bits; el de 8 bits solo los de 8
+    'libjpeg-turbo-12': { file: 'libjpegturbo12js.js', globalName: 'libjpegturbo12js' },
 };
 
 /** Ruta (relativa al base href) donde se sirven los códecs. */
