@@ -135,6 +135,13 @@
     font-size: 0.9em;
   }
 
+  // Pie legal: aviso corto y enlaces, que se envuelven en pantallas estrechas
+  .news-legal {
+    flex-wrap: wrap;
+    gap: 0.5rem 1.5rem;
+    margin-top: -0.5rem;
+  }
+
   .dark {
     .news-date, .news-history dt { color: #adb5bd; }
     .news-highlights i { color: #6ea8fe; }
