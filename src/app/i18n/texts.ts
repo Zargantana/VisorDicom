@@ -83,6 +83,8 @@ export interface Texts {
   'viewer.window': string;
   'viewer.windowVOI': string;
   'viewer.loading': string;
+  'viewer.fullscreen': string;
+  'viewer.exitFullscreen': string;
   // Novedades
   'news.title': string;
   'news.headline': string;

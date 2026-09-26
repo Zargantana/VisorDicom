@@ -63,6 +63,8 @@ export const JA: Texts = {
   'viewer.window': 'ウィンドウ',
   'viewer.windowVOI': 'コントラストウィンドウ',
   'viewer.loading': '読み込み中…',
+  'viewer.fullscreen': '全画面表示',
+  'viewer.exitFullscreen': '全画面表示を終了',
 
   'news.title': '新着情報',
   'news.headline': 'ポータルが復活',

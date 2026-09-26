@@ -63,6 +63,8 @@ export const IT: Texts = {
   'viewer.window': 'Finestra',
   'viewer.windowVOI': 'Finestra di contrasto',
   'viewer.loading': 'Caricamento…',
+  'viewer.fullscreen': 'Schermo intero',
+  'viewer.exitFullscreen': 'Esci da schermo intero',
 
   'news.title': 'Novità',
   'news.headline': 'Il portale è tornato',

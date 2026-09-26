@@ -1,4 +1,4 @@
-import { AfterViewInit, Component, DoCheck, ElementRef, EventEmitter, Inject, Input, Optional, Output, ViewChild } from '@angular/core';
+import { AfterViewInit, Component, DoCheck, ElementRef, EventEmitter, HostListener, Inject, Input, OnDestroy, Optional, Output, ViewChild } from '@angular/core';
 import { DCMFileReader } from 'src/app/clases/DCM/DCM-file-reader.class';
 import { classifierDCM } from 'src/app/clases/Images/classifier-DCM.class';
 import { ImageDCM, VOIWindowOption } from 'src/app/clases/Images/image-DCM.class';
@@ -11,7 +11,7 @@ import { VIEWER_UPLOAD_HANDLER, ViewerUploadHandler } from '../../viewer-upload-
     styleUrls: ['./basic-image-viewer.component.scss'],
     standalone: false
 })
-export class BasicImageViewerComponent implements AfterViewInit, DoCheck {
+export class BasicImageViewerComponent implements AfterViewInit, DoCheck, OnDestroy {
   
   @ViewChild('componentDiv')
   private componentDiv: ElementRef<HTMLImageElement> | undefined;
@@ -143,9 +143,39 @@ export class BasicImageViewerComponent implements AfterViewInit, DoCheck {
     return (ThemeService.current === 'dark');
   }
 
+  /** La pestaña está en pantalla completa del navegador (Fullscreen API), pedida desde el botón del visor */
+  public fullscreen = false;
+
+  /**
+   * Botón de maximizar: pone el navegador en pantalla completa (como F11) y la imagen sigue ajustándose al ancho o al
+   * alto disponible; al volver a pulsar (o con Esc) se sale. Donde no hay Fullscreen API (iOS) se hace lo de antes:
+   * alternar entre ajustar a la ventana y tamaño natural con desplazamiento.
+   */
   public MaxMin() {
-    this.fitScreen = !this.fitScreen;
+    const doc: any = document;
+    const root: any = doc.documentElement;
+    if (typeof root?.requestFullscreen === 'function' && typeof doc.exitFullscreen === 'function') {
+      if (!doc.fullscreenElement) {
+        root.requestFullscreen().catch(() => { this.fitScreen = !this.fitScreen; this.enqueueRatioRecalc(); });
+      } else {
+        doc.exitFullscreen().catch(() => { /* ya no estaba */ });
+      }
+    } else {
+      this.fitScreen = !this.fitScreen;
+    }
     this.enqueueRatioRecalc();
+  }
+
+  /** El navegador entra o sale de pantalla completa (por el botón o con Esc): se recalcula el tamaño de la imagen */
+  @HostListener('document:fullscreenchange')
+  public onFullscreenChange() {
+    this.fullscreen = !!(document as any).fullscreenElement;
+    this.onResize();
+  }
+
+  ngOnDestroy(): void {
+    const doc: any = document;
+    if (doc.fullscreenElement && typeof doc.exitFullscreen === 'function') doc.exitFullscreen().catch(() => { /* nada */ });
   }
 
   public infoClick() {

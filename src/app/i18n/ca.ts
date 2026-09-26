@@ -63,6 +63,8 @@ export const CA: Texts = {
   'viewer.window': 'Finestra',
   'viewer.windowVOI': 'Finestra de contrast',
   'viewer.loading': 'Carregant…',
+  'viewer.fullscreen': 'Pantalla completa',
+  'viewer.exitFullscreen': 'Sortir de pantalla completa',
 
   'news.title': 'Novetats',
   'news.headline': 'Torna el portal',

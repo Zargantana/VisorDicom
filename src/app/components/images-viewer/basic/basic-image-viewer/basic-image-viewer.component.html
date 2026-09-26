@@ -52,11 +52,10 @@
             <button (click)="infoClick()">
               <i class="fa-solid fa-info-circle fa-1x"></i>
             </button>
-            <button (click)="MaxMin()">
-              @if (!fitScreen) {
+            <button (click)="MaxMin()" [title]="(fullscreen || !fitScreen ? 'viewer.exitFullscreen' : 'viewer.fullscreen') | t">
+              @if (fullscreen || !fitScreen) {
                 <i class="fa-solid fa-compress fa-1x"></i>
-              }
-              @if (fitScreen) {
+              } @else {
                 <i class="fa-solid fa-expand fa-1x"></i>
               }
             </button>

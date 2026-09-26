@@ -63,6 +63,8 @@ export const PT: Texts = {
   'viewer.window': 'Janela',
   'viewer.windowVOI': 'Janela de contraste',
   'viewer.loading': 'A carregar…',
+  'viewer.fullscreen': 'Ecrã inteiro',
+  'viewer.exitFullscreen': 'Sair do ecrã inteiro',
 
   'news.title': 'Novidades',
   'news.headline': 'O portal está de volta',

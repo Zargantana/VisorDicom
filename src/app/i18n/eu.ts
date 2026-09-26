@@ -63,6 +63,8 @@ export const EU: Texts = {
   'viewer.window': 'Leihoa',
   'viewer.windowVOI': 'Kontraste-leihoa',
   'viewer.loading': 'Kargatzen…',
+  'viewer.fullscreen': 'Pantaila osoa',
+  'viewer.exitFullscreen': 'Irten pantaila osotik',
 
   'news.title': 'Berriak',
   'news.headline': 'Ataria itzuli da',

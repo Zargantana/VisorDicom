@@ -63,6 +63,8 @@ export const GL: Texts = {
   'viewer.window': 'Xanela',
   'viewer.windowVOI': 'Xanela de contraste',
   'viewer.loading': 'Cargando…',
+  'viewer.fullscreen': 'Pantalla completa',
+  'viewer.exitFullscreen': 'Saír de pantalla completa',
 
   'news.title': 'Novidades',
   'news.headline': 'Volve o portal',

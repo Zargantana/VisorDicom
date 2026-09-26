@@ -63,6 +63,8 @@ export const DE: Texts = {
   'viewer.window': 'Fenster',
   'viewer.windowVOI': 'Kontrastfenster',
   'viewer.loading': 'Wird geladen…',
+  'viewer.fullscreen': 'Vollbild',
+  'viewer.exitFullscreen': 'Vollbild beenden',
 
   'news.title': 'Neuigkeiten',
   'news.headline': 'Das Portal ist zurück',
