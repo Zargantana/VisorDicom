@@ -12,6 +12,7 @@
             </div>
         </div>
         <div class="news-content d-flex flex-column p-4 decreasingFont" [class.dark]="isDark()">
+            @if (!creditos) {
             <div class="news-head">
                 <h3 class="p-0 m-0">Novedades</h3>
                 <span class="news-date">26/09/2026</span>
@@ -51,10 +52,56 @@
                 <span class="news-tag">JPEG XL</span>
                 <span class="news-tag">Móvil</span>
             </div>
+            }
+
+            @if (creditos) {
+            <div class="news-head">
+                <h3 class="p-0 m-0">Créditos y agradecimientos</h3>
+                <a class="clickable text-primary" (click)="creditosClick(false)">novedades</a>
+            </div>
+            <p class="m-0">VisorDicom es desarrollo propio: el parser DICOM, el decodificador RLE, el inflado Deflate, el pipeline de color y ventanas y los visores. Para lo demás se apoya en el trabajo de otros, a quienes debe y agradece:</p>
+
+            <b>Códecs de imagen</b>
+            <dl class="news-history credits">
+                <dt><a href="https://github.com/mozilla/pdf.js" target="_blank" rel="noopener">pdf.js JPEG</a></dt><dd>JPEG baseline y extendido (<code>jpeg-baseline.js</code>). © 2011 notmasteryet. Apache 2.0.</dd>
+                <dt><a href="https://github.com/rii-mango/JPEGLosslessDecoderJS" target="_blank" rel="noopener">jpeg-lossless-decoder-js</a></dt><dd>JPEG Lossless. © Michael Martinez, Helmut Dersch. MIT.</dd>
+                <dt><a href="https://github.com/team-charls/charls" target="_blank" rel="noopener">CharLS</a></dt><dd>JPEG-LS, compilado con emscripten y adaptado de <a href="https://github.com/cornerstonejs/cornerstoneWADOImageLoader" target="_blank" rel="noopener">cornerstoneWADOImageLoader</a> (© 2014 Chris Hafey). BSD 3-Clause y MIT.</dd>
+                <dt><a href="https://github.com/OHIF/image-JPEG2000" target="_blank" rel="noopener">image-JPEG2000</a></dt><dd>JPEG 2000 de reserva (<code>jpx.js</code>), a partir de pdf.js. © 2012 Mozilla Foundation. Apache 2.0.</dd>
+                <dt><a href="https://github.com/uclouvain/openjpeg" target="_blank" rel="noopener">OpenJPEG</a></dt><dd>JPEG 2000 y HTJ2K, bajo demanda, en el build JS de <a href="https://github.com/cornerstonejs/codecs" target="_blank" rel="noopener">Cornerstone codecs</a>. BSD 2-Clause y MIT.</dd>
+                <dt><a href="https://github.com/libjpeg-turbo/libjpeg-turbo" target="_blank" rel="noopener">libjpeg-turbo</a></dt><dd>JPEG de 8 bits extendido, progresivo y aritmético, bajo demanda, en el build JS de Cornerstone codecs. Licencias IJG, BSD 3-Clause y zlib; ISC el build.</dd>
+            </dl>
+            <p class="m-0 news-note">Este software se basa en parte en el trabajo del Independent JPEG Group.</p>
+
+            <b>Estándar</b>
+            <dl class="news-history credits">
+                <dt><a href="https://www.dicomstandard.org/" target="_blank" rel="noopener">DICOM&reg;</a></dt><dd>Diccionario de datos (PS3.6), sintaxis de transferencia y codificación (PS3.5) y modelos de presentación (PS3.3, PS3.4). DICOM es la marca registrada de la National Electrical Manufacturers Association (NEMA) para sus publicaciones de estándares relativas a las comunicaciones digitales de información médica.</dd>
+            </dl>
+
+            <b>Aplicación</b>
+            <dl class="news-history credits">
+                <dt><a href="https://angular.dev/" target="_blank" rel="noopener">Angular</a></dt><dd>Google. MIT. Con RxJS (Apache 2.0) y zone.js (MIT).</dd>
+                <dt><a href="https://getbootstrap.com/" target="_blank" rel="noopener">Bootstrap</a></dt><dd>Estilos y componentes. MIT. Con jQuery y Popper (MIT).</dd>
+                <dt><a href="https://fontawesome.com/" target="_blank" rel="noopener">Font Awesome Free</a></dt><dd>Iconos. CC BY 4.0 los iconos, SIL OFL 1.1 las fuentes, MIT el código.</dd>
+            </dl>
+
+            <b>Pruebas</b>
+            <dl class="news-history credits">
+                <dt>Batería DICOM</dt><dd><a href="https://pydicom.github.io/" target="_blank" rel="noopener">pydicom</a> y pyjpegls (MIT), <a href="https://github.com/cgohlke/imagecodecs" target="_blank" rel="noopener">imagecodecs</a> (BSD 3-Clause), NumPy (BSD 3-Clause), Pillow (HPND) y <a href="https://playwright.dev/" target="_blank" rel="noopener">Playwright</a> (Apache 2.0). No forman parte del visor.</dd>
+            </dl>
+
+            <div class="news-links">
+                <a class="clickable text-primary" href="3rdpartylicenses.txt">Textos de las licencias</a>
+                <a class="clickable text-primary" href="assets/codecs/THIRD_PARTY_NOTICES.md">Avisos de los códecs</a>
+                <a class="clickable text-primary" href="assets/CREDITS.txt">Créditos (texto)</a>
+            </div>
+            }
 
             <div class="news-links">
                 <a class="clickable text-primary" href="assets/ReleaseNotes.txt">Notas de la versión</a>
                 <a class="clickable text-primary" href="assets/ConformanceStatement.pdf">Conformance statement</a>
+                @if (!creditos) {
+                <a class="clickable text-primary" (click)="creditosClick(true)">Créditos</a>
+                }
             </div>
         </div>
     </div>
