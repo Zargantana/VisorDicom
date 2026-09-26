@@ -64,6 +64,7 @@ export class DCMFileReader {
     public StudyInstanceUID: string = '';
     public StudyDescription: string = '';
     public SeriesInstanceUID: string = '';
+    public SeriesDescription: string = '';
     public SOPInstanceUID: string = '';
     public SeriesNumber: number = 0;
     public InstanceNumber: number = 0;
@@ -175,6 +176,10 @@ export class DCMFileReader {
                     } else if(this.last_readed_tag.TagLow == 0x1030) {
                       if (this.last_readed_tag.Value) {
                           this.StudyDescription = Functions.clearDCMImpairValue(this.last_readed_tag.Value??'').trim();
+                      }
+                    } else if(this.last_readed_tag.TagLow == 0x103E) {
+                      if (this.last_readed_tag.Value) {
+                          this.SeriesDescription = Functions.clearDCMImpairValue(this.last_readed_tag.Value??'').trim();
                       }
                     }
                 } else if (this.last_readed_tag.TagHigh == 0x10) {

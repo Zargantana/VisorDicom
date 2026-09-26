@@ -11,9 +11,10 @@
   min-width: 0;
 }
 
+// La columna deja crecer el selector de estudios (hay pantalla: que la use); contadores y progreso, más recogidos
 .loader-column {
   width: 100%;
-  max-width: 44rem;
+  max-width: 76rem;
   min-width: 0;
   margin: 0 auto;
 }
@@ -22,6 +23,8 @@
   display: grid;
   grid-template-columns: repeat(4, 1fr);
   gap: 0.75rem;
+  max-width: 44rem;
+  margin: 0 auto;
 }
 
 .loader-stat {
@@ -69,7 +72,8 @@
 
 .loader-progress {
   height: 10px;
-  margin-top: 1rem;
+  max-width: 44rem;
+  margin: 1rem auto 0;
 }
 
 .loader-status {
@@ -133,11 +137,12 @@
 
 .loader-tree-table {
   display: block;
-  min-width: 34rem;
+  min-width: 40rem;
 }
 
 .loader-errors {
-  margin-top: 0.5rem !important;
+  margin: 0.5rem auto 0 !important;
+  max-width: 44rem;
   padding-left: 0;
   list-style: none;
   color: #b02a37;
@@ -154,7 +159,8 @@
 }
 
 .loader-files {
-  margin-top: 1rem;
+  margin: 1rem auto 0;
+  max-width: 44rem;
   display: flex;
   flex-direction: column;
   gap: 0.4rem;

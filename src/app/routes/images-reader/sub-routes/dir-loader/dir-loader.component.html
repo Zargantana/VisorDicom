@@ -1,7 +1,7 @@
 <div class="loader d-flex slab-flex-1 flex-column m-0 p-0">
     <!-- Barra siempre visible: elegir, y pasar al visor cuando se quiera (la lectura sigue por detrás) -->
-    <!-- Todo centrado: el botón de elegir antes de leer; después, "Ver imágenes" o "Carga" -->
-    <div class="loader-bar d-flex align-items-center justify-content-center flex-wrap px-3 py-2 border-bottom" [class.border-dark]="!isDark()" [class.border-light]="isDark()">
+    <!-- A la izquierda: el botón de elegir antes de leer; después, "Ver imágenes" o "Carga" -->
+    <div class="loader-bar d-flex align-items-center justify-content-start flex-wrap px-3 py-2 border-bottom" [class.border-dark]="!isDark()" [class.border-light]="isDark()">
         @if (imgsLoader.totalFiles == 0) {
             <label for="dirPicker" class="btn btn-primary loader-choose m-0"><i class="fa-solid fa-folder-open"></i> Selecciona la unidad o carpeta</label>
         }

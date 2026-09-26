@@ -82,18 +82,20 @@ if (notices) console.log('avisos del cargador: ' + notices.replace(/\s+/g, ' ').
 
 // Selector de estudios en vivo del cargador: el árbol completo tiene que estar ahí antes de abrir el visor, y pulsar
 // una serie abre el visor en ella. Si no hay selector (build antiguo), se pulsa "Ver imágenes".
-const loaderTree = await page.evaluate(() => {
-  const table = document.querySelector('images-loader findings-table');
-  if (!table) return null;
+// La tabla de hallazgos: una fila (tbody tr) por serie; td.ft-patient / td.ft-date solo en la primera fila de cada
+// paciente / estudio (rowspan); td.ft-n = imágenes de la serie
+const countTree = table => {
   const text = el => (el.textContent || '').trim();
-  const seriesRows = [...table.querySelectorAll('.row.clickable.selectable')];
-  return { series: seriesRows.length, images: seriesRows.reduce((s, r) => s + (+text(r.children[1]) || 0), 0) };
-});
+  const rows = [...table.querySelectorAll('tbody tr')];
+  return { patients: table.querySelectorAll('td.ft-patient').length, studies: table.querySelectorAll('td.ft-date').length,
+           series: rows.length, images: [...table.querySelectorAll('td.ft-n')].reduce((s, td) => s + (+text(td) || 0), 0) };
+};
+const loaderTree = await page.evaluate(countTree.toString().replace(/^[^{]*=>\s*/, '(table => ') + ')(document.querySelector("images-loader findings-table"))').catch(() => null);
 await page.screenshot({ path: path.join(root, 'tools', 'dicom-test', 'out', 'cd_loader.png'), fullPage: false }).catch(() => {});
 if (loaderTree) {
   check('selector en vivo del cargador: series', loaderTree.series === expected.series, `${loaderTree.series} vs ${expected.series}`);
   check('selector en vivo del cargador: imágenes', loaderTree.images === expected.images, `${loaderTree.images} vs ${expected.images}`);
-  await page.locator('images-loader findings-table .row.clickable.selectable').last().locator('div').first().click({ timeout: 10000 });
+  await page.locator('images-loader findings-table tbody tr').last().locator('td.ft-serie').click({ timeout: 10000 });
 } else {
   await page.locator('button.loader-view').click({ timeout: 10000 }).catch(() => {});
 }
@@ -108,11 +110,8 @@ const tree = await page.evaluate(() => {
   const text = el => (el.textContent || '').trim();
   let best = null;
   for (const table of document.querySelectorAll('findings-table')) {
-    const patients = [...table.querySelectorAll('div')].filter(d => /^Id: /.test(text(d)) && d.classList.contains('selectable')).length;
-    const studies = table.querySelectorAll('.col-2.selectable').length;
-    const seriesRows = [...table.querySelectorAll('.row.clickable.selectable')];
-    const images = seriesRows.reduce((s, r) => s + (+text(r.children[1]) || 0), 0);
-    const t = { patients, studies, series: seriesRows.length, images };
+    const t = { patients: table.querySelectorAll('td.ft-patient').length, studies: table.querySelectorAll('td.ft-date').length,
+                series: table.querySelectorAll('tbody tr').length, images: [...table.querySelectorAll('td.ft-n')].reduce((s, td) => s + (+text(td) || 0), 0) };
     if (!best || t.series > best.series) best = t;
   }
   return best;
