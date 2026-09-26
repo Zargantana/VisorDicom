@@ -1,9 +1,8 @@
 <div class="loader d-flex slab-flex-1 flex-column m-0 p-0">
     <!-- Barra siempre visible: elegir, y pasar al visor cuando se quiera (la lectura sigue por detrás) -->
     <div class="loader-bar d-flex align-items-center flex-wrap px-3 py-2 border-bottom" [class.border-dark]="!isDark()" [class.border-light]="isDark()">
-        <h1 class="loader-title m-0">Selecciona los ficheros</h1>
         @if (imgsLoader.totalFiles == 0) {
-            <label for="file" class="btn btn-primary loader-choose m-0"><i class="fa-solid fa-file-circle-plus"></i> Elegir ficheros</label>
+            <label for="file" class="btn btn-primary loader-choose m-0"><i class="fa-solid fa-file-circle-plus"></i> Selecciona los ficheros</label>
         }
         <input type="file" id="file" name="file" class="d-none" multiple (change)="imgsLoader.onSelected($event)" #fileUpload/>
         <span class="loader-spacer"></span>
