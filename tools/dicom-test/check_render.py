@@ -111,13 +111,14 @@ def expected_frames(path, win, indices=None):
     voi_func = str(ds.get("VOILUTFunction", "")) or None
     shared = ds.get("SharedFunctionalGroupsSequence")
     shared = shared[0] if shared else None
-    if shared is not None and "WindowCenter" not in ds and "FrameVOILUTSequence" in shared:
+    # (las secuencias pueden estar presentes pero vacías: DISCIMG)
+    if shared is not None and "WindowCenter" not in ds and shared.get("FrameVOILUTSequence") and "WindowCenter" in shared.FrameVOILUTSequence[0]:
         ds.WindowCenter = shared.FrameVOILUTSequence[0].WindowCenter
-        ds.WindowWidth = shared.FrameVOILUTSequence[0].WindowWidth
+        ds.WindowWidth = shared.FrameVOILUTSequence[0].get("WindowWidth")
         voi_func = voi_func or (str(shared.FrameVOILUTSequence[0].get("VOILUTFunction", "")) or None)
-    if shared is not None and "RescaleSlope" not in ds and "PixelValueTransformationSequence" in shared:
+    if shared is not None and "RescaleSlope" not in ds and shared.get("PixelValueTransformationSequence") and "RescaleSlope" in shared.PixelValueTransformationSequence[0]:
         ds.RescaleSlope = shared.PixelValueTransformationSequence[0].RescaleSlope
-        ds.RescaleIntercept = shared.PixelValueTransformationSequence[0].RescaleIntercept
+        ds.RescaleIntercept = shared.PixelValueTransformationSequence[0].get("RescaleIntercept", 0)
     per_frame = ds.get("PerFrameFunctionalGroupsSequence")
 
     def frame_params(k):
@@ -237,6 +238,9 @@ for key, meta in summary.items():
     try:
         exp = expected_frames(path, win, written)
     except Exception as e:
+        if os.environ.get("DICOM_TEST_VERBOSE"):
+            import traceback
+            traceback.print_exc()
         rows.append((key, "SKIP", f"sin verdad pydicom: {e}"[:70])); continue
     got = []
     for k in (written if written is not None else range(meta["decodedFrames"])):
