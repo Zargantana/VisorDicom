@@ -1,23 +1,48 @@
-<div class="d-flex slab-flex-1 flex-column p-0 m-0">
-  <div class="container m-1 p-0">
-    <div class="row">
-      <div class="col-3 col-lg-1">{{'#Files'}}</div>
-      <div class="col-3 col-lg-1">{{'#Reading'}}</div>
-      <div class="col-3 col-lg-1">{{'#Readed'}}</div>
-      <div class="col-3 col-lg-1">{{'#DICOM'}}</div>
+<div class="loader-panel d-flex slab-flex-1 flex-column p-3 m-0">
+  @if (totalFiles == 0) {
+    <div class="loader-empty d-flex flex-column align-items-center justify-content-center slab-flex-1 text-center">
+      <i class="fa-solid fa-folder-open loader-empty-icon"></i>
+      <p class="m-0">Elige qué leer con el botón de arriba.<br>Todo se lee en tu navegador.</p>
     </div>
-    <div class="row">
-      <div class="col-3 col-lg-1">{{totalFiles}}</div>
-      <div class="col-3 col-lg-1">{{readingFiles}}</div>
-      <div class="col-3 col-lg-1">{{readEndedFiles}}</div>
-      <div class="col-3 col-lg-1">{{foundDCMFiles?.length}}</div>
+  } @else {
+    <div class="loader-stats">
+      <div class="loader-stat">
+        <i class="fa-solid fa-file"></i>
+        <span class="loader-num">{{totalFiles}}</span>
+        <span class="loader-lbl">ficheros</span>
+      </div>
+      <div class="loader-stat" [class.active]="!AllDone">
+        <i class="fa-solid fa-hourglass-half"></i>
+        <span class="loader-num">{{pendingFiles}}</span>
+        <span class="loader-lbl">pendientes</span>
+      </div>
+      <div class="loader-stat">
+        <i class="fa-solid fa-check"></i>
+        <span class="loader-num">{{readEndedFiles}}</span>
+        <span class="loader-lbl">leídos</span>
+      </div>
+      <div class="loader-stat dicom">
+        <i class="fa-solid fa-x-ray"></i>
+        <span class="loader-num">{{foundDCMFiles?.length}}</span>
+        <span class="loader-lbl">DICOM</span>
+      </div>
     </div>
-  </div>
-  @for (item of foundFiles; track item; let i = $index) {
-    <div class="d-flex w-100 m-0 p-0">
-      @if ((item.readStatus != FILEREAD_STATUS.SUCCESS)||(item.isDCM)) {
-        <file-tracker class="w-100 m-0 p-0" [theDICOMFile]="item"></file-tracker>
+    <div class="progress loader-progress" role="progressbar" [attr.aria-valuenow]="progressPct" aria-valuemin="0" aria-valuemax="100">
+      <div class="progress-bar" [class.progress-bar-striped]="!AllDone" [class.progress-bar-animated]="!AllDone" [class.bg-success]="AllDone" [style.width.%]="progressPct"></div>
+    </div>
+    <p class="loader-status m-0">
+      @if (!AllDone) {
+        Leyendo {{readEndedFiles}} de {{totalFiles}}…
+      } @else {
+        Listo: {{foundDCMFiles?.length}} DICOM entre {{totalFiles}} ficheros. Pulsa <b>Ver imágenes</b>.
       }
-    </div>
+    </p>
+    @if (activeFiles.length) {
+      <div class="loader-files">
+        @for (item of activeFiles; track item) {
+          <file-tracker [theDICOMFile]="item"></file-tracker>
+        }
+      </div>
+    }
   }
 </div>

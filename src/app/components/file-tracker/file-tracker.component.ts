@@ -68,6 +68,12 @@ export class FileTrackerComponent implements OnInit, OnDestroy {
     return FILESTATUS;
   }
 
+  /** Porcentaje leído, entero entre 0 y 100 */
+  public get pct(): number {
+    const value = Math.round(Number(this.readedpct));
+    return isNaN(value) ? 0 : Math.min(100, Math.max(0, value));
+  }
+
   private trackFileState(status: FILEREAD_STATUS, isDCM: boolean | null) {
     this.readStatus = status; 
     this.isDCM = isDCM;
