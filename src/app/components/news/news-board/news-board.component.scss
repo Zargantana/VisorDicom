@@ -145,3 +145,23 @@
     .decreasingFont { font-size: 0.95rem; }
     .news-history { grid-template-columns: 6.4rem 1fr; }
   }
+
+  // Créditos: nombre a la izquierda, uso y licencia a la derecha
+  .news-history.credits {
+    grid-template-columns: 9.5rem 1fr;
+    dt { font-weight: 600; color: inherit; }
+    a { color: inherit; text-decoration: underline; }
+    code { font-size: 0.9em; }
+  }
+
+  .news-note {
+    font-size: 0.9em;
+    color: #6c757d;
+  }
+
+  .dark .news-note { color: #adb5bd; }
+
+  @media (max-width: 600px) {
+    .news-history.credits { grid-template-columns: 1fr; row-gap: 0; }
+    .news-history.credits dd { margin-bottom: 0.4rem; }
+  }

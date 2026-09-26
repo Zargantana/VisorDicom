@@ -1,0 +1,75 @@
+VisorDicom - Creditos y agradecimientos
+=======================================
+
+VisorDicom es desarrollo propio: el parser DICOM, el decodificador RLE, el
+inflado Deflate, el pipeline de color y ventanas y los visores. Para lo demas
+se apoya en el trabajo de otros, a quienes debe y agradece. Los textos
+completos de las licencias de los paquetes empaquetados con la aplicacion
+estan en /3rdpartylicenses.txt; los de los codecs bajo demanda en
+/assets/codecs/THIRD_PARTY_NOTICES.md.
+
+CODECS DE IMAGEN
+----------------
+
+jpeg-baseline.js - decodificador JPEG (baseline y extendido) de pdf.js
+  Copyright 2011 notmasteryet
+  Licensed under the Apache License, Version 2.0
+  https://github.com/mozilla/pdf.js
+
+lossless.js - jpeg-lossless-decoder-js (JPEG Lossless)
+  Copyright (C) 2015 Michael Martinez
+  Copyright (C) Helmut Dersch (08-25-2015: Helmut Dersch agreed to a license
+  change from LGPL to MIT)
+  The MIT License (MIT)
+  https://github.com/rii-mango/JPEGLosslessDecoderJS
+
+jpeg-ls.js - CharLS (JPEG-LS) compilado con emscripten, adaptado de
+  cornerstoneWADOImageLoader (decodeJPEGLS.js)
+  CharLS: Copyright (c) 2007-2010, Jan de Vaan. BSD 3-Clause License.
+  https://github.com/team-charls/charls
+  Adaptacion: Copyright (c) 2014 Chris Hafey (chafey@gmail.com). The MIT License.
+  https://github.com/chafey/cornerstoneWADOImageLoader
+
+jpx.js - image-JPEG2000 v0.3.1 (JPEG 2000 de reserva), a partir de pdf.js
+  Copyright 2012 Mozilla Foundation
+  Licensed under the Apache License, Version 2.0
+  https://github.com/OHIF/image-JPEG2000
+
+assets/codecs/openjpegjs_decode.js - OpenJPEG (JPEG 2000 Part 1/2 y HTJ2K),
+  build JS de @cornerstonejs/codec-openjpeg
+  OpenJPEG: Copyright (c) 2002-2014, Universite catholique de Louvain (UCL),
+  Belgium, y colaboradores. BSD 2-Clause License.
+  https://github.com/uclouvain/openjpeg
+  Build: MIT License. https://github.com/cornerstonejs/codecs
+
+assets/codecs/libjpegturbojs_decode.js - libjpeg-turbo (JPEG de 8 bits:
+  extendido, progresivo y aritmetico), build JS de
+  @cornerstonejs/codec-libjpeg-turbo-8bit
+  libjpeg-turbo: IJG License, Modified (3-clause) BSD License y zlib License.
+  https://github.com/libjpeg-turbo/libjpeg-turbo
+  Build: ISC License. https://github.com/cornerstonejs/codecs
+  This software is based in part on the work of the Independent JPEG Group.
+
+ESTANDAR
+--------
+
+DICOM(R): diccionario de datos (PS3.6), sintaxis de transferencia y
+codificacion (PS3.5) y modelos de presentacion (PS3.3 y PS3.4).
+DICOM is the registered trademark of the National Electrical Manufacturers
+Association (NEMA) for its Standards publications relating to digital
+communications of medical information.
+https://www.dicomstandard.org/
+
+APLICACION
+----------
+
+Angular (Google) - MIT. RxJS - Apache 2.0. zone.js - MIT.
+Bootstrap - MIT. jQuery - MIT. Popper - MIT.
+Font Awesome Free - iconos CC BY 4.0, fuentes SIL OFL 1.1, codigo MIT.
+  https://fontawesome.com/license/free
+
+PRUEBAS (no forman parte del visor)
+-----------------------------------
+
+pydicom - MIT. pyjpegls - MIT. imagecodecs - BSD 3-Clause. NumPy - BSD 3-Clause.
+Pillow - HPND. Playwright - Apache 2.0.

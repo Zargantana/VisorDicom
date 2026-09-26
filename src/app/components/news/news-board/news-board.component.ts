@@ -9,6 +9,13 @@ import { ThemeService } from 'src/app/services/theme.service';
     standalone: false
 })
 export class NewsBoardComponent {
+  /** Vista de créditos y agradecimientos en lugar de las novedades */
+  public creditos: boolean = false;
+
+  public creditosClick(visible: boolean) {
+    this.creditos = visible;
+  }
+
 
   public elfua: boolean = false;
 
@@ -21,6 +28,7 @@ export class NewsBoardComponent {
   public changeBannerVisibility() {
     NewsService.visible = !NewsService.visible;
     this.elfua = false;
+    this.creditos = false;
   }
 
   public masClick() {
