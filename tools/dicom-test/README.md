@@ -134,7 +134,7 @@ crudo (403), hay que bajarlo a mano.
 | t89 | VOI LUT con **primer valor mapeado negativo** (descriptor US 63488 = -2048) en un CT de 12 bits con signo sin rescale (PS3.3 C.11.2.1.1: SS si la entrada de la LUT puede ser negativa). Antes salía negra |
 | t80-t84 | **Specific Character Set** (0008,0005): UTF-8 (ISO_IR 192), Latin-1 (ISO_IR 100), japonés con ISO 2022 (`\ISO 2022 IR 87`, nombre con los tres grupos), coreano con ISO 2022 (`\ISO 2022 IR 149`) y griego (ISO_IR 126). Los textos se comparan con pydicom (`#text`) |
 | t85 | UTF-8 **sin declarar** (0008,0005): el visor lo lee como UTF-8 porque los bytes lo son |
-| t86-t88 | DICOM **sin preámbulo**: dataset crudo en Implicit VR LE sin grupo 0002 (ACR-NEMA 2.0, MESA); grupo 0002 sin los 128 bytes ni "DICM"; "DICM" al principio sin los 128 bytes |
+| t86-t88 | DICOM **sin preámbulo**: dataset crudo en Implicit VR LE sin grupo 0002 (ACR-NEMA 2.0, MESA); grupo 0002 sin los 128 bytes ni "DICM"; "DICM" al principio sin los 128 bytes. Forman una serie de tres cortes, para subirlos juntos al portal (`E2E_FILES`) |
 | t77 | JPEG Baseline con **bytes de relleno 0xFF** delante de SOS y EOI (ISO 10918-1 B.1.1.2; las miniaturas "DicomObjects" de las láminas 3DHISTECH): el decoder los quita antes de JpegImage/libjpeg-turbo |
 | t76 (×2) | **Mismo estudio con dos Study Date distintas** (pasa en CD reales): el clasificador agrupa por Study Instance UID. Lo comprueba `real/classify_corpus.mjs tools/dicom-test/out` (árbol del visor frente a pydicom), que conviene pasar tras tocar `classifier-DCM.class.ts` |
 

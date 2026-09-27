@@ -440,8 +440,8 @@ expect("t79_voi_lut_sequence.dcm", rows=R, cols=C, frames=1, windows=0, kind="vo
 
 # --- t80-t86: Specific Character Set (0008,0005). El visor decodifica nombre, ID y descripciones con el juego
 #     declarado; check_render.py compara esos textos con pydicom (fila "<fichero>#text"). Nombres inventados.
-def charset_ds(charset, patient, study_desc, series_desc, pid="SYNTH-080"):
-    ds = base_ds("CT", "1.2.840.10008.5.1.4.1.1.2")
+def charset_ds(charset, patient, study_desc, series_desc, pid="SYNTH-080", study=None, series=None, inst=1):
+    ds = base_ds("CT", "1.2.840.10008.5.1.4.1.1.2", study, series, inst=inst)
     if charset is not None:
         ds.SpecificCharacterSet = charset
     ds.PatientName = patient
@@ -474,11 +474,13 @@ expect("t85_charset_utf8_undeclared.dcm", rows=R, cols=C, frames=1, windows=1, k
 
 # --- t86-t88: DICOM SIN preámbulo. t86: dataset crudo en Implicit VR LE, sin grupo 0002 (ACR-NEMA 2.0, MESA);
 #     t87: con el grupo 0002 pero sin los 128 bytes ni "DICM"; t88: "DICM" al principio, sin los 128 bytes. Antes el
-#     cargador solo reconocía "DICM" en el byte 128 y los ignoraba.
+#     cargador solo reconocía "DICM" en el byte 128 y los ignoraba. Los tres forman una serie de tres cortes (como
+#     t60-t62) para poder subirlos juntos al portal: E2E_FILES=t86_…,t87_…,t88_… en tools/portal-test.
 from pydicom.filebase import DicomBytesIO
 from pydicom.filewriter import write_dataset
 
-ds = charset_ds(None, "NOPREAMBLE^ACRNEMA", "SIN PREAMBULO", "Implicit VR LE")
+STUDY_86, SERIES_86 = generate_uid(), generate_uid()
+ds = charset_ds(None, "NOPREAMBLE^TEST", "SIN PREAMBULO", "Sin preambulo", study=STUDY_86, series=SERIES_86, inst=1)
 del ds.file_meta
 fp = DicomBytesIO()
 fp.is_little_endian, fp.is_implicit_VR = True, True
@@ -486,8 +488,8 @@ write_dataset(fp, ds)
 open(os.path.join(OUT, "t86_no_preamble_implicit.dcm"), "wb").write(fp.getvalue())
 expect("t86_no_preamble_implicit.dcm", rows=R, cols=C, frames=1, windows=1, kind="ct")
 
-for name, cut in (("t87_no_preamble_meta.dcm", 132), ("t88_no_preamble_dicm_at_0.dcm", 128)):
-    ds = charset_ds(None, "NOPREAMBLE^META", "SIN PREAMBULO", name[:3])
+for inst, (name, cut) in enumerate((("t87_no_preamble_meta.dcm", 132), ("t88_no_preamble_dicm_at_0.dcm", 128)), start=2):
+    ds = charset_ds(None, "NOPREAMBLE^TEST", "SIN PREAMBULO", "Sin preambulo", study=STUDY_86, series=SERIES_86, inst=inst)
     p = save(ds, name, ExplicitVRLittleEndian)
     data = open(p, "rb").read()
     open(p, "wb").write(data[cut:])
