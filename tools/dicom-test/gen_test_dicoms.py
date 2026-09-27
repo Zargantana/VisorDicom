@@ -513,6 +513,38 @@ ds.PixelData = stored89.tobytes()
 save(ds, "t89_voi_lut_signed_first.dcm", ExplicitVRLittleEndian)
 expect("t89_voi_lut_signed_first.dcm", rows=R, cols=C, frames=1, windows=0, kind="voi_lut")
 
+# --- t91-t95: cine de los multiframe (src/app/clases/Images/cine.ts; check_render.py, fila "<fichero>#cine"). Cuatro
+#     frames grises nativos. t91: MR sin tiempos = cortes, sin play, el clic pasa de frame; t92: XA sin tiempos = cine a
+#     15 fps (los de su modalidad); t93: US con solo Frame Time Vector (20 ms); t94: NM (cortes) con Recommended Display
+#     Frame Rate = cine a 8 fps, porque el fichero lo pide; t95: secundaria (OT) con solo Cine Rate (25 fps).
+def cine_ds(modality, sop_class, **timing):
+    ds = base_ds(modality, sop_class)
+    ds.SamplesPerPixel = 1
+    ds.PhotometricInterpretation = "MONOCHROME2"
+    ds.Rows, ds.Columns = R, C
+    ds.BitsAllocated, ds.BitsStored, ds.HighBit, ds.PixelRepresentation = 8, 8, 7, 0
+    ds.NumberOfFrames = 4
+    frames = []
+    for f in range(4):
+        g = np.full((R, C), 30 + 60 * f, np.uint8)
+        g[:, : C // 4] = 255
+        frames.append(g)
+    ds.PixelData = np.stack(frames).tobytes()
+    for keyword, value in timing.items():
+        setattr(ds, keyword, value)
+    return ds
+
+
+for name, modality, sop_class, timing in (
+        ("t91_cine_mr_stack_no_timing.dcm", "MR", "1.2.840.10008.5.1.4.1.1.7.2", {}),
+        ("t92_cine_xa_no_timing.dcm", "XA", "1.2.840.10008.5.1.4.1.1.12.1", {}),
+        ("t93_cine_us_frame_time_vector.dcm", "US", "1.2.840.10008.5.1.4.1.1.3.1",
+         {"FrameTimeVector": [0, 20, 20, 20], "FrameIncrementPointer": 0x00181065}),
+        ("t94_cine_nm_recommended_rate.dcm", "NM", "1.2.840.10008.5.1.4.1.1.7.2", {"RecommendedDisplayFrameRate": 8}),
+        ("t95_cine_ot_cine_rate.dcm", "OT", "1.2.840.10008.5.1.4.1.1.7.2", {"CineRate": 25})):
+    save(cine_ds(modality, sop_class, **timing), name, ExplicitVRLittleEndian)
+    expect(name, rows=R, cols=C, frames=4, windows=0, kind="cine")
+
 # --- t75: el mismo J2K con la cabecera SIZ corrupta: los bytes de un delimitador de secuencia (FFFE,E0DD) dentro del
 # codestream, como JPEG2000-embedded-sequence-delimiter.dcm de pydicom-data (Rsiz = FEFF, Xsiz = DDE00100). OpenJPEG
 # rechaza la cabecera y jpx.js NO debe reservar memoria según un Xsiz de 3.700 millones (tumbaba el proceso con 4 GB):

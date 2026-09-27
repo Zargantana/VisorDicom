@@ -70,6 +70,10 @@ o si difieren). Sin juego declarado, la verdad es el UTF-8 cuando los bytes lo s
 deja en Latin-1). Los ficheros sin preámbulo ni grupo 0002 se leen con `force=True` y la Transfer Syntax que deduce
 pydicom.
 
+**Cine.** En los multiframe, el harness guarda qué hará el visor (`cine`: reproducir o pasar frame a frame, y los ms por
+frame) y `check_render.py` lo compara, en la fila `<fichero>#cine`, con la misma regla escrita en Python a partir de
+las etiquetas que lee pydicom (Frame Time, Frame Time Vector, Recommended Display Frame Rate, Cine Rate y la modalidad).
+
 ### Un corpus entero (carpetas anidadas, CD, archivos comprimidos)
 
 Para pasar por el visor todos los ficheros de un árbol de carpetas sin copiarlos (ficheros sin extensión, DICOMDIR,
@@ -147,6 +151,7 @@ crudo (403), hay que bajarlo a mano.
 | t80-t84 | **Specific Character Set** (0008,0005): UTF-8 (ISO_IR 192), Latin-1 (ISO_IR 100), japonés con ISO 2022 (`\ISO 2022 IR 87`, nombre con los tres grupos), coreano con ISO 2022 (`\ISO 2022 IR 149`) y griego (ISO_IR 126). Los textos se comparan con pydicom (`#text`) |
 | t85 | UTF-8 **sin declarar** (0008,0005): el visor lo lee como UTF-8 porque los bytes lo son |
 | t86-t88 | DICOM **sin preámbulo**: dataset crudo en Implicit VR LE sin grupo 0002 (ACR-NEMA 2.0, MESA); grupo 0002 sin los 128 bytes ni "DICM"; "DICM" al principio sin los 128 bytes. Forman una serie de tres cortes, para subirlos juntos al portal (`E2E_FILES`) |
+| t91-t95 | **Cine de los multiframe** (`Images/cine.ts`, fila `#cine`): MR sin tiempos (cortes: sin play, el clic pasa de frame), XA sin tiempos (15 fps, los de su modalidad), US con solo Frame Time Vector, NM con Recommended Display Frame Rate (cine porque el fichero lo pide) y OT con solo Cine Rate |
 | t77 | JPEG Baseline con **bytes de relleno 0xFF** delante de SOS y EOI (ISO 10918-1 B.1.1.2; las miniaturas "DicomObjects" de las láminas 3DHISTECH): el decoder los quita antes de JpegImage/libjpeg-turbo |
 | t76 (×2) | **Mismo estudio con dos Study Date distintas** (pasa en CD reales): el clasificador agrupa por Study Instance UID. Lo comprueba `real/classify_corpus.mjs tools/dicom-test/out` (árbol del visor frente a pydicom), que conviene pasar tras tocar `classifier-DCM.class.ts` |
 

@@ -64,7 +64,7 @@
     <basic-image-viewer class="d-flex slab-flex-1 p-0 m-0"
       [iconListVisible]="true"
       [pointerControls]="((reader?.Frames??0) > 1)"
-      [playpauseControl]="((reader?.Frames??0) > 1)"
+      [playpauseControl]="canPlay"
       [playpauseControlState]="stoppedPlaying"
       [wheelScrolls]="true"
       [currentElementPointer]="currentImage?currentImage.currentFrame + 1:0"

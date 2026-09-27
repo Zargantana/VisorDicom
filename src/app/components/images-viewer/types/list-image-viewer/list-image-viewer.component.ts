@@ -1,5 +1,6 @@
 import { Component, Inject, Input, Optional, ViewChild } from '@angular/core';
 import { DCMFileReader } from 'src/app/clases/DCM/DCM-file-reader.class';
+import { Cine } from 'src/app/clases/Images/cine';
 import { classifierDCM } from 'src/app/clases/Images/classifier-DCM.class';
 import { ImageDCM } from 'src/app/clases/Images/image-DCM.class';
 import { ThemeService } from 'src/app/services/theme.service';
@@ -51,9 +52,17 @@ export class ListImageViewerComponent{
     return BasicImageViewerComponent.viewerMaxHeight;
   }
 
+  /** Multiframe que se reproduce como vídeo (Cine: tiempos del fichero o la modalidad). */
+  public get canPlay(): boolean {
+    return !!this.reader && Cine.canPlay(this.reader);
+  }
+
+  /** Clic en la imagen: cine → play/pausa; cortes sin tiempos (TC, RM, NM, tomosíntesis...) → frame siguiente; una sola imagen → maximizar. */
   public ImageClicked() {
-    if ((this.reader?.Frames??1) > 1) {
+    if (this.canPlay) {
       this.PlayPause();
+    } else if (this.reader && Cine.isStack(this.reader)) {
+      this.NextFrameClick();
     } else {
       this.display?.MaxMin();
     }
@@ -78,7 +87,7 @@ export class ListImageViewerComponent{
       this.NextFrameClick();
       setTimeout(() => {
         this.NextFrameAndEnqueue();
-        }, this.reader?.FrameTime);
+        }, this.reader ? Cine.frameTime(this.reader) : 100);
     } else {
       this.stoppedPlaying = true;
     }
@@ -106,7 +115,7 @@ export class ListImageViewerComponent{
     if (this.classifier?.studySplit.length) {
       this.reader = this.classifier?.searchImageByUID(SOPInstanceUID);
       if (this.reader) {
-        if (this.reader.Frames <= 1) {
+        if (!this.canPlay) {
           this.Pause();
         }
         this.viewingImage = (this.classifier?.lastSearchIndexFound??0) + 1;

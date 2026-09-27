@@ -5,6 +5,7 @@
 import { DCMFile, FILEREAD_STATUS } from 'src/app/clases/DCM/DCM-file.class';
 import { DCMFileReader } from 'src/app/clases/DCM/DCM-file-reader.class';
 import { DCMInterpreter } from 'src/app/clases/DCM/DCM-interpreter.class';
+import { Cine } from 'src/app/clases/Images/cine';
 import { ImageDCM } from 'src/app/clases/Images/image-DCM.class';
 
 /**
@@ -50,6 +51,8 @@ export async function renderDicom(input: { blob?: Blob; name?: string; bin?: str
       StudyDescription: reader.StudyDescription, SeriesDescription: reader.SeriesDescription,
       charset: reader.SpecificCharacterSet.join('\\'),
     },
+    // Qué hace el visor con los multiframe: cine (y a qué velocidad) o paso de frame a frame; check_render.py lo compara
+    cine: { play: Cine.canPlay(reader), stack: Cine.isStack(reader), frameTimeMs: Cine.frameTime(reader) },
   };
   try {
     image.selectedWindow = windowIndex;

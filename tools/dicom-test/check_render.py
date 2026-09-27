@@ -76,6 +76,48 @@ def expected_texts(path):
     return out
 
 
+# Cine de los multiframe (src/app/clases/Images/cine.ts), escrito aparte: si el visor y esto no coinciden, falla
+CINE_FPS = {"XA": 15, "RF": 15, "US": 30, "IVUS": 30, "ES": 30, "XC": 30}
+CINE_DEFAULT_FPS = 10
+CINE_STACK = {"CT", "MR", "PT", "NM", "MG", "OPT", "IVOCT", "SEG", "RTDOSE", "SM"}
+
+
+def expected_cine(path, frames):
+    """Qué debe hacer el visor con un multiframe: {play, stack, frameTimeMs}. Tiempos del dataset raíz por este orden:
+    Frame Time, media de Frame Time Vector (sin el primer valor), Recommended Display Frame Rate y Cine Rate; si no
+    hay, los fps de la modalidad. Las modalidades de cortes sin tiempos no se reproducen."""
+    ds = read_ds(path, stop_before_pixels=True)
+
+    def values(keyword):
+        try:
+            v = ds.get(keyword)
+        except Exception:  # noqa: BLE001  (valor ilegible: como si no viniera)
+            return []
+        if v is None or v == "":
+            return []
+        out = []
+        for x in (v if isinstance(v, pydicom.multival.MultiValue) else [v]):
+            try:
+                out.append(float(x))
+            except (TypeError, ValueError):
+                pass
+        return [x for x in out if np.isfinite(x)]
+
+    first = lambda kw: (values(kw) or [0])[0]  # noqa: E731
+    gaps = [x for x in values("FrameTimeVector")[1:] if x > 0]
+    file_ms = 0.0
+    for ms in (first("FrameTime"), sum(gaps) / len(gaps) if gaps else 0,
+               1000 / first("RecommendedDisplayFrameRate") if first("RecommendedDisplayFrameRate") > 0 else 0,
+               1000 / first("CineRate") if first("CineRate") > 0 else 0):
+        if ms > 0:
+            file_ms = ms
+            break
+    modality = str(ds.get("Modality", "") or "").strip(" \0").upper()
+    ms = file_ms or 1000 / CINE_FPS.get(modality, CINE_DEFAULT_FPS)
+    stack = frames > 1 and modality in CINE_STACK and not file_ms
+    return {"play": frames > 1 and not stack, "stack": stack, "frameTimeMs": min(2000.0, max(10.0, ms))}
+
+
 def voi_linear(x, c, w):
     # PS3.3 C.11.2.1.2.1 (LINEAR)
     if w <= 1:
@@ -285,6 +327,19 @@ for key, meta in summary.items():
                 rows.append((name + "#text", "PASS", ("texto: " + " | ".join(v for v in exp_text.values() if v))[:120]))
         except Exception as e:  # noqa: BLE001
             rows.append((name + "#text", "SKIP", f"sin verdad de texto: {e}"[:90]))
+    if not w and meta.get("cine") is not None:
+        # Multiframe: cine o frame a frame, y la velocidad (fila "<fichero>#cine")
+        try:
+            got, exp = meta["cine"], expected_cine(path, meta.get("frames") or 1)
+            if got.get("play") != exp["play"] or got.get("stack") != exp["stack"] \
+                    or abs((got.get("frameTimeMs") or 0) - exp["frameTimeMs"]) > 0.01:
+                fails += 1
+                rows.append((name + "#cine", "FAIL", f"cine distinto: {got} != {exp}"[:300]))
+            else:
+                how = f"cine a {exp['frameTimeMs']:.1f} ms/frame" if exp["play"] else "frame a frame, sin cine"
+                rows.append((name + "#cine", "PASS", how))
+        except Exception as e:  # noqa: BLE001
+            rows.append((name + "#cine", "SKIP", f"sin verdad de cine: {e}"[:90]))
     if exp_meta.get("kind") == "expect_fail":
         # Debe fallar de forma controlada: sin frames decodificados y sin excepción que tumbe el visor. Con
         # reason_contains, además, el motivo que enseña el visor tiene que mencionarlo (p. ej. "Sectra").

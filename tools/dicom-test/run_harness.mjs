@@ -119,7 +119,8 @@ for (const { name: f, file, frames, modality } of entries) {
                      windows: r.windows, windowCount: r.windowCount, decodedFrames: r.decoded ?? r.rgba.length, error: r.error,
                      unsupportedReason: r.unsupportedReason, decodedBy: r.decodedBy, partial: r.partial, ms: Date.now() - tf };
     if (r.written) summary[key].writtenFrames = r.written;
-    if (w === 0) Object.assign(summary[key], { isDicom: r.isDicom, noFileMeta: r.noFileMeta || undefined, text: r.text });
+    if (w === 0) Object.assign(summary[key], { isDicom: r.isDicom, noFileMeta: r.noFileMeta || undefined, text: r.text,
+                                                cine: r.frames > 1 ? r.cine : undefined });
     r.rgba.forEach((buf, i) => fs.writeFileSync(path.join(renderDir, `${key}.f${r.written ? r.written[i] : i}.rgba`), Buffer.from(buf.buffer)));
   }
 }

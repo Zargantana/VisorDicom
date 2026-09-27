@@ -70,6 +70,12 @@ export class DCMFileReader {
     public SeriesNumber: number = 0;
     public InstanceNumber: number = 0;
     public FrameTime: number = 0;
+    /** Frame Time Vector (0018,1065): media en ms de los intervalos entre frames (el primer valor es 0 y no cuenta). 0 = no viene. */
+    public FrameTimeVector: number = 0;
+    /** Recommended Display Frame Rate (0008,2144), en frames por segundo. 0 = no viene. */
+    public RecommendedDisplayFrameRate: number = 0;
+    /** Cine Rate (0018,0040), en frames por segundo. 0 = no viene. */
+    public CineRate: number = 0;
     public HighBit: number = 0;
     /** Specific Character Set (0008,0005) del dataset raíz, ya normalizado (DicomCharset.parse). [] = repertorio básico. */
     public SpecificCharacterSet: string[] = [];
@@ -246,6 +252,8 @@ export class DCMFileReader {
                       if (this.last_readed_tag.Value) {
                           this.SeriesDescription = this.last_readed_tag.Value;
                       }
+                    } else if(this.last_readed_tag.TagLow == 0x2144) {
+                        this.RecommendedDisplayFrameRate = DCMFileReader.decimals(this.last_readed_tag.Value)[0] ?? 0; // IS
                     }
                 } else if (this.last_readed_tag.TagHigh == 0x10) {
                     if(this.last_readed_tag.TagLow == 0x20) {
@@ -273,6 +281,11 @@ export class DCMFileReader {
                         if (this.last_readed_tag.Value) {
                             this.FrameTime = parseFloat(Functions.clearDCMImpairValue(this.last_readed_tag.Value).trim()); // DS
                         }
+                    } else if(this.last_readed_tag.TagLow == 0x1065) {
+                        const gaps = DCMFileReader.decimals(this.last_readed_tag.Value).slice(1).filter(v => v > 0); // DS
+                        this.FrameTimeVector = gaps.length ? gaps.reduce((a, b) => a + b, 0) / gaps.length : 0;
+                    } else if(this.last_readed_tag.TagLow == 0x0040) {
+                        this.CineRate = DCMFileReader.decimals(this.last_readed_tag.Value)[0] ?? 0; // IS
                     }
                 } else if (this.last_readed_tag.TagHigh == 0x20) {
                     if(this.last_readed_tag.TagLow == 0xD) {
@@ -310,6 +323,11 @@ export class DCMFileReader {
         this.PatientId = this.text(this.PatientId);
         this.StudyDescription = this.text(this.StudyDescription);
         this.SeriesDescription = this.text(this.SeriesDescription);
+    }
+
+    /** Valores de un DS o IS (varios separados por "\"): parseFloat, nunca parseInt; los que no son números no cuentan. */
+    private static decimals(raw: string | undefined): number[] {
+        return Functions.clearDCMImpairValue(raw ?? '').split('\\').map(v => parseFloat(v.trim())).filter(v => isFinite(v));
     }
 
     /**
