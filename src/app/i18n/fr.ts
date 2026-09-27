@@ -79,7 +79,7 @@ export const FR: Texts = {
   'news.h5.b': 'Le CD entier d\'un coup :', 'news.h5.t': 'glissez le dossier et regardez les examens apparaître, classés par patient et par série, pendant leur lecture.',
   'news.h6.b': 'Plus d\'examens s\'ouvrent :', 'news.h6.t': 'plus de formats d\'image et de couleur, et vous pouvez choisir le contraste quand l\'examen en propose plusieurs.',
   'news.h7.b': 'Sur tous les appareils :', 'news.h7.t': 'Windows, Linux et Mac ; Android et iOS. PC, tablette et mobile.',
-  'news.h8.b': 'Dans votre langue :', 'news.h8.t': 'espagnol, anglais, catalan, basque, galicien, portugais, français, italien, allemand et japonais. Choisissez-la avec le bouton du globe, en haut à droite.',
+  'news.h8.b': 'Dans votre langue :', 'news.h8.t': 'espagnol, anglais, catalan, basque, galicien, portugais, français, italien, allemand, japonais, chinois, russe, coréen et grec. Choisissez-la avec le bouton du globe, en haut à droite.',
   'news.more': 'plus...',
   'news.less': '...moins',
   'news.hist.1': 'Naissance de VisorDicom, la version libre et gratuite de la visionneuse.',

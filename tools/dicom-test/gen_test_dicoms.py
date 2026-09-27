@@ -438,6 +438,77 @@ ds.PixelData = stored79.tobytes()
 save(ds, "t79_voi_lut_sequence.dcm", ExplicitVRLittleEndian)
 expect("t79_voi_lut_sequence.dcm", rows=R, cols=C, frames=1, windows=0, kind="voi_lut")
 
+# --- t80-t86: Specific Character Set (0008,0005). El visor decodifica nombre, ID y descripciones con el juego
+#     declarado; check_render.py compara esos textos con pydicom (fila "<fichero>#text"). Nombres inventados.
+def charset_ds(charset, patient, study_desc, series_desc, pid="SYNTH-080"):
+    ds = base_ds("CT", "1.2.840.10008.5.1.4.1.1.2")
+    if charset is not None:
+        ds.SpecificCharacterSet = charset
+    ds.PatientName = patient
+    ds.PatientID = pid
+    ds.StudyDescription = study_desc
+    ds.SeriesDescription = series_desc
+    stored = (ct_hu() + 1024).astype(np.uint16)
+    set_mono16(ds, stored, signed=False)
+    ds.WindowCenter, ds.WindowWidth = 40, 400
+    ds.PixelData = stored.tobytes()
+    return ds
+
+
+for name, charset, patient, study_desc, series_desc in (
+        ("t80_charset_utf8.dcm", "ISO_IR 192", "Müller^Jürgen", "Tórax con contraste", "Axial ñandú 1,5 mm"),
+        ("t81_charset_latin1.dcm", "ISO_IR 100", "Peña^José María", "Abdomen y pelvis", "Coronal hígado"),
+        ("t82_charset_japanese_iso2022.dcm", ["", "ISO 2022 IR 87"], "Yamada^Tarou=山田^太郎=やまだ^たろう", "胸部CT", "Axial"),
+        ("t83_charset_korean_iso2022.dcm", ["", "ISO 2022 IR 149"], "Hong^Gildong=洪^吉洞=홍^길동", "흉부 CT", "Axial"),
+        ("t84_charset_greek.dcm", "ISO_IR 126", "Διονυσίου^Ελένη", "Θώρακας", "Αξονική")):
+    save(charset_ds(charset, patient, study_desc, series_desc), name, ExplicitVRLittleEndian)
+    expect(name, rows=R, cols=C, frames=1, windows=1, kind="ct")
+
+# t85: UTF-8 SIN declarar (0008,0005), como escriben muchos programas: el visor lo lee como UTF-8 porque los bytes
+#      lo son (pydicom lo deja en Latin-1; check_render toma el UTF-8 como verdad en ese caso)
+ds = charset_ds(None, "x", "x", "x")
+ds.add_new(0x00100010, "PN", "Çelik^Ayşe".encode("utf-8"))
+ds.add_new(0x00081030, "LO", "Tórax".encode("utf-8") + b" ")
+save(ds, "t85_charset_utf8_undeclared.dcm", ExplicitVRLittleEndian)
+expect("t85_charset_utf8_undeclared.dcm", rows=R, cols=C, frames=1, windows=1, kind="ct")
+
+# --- t86-t88: DICOM SIN preámbulo. t86: dataset crudo en Implicit VR LE, sin grupo 0002 (ACR-NEMA 2.0, MESA);
+#     t87: con el grupo 0002 pero sin los 128 bytes ni "DICM"; t88: "DICM" al principio, sin los 128 bytes. Antes el
+#     cargador solo reconocía "DICM" en el byte 128 y los ignoraba.
+from pydicom.filebase import DicomBytesIO
+from pydicom.filewriter import write_dataset
+
+ds = charset_ds(None, "NOPREAMBLE^ACRNEMA", "SIN PREAMBULO", "Implicit VR LE")
+del ds.file_meta
+fp = DicomBytesIO()
+fp.is_little_endian, fp.is_implicit_VR = True, True
+write_dataset(fp, ds)
+open(os.path.join(OUT, "t86_no_preamble_implicit.dcm"), "wb").write(fp.getvalue())
+expect("t86_no_preamble_implicit.dcm", rows=R, cols=C, frames=1, windows=1, kind="ct")
+
+for name, cut in (("t87_no_preamble_meta.dcm", 132), ("t88_no_preamble_dicm_at_0.dcm", 128)):
+    ds = charset_ds(None, "NOPREAMBLE^META", "SIN PREAMBULO", name[:3])
+    p = save(ds, name, ExplicitVRLittleEndian)
+    data = open(p, "rb").read()
+    open(p, "wb").write(data[cut:])
+    expect(name, rows=R, cols=C, frames=1, windows=1, kind="ct")
+
+# --- t89: VOI LUT con primer valor mapeado NEGATIVO en un CT de 12 bits con signo sin rescale (OFFIS vlut_09): el
+#     descriptor va como US y 63488 es -2048 (PS3.3 C.11.2.1.1: SS si la entrada de la LUT puede ser negativa). Antes
+#     el visor lo tomaba sin signo y pintaba la imagen negra.
+ds = base_ds("CT", "1.2.840.10008.5.1.4.1.1.2")
+stored89 = np.clip(ct_hu(), -2048, 2047).astype(np.int16)
+set_mono16(ds, stored89, signed=True)
+ds.BitsStored, ds.HighBit = 12, 11
+del ds.RescaleIntercept, ds.RescaleSlope, ds.RescaleType
+lut89 = Dataset()
+lut89.add_new((0x0028, 0x3002), "US", [4096, 63488, 16])            # 4096 entradas desde -2048
+lut89.add_new((0x0028, 0x3006), "OW", (np.linspace(0, 1, 4096) ** 0.5 * 65535).astype("<u2").tobytes())
+ds.VOILUTSequence = Sequence([lut89])
+ds.PixelData = stored89.tobytes()
+save(ds, "t89_voi_lut_signed_first.dcm", ExplicitVRLittleEndian)
+expect("t89_voi_lut_signed_first.dcm", rows=R, cols=C, frames=1, windows=0, kind="voi_lut")
+
 # --- t75: el mismo J2K con la cabecera SIZ corrupta: los bytes de un delimitador de secuencia (FFFE,E0DD) dentro del
 # codestream, como JPEG2000-embedded-sequence-delimiter.dcm de pydicom-data (Rsiz = FEFF, Xsiz = DDE00100). OpenJPEG
 # rechaza la cabecera y jpx.js NO debe reservar memoria según un Xsiz de 3.700 millones (tumbaba el proceso con 4 GB):

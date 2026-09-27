@@ -7,6 +7,11 @@ import { DCMFile } from 'src/app/clases/DCM/DCM-file.class';
 import { DCMFileReader } from 'src/app/clases/DCM/DCM-file-reader.class';
 import { classifierDCM } from 'src/app/clases/Images/classifier-DCM.class';
 
+/** ¿Lo reconoce el cargador como DICOM? `head`: los primeros bytes (HEAD_BYTES) como binary string. */
+export function isDicomHead(head: string): boolean {
+  return DCMFile.datasetOffset(head) !== null;
+}
+
 export async function classifyAll(files: { name: string; bin: string }[]) {
   const classifier = new classifierDCM();
   const errors: { name: string; error: string }[] = [];

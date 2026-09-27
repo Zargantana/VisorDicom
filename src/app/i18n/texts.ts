@@ -5,7 +5,7 @@
  * statement, los créditos, los mensajes técnicos del visor (motivos de los carteles, datos de la imagen) ni la
  * pantalla de pruebas.
  */
-export type Lang = 'es' | 'en' | 'ca' | 'eu' | 'gl' | 'pt' | 'fr' | 'it' | 'de' | 'ja';
+export type Lang = 'es' | 'en' | 'ca' | 'eu' | 'gl' | 'pt' | 'fr' | 'it' | 'de' | 'ja' | 'zh' | 'ru' | 'ko' | 'el';
 
 export const LANGS: { code: Lang; label: string; name: string }[] = [
   { code: 'es', label: 'ES', name: 'Español' },
@@ -18,6 +18,10 @@ export const LANGS: { code: Lang; label: string; name: string }[] = [
   { code: 'it', label: 'IT', name: 'Italiano' },
   { code: 'de', label: 'DE', name: 'Deutsch' },
   { code: 'ja', label: 'JA', name: '日本語' },
+  { code: 'zh', label: 'ZH', name: '中文（简体）' },
+  { code: 'ru', label: 'RU', name: 'Русский' },
+  { code: 'ko', label: 'KO', name: '한국어' },
+  { code: 'el', label: 'EL', name: 'Ελληνικά' },
 ];
 
 export interface Texts {

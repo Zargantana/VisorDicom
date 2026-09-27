@@ -25,6 +25,57 @@ def source_path(name):
     return (m["path"] if isinstance(m, dict) else m) if m else os.path.join(OUT, name)
 
 
+def read_ds(path, **kw):
+    """dcmread que también abre los ficheros sin preámbulo ni File Meta Information (ACR-NEMA, datasets crudos), como
+    el visor: la Transfer Syntax implícita sale de cómo los ha leído pydicom. Con "DICM" al principio y sin los 128
+    bytes del preámbulo, pydicom se pierde: se le da el fichero sin esas cuatro letras."""
+    with open(path, "rb") as fh:
+        head = fh.read(4)
+    if head == b"DICM":
+        import io
+        path = io.BytesIO(open(path, "rb").read()[4:])
+    ds = pydicom.dcmread(path, force=True, **kw)
+    fm = getattr(ds, "file_meta", None)
+    if fm is None or "TransferSyntaxUID" not in fm:
+        from pydicom.dataset import FileMetaDataset
+        from pydicom.uid import ExplicitVRBigEndian, ExplicitVRLittleEndian, ImplicitVRLittleEndian
+        implicit, little = ds.original_encoding
+        ds.file_meta = fm if fm is not None else FileMetaDataset()
+        ds.file_meta.TransferSyntaxUID = ImplicitVRLittleEndian if implicit else (ExplicitVRLittleEndian if little else ExplicitVRBigEndian)
+    return ds
+
+
+# Textos que enseña el visor (nombre, ID, descripciones) frente a pydicom, que decodifica con (0008,0005)
+TEXT_TAGS = (("PatientName", 0x00100010), ("PatientID", 0x00100020), ("StudyDescription", 0x00081030), ("SeriesDescription", 0x0008103E))
+
+
+def expected_texts(path):
+    """Lo que pydicom da para cada texto. Sin juego de caracteres declarado (o con ISO_IR 6), el visor lee como UTF-8
+    los bytes de 8 bits que lo son (muchos programas escriben UTF-8 sin declararlo); pydicom los deja en Latin-1: en ese
+    caso la verdad es el UTF-8."""
+    ds = read_ds(path, stop_before_pixels=True)
+    cs = ds.get("SpecificCharacterSet")
+    cs = [str(v).strip() for v in (cs if isinstance(cs, pydicom.multival.MultiValue) else [cs])] if cs is not None else []
+    undeclared = not cs or cs[0] in ("", "ISO_IR 6") and len(cs) == 1
+    out = {}
+    for kw, tag in TEXT_TAGS:
+        if tag not in ds:
+            out[kw] = ""
+            continue
+        raw = ds.get_item(tag).value
+        value = None
+        if undeclared and isinstance(raw, (bytes, bytearray)) and any(b >= 0x80 for b in raw):
+            try:
+                value = bytes(raw).decode("utf-8")
+            except UnicodeDecodeError:
+                value = None
+        if value is None:
+            v = ds[tag].value
+            value = "\\".join(str(x) for x in v) if isinstance(v, pydicom.multival.MultiValue) else ("" if v is None else str(v))
+        out[kw] = value.strip(" \0").replace("\0", "").strip()
+    return out
+
+
 def voi_linear(x, c, w):
     # PS3.3 C.11.2.1.2.1 (LINEAR)
     if w <= 1:
@@ -54,16 +105,17 @@ def first_value(v, index=0):
     return float(vals[index if index < len(vals) else 0])
 
 
-def voi_lut_gray(x, item):
+def voi_lut_gray(x, item, signed_input):
     """VOI LUT Sequence como la aplica el visor (Monochorme2Color.buildGrayFunction): índice = round(valor) - first,
-    recortado; gris normalizado con el mínimo y máximo de la propia LUT."""
+    recortado; gris normalizado con el mínimo y máximo de la propia LUT. El primer valor mapeado es con signo (SS) si
+    la entrada de la LUT puede ser negativa (PS3.3 C.11.2.1.1): `signed_input`."""
     n, first, bits = (int(v) for v in item.LUTDescriptor)
     data = item.LUTData
     if isinstance(data, (bytes, bytearray)):
         lut = np.frombuffer(data, "<u2" if bits > 8 else "u1").astype(np.float64)
     else:
         lut = np.array([int(v) for v in data], np.float64)
-    if first > 32767 and bits <= 16:
+    if signed_input and first > 32767:
         first -= 65536
     lo, hi = lut.min(), lut.max()
     idx = np.clip(np.round(x).astype(np.int64) - first, 0, len(lut) - 1)
@@ -74,7 +126,7 @@ def expected_frames(path, win, indices=None):
     """Frames esperados (RGB 0..255). Con `indices` (writtenFrames del harness en multiframes grandes) solo se
     decodifican esos frames con pydicom, frame a frame: una lámina de 5.000 tiles o una tomosíntesis de 700 MB no
     hace falta decodificarla entera para comparar tres frames."""
-    ds = pydicom.dcmread(path)
+    ds = read_ds(path)
     ts = str(ds.file_meta.TransferSyntaxUID)
     nf = int(getattr(ds, "NumberOfFrames", 1) or 1)
     ref = os.path.join(OUT, "ref", os.path.basename(path) + ".npy")
@@ -160,7 +212,9 @@ def expected_frames(path, win, indices=None):
             if wcv is not None and wwv is not None:
                 y = voi_window(x, wcv, wwv, func)
             elif "VOILUTSequence" in ds:  # VOI LUT (0028,3010) como la aplica el visor
-                y = voi_lut_gray(x, ds.VOILUTSequence[0])
+                bs = int(getattr(ds, "BitsStored", ds.BitsAllocated))
+                lo, hi = (-(1 << (bs - 1)), (1 << (bs - 1)) - 1) if ds.PixelRepresentation else (0, (1 << bs) - 1)
+                y = voi_lut_gray(x, ds.VOILUTSequence[0], min(lo * slope + intercept, hi * slope + intercept) < 0)
             else:
                 bs = int(getattr(ds, "BitsStored", ds.BitsAllocated))
                 if bs <= 8:  # identidad sobre el rango completo
@@ -219,6 +273,18 @@ for key, meta in summary.items():
         continue
     path = source_path(name)
     exp_meta = EXPECTED.get(name, {})
+    if not w and meta.get("text") is not None:
+        # Textos (juego de caracteres): fila propia "<fichero>#text", para que un fallo de texto no tape el de píxeles
+        try:
+            exp_text = expected_texts(path)
+            bad = [f"{k}: {meta['text'].get(k, '')!r} != {v!r}" for k, v in exp_text.items() if (meta["text"].get(k) or "") != v]
+            if bad:
+                fails += 1
+                rows.append((name + "#text", "FAIL", ("texto distinto: " + "; ".join(bad))[:300]))
+            elif any(ord(ch) > 127 for v in exp_text.values() for ch in v):
+                rows.append((name + "#text", "PASS", ("texto: " + " | ".join(v for v in exp_text.values() if v))[:120]))
+        except Exception as e:  # noqa: BLE001
+            rows.append((name + "#text", "SKIP", f"sin verdad de texto: {e}"[:90]))
     if exp_meta.get("kind") == "expect_fail":
         # Debe fallar de forma controlada: sin frames decodificados y sin excepción que tumbe el visor. Con
         # reason_contains, además, el motivo que enseña el visor tiene que mencionarlo (p. ej. "Sectra").

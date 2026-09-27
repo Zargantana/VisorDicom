@@ -78,7 +78,7 @@ const rss1 = rendererRSS();
 const results = [];
 const check = (name, ok, extra = '') => { results.push(ok); console.log(`${ok ? 'OK  ' : 'FAIL'} ${name}${extra ? ' :: ' + extra : ''}`); };
 check('el cargador termina', finished, `${status} en ${Math.round(msLoad / 1000)} s`);
-if (m) check('DICOM encontrados = ficheros con preámbulo DICM', +m[1] === expected.dicomFound, `${m[1]} vs ${expected.dicomFound}`);
+if (m) check('DICOM encontrados = ficheros que el cargador reconoce (con o sin preámbulo)', +m[1] === expected.dicomFound, `${m[1]} vs ${expected.dicomFound}`);
 if (notices) console.log('avisos del cargador: ' + notices.replace(/\s+/g, ' ').trim().slice(0, 300));
 
 // Selector de estudios en vivo del cargador: el árbol completo tiene que estar ahí antes de abrir el visor, y pulsar

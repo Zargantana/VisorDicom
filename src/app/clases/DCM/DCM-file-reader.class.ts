@@ -1,6 +1,7 @@
 import { DataTranslator } from "../../dictionaries/data-tag-elements";
 import { TXTranslator } from "../../dictionaries/transfer-syntaxes";
 import { Functions } from "../Crosscutting/Functions";
+import { DicomCharset } from "./DCM-charset.class";
 import { DCMFile } from "./DCM-file.class";
 import { DCMTag } from "./DCM-tag.class";
 
@@ -70,6 +71,12 @@ export class DCMFileReader {
     public InstanceNumber: number = 0;
     public FrameTime: number = 0;
     public HighBit: number = 0;
+    /** Specific Character Set (0008,0005) del dataset raíz, ya normalizado (DicomCharset.parse). [] = repertorio básico. */
+    public SpecificCharacterSet: string[] = [];
+    /** Sin File Meta Information (ACR-NEMA, datasets crudos): la TS se ha deducido de los primeros elementos. */
+    public noFileMeta: boolean = false;
+    /** Grupo 0002 en VR explícita, como manda PS3.10; algunos datasets de MESA lo escriben en implícita. */
+    private metaExplicit: boolean = true;
 
     private forceLittleEndianForHeaderActive: boolean = true;
     private _isLittleEndian: boolean = true;
@@ -113,8 +120,45 @@ export class DCMFileReader {
         this.readFile();
     }
 
+    /**
+     * Dónde empieza y cómo va codificado lo primero que se lee. Con preámbulo, en 132 y como siempre. Sin preámbulo
+     * (DCMFile.datasetOffset), en 0 o en 4; si no hay grupo 0002, la TS sale de los propios elementos: Implicit VR LE
+     * (lo habitual en ACR-NEMA), Explicit VR LE o Explicit VR Big Endian.
+     */
+    private startDataset(): void {
+        const raw = this.file.rawData;
+        const start = DCMFile.datasetOffset(raw) ?? 132;
+        this.current_position = start;
+        const enc = DCMFile.sniffDataset(raw, start);
+        if (!enc) {
+            return;
+        }
+        const firstGroup = enc.littleEndian
+            ? raw.charCodeAt(start) | (raw.charCodeAt(start + 1) << 8)
+            : (raw.charCodeAt(start) << 8) | raw.charCodeAt(start + 1);
+        if (firstGroup == 0x0002) {
+            this.metaExplicit = enc.explicit;
+            if (!enc.littleEndian) { // grupo 0002 en Big Endian (ficheros mal escritos)
+                this.isLittleEndian = false;
+                this.forceLittleEndianForHeaderActive = false;
+            }
+            return;
+        }
+        if (start == 132) {
+            return; // preámbulo sin grupo 0002: se sigue como antes (detección de VR en el primer elemento)
+        }
+        this.noFileMeta = true;
+        this.isVRExplicit = enc.explicit;
+        this.isLittleEndian = enc.littleEndian;
+        this.isPixelDataLittleEndian = enc.littleEndian;
+        this.forceLittleEndianForHeaderActive = false;
+        this.TransferSyntax = !enc.explicit ? '1.2.840.10008.1.2' : (enc.littleEndian ? '1.2.840.10008.1.2.1' : '1.2.840.10008.1.2.2');
+        this.TransferSyntaxName = TXTranslator.getName(this.TransferSyntax);
+    }
+
     private readFile(): void {
         this.isLittleEndian = true;
+        this.startDataset();
         while (this.current_position < this.file.length) {
             this.readTag();
             if (this.last_readed_tag && (this.last_readed_tag.TagHigh != 0 || this.last_readed_tag.TagLow != 0)) {
@@ -161,7 +205,15 @@ export class DCMFileReader {
                         }
                     }
                 } else if (this.last_readed_tag.TagHigh == 8) {
-                    if(this.last_readed_tag.TagLow == 0x18) {
+                    if(this.last_readed_tag.TagLow == 0x05) {
+                        this.SpecificCharacterSet = DicomCharset.parse(this.last_readed_tag.Value);
+                    } else if(this.last_readed_tag.TagLow == 0x16) {
+                        // SOP Class UID del dataset: manda el del grupo 0002 (Media Storage), pero sin él (ficheros sin
+                        // File Meta Information) es el único que hay
+                        if (!this.SOPClass && this.last_readed_tag.Value) {
+                            this.SOPClass = Functions.clearDCMImpairValue(this.last_readed_tag.Value);
+                        }
+                    } else if(this.last_readed_tag.TagLow == 0x18) {
                         if (this.last_readed_tag.Value) {
                             this.SOPInstanceUID = this.last_readed_tag.Value;
                         }
@@ -175,23 +227,23 @@ export class DCMFileReader {
                       }
                     } else if(this.last_readed_tag.TagLow == 0x1030) {
                       if (this.last_readed_tag.Value) {
-                          this.StudyDescription = Functions.clearDCMImpairValue(this.last_readed_tag.Value??'').trim();
+                          this.StudyDescription = this.last_readed_tag.Value; // texto: se decodifica al final (decodeTexts)
                       }
                     } else if(this.last_readed_tag.TagLow == 0x103E) {
                       if (this.last_readed_tag.Value) {
-                          this.SeriesDescription = Functions.clearDCMImpairValue(this.last_readed_tag.Value??'').trim();
+                          this.SeriesDescription = this.last_readed_tag.Value;
                       }
                     }
                 } else if (this.last_readed_tag.TagHigh == 0x10) {
                     if(this.last_readed_tag.TagLow == 0x20) {
                         if (this.last_readed_tag.Value) {
-                            this.PatientId = Functions.clearDCMImpairValue(this.last_readed_tag.Value).trim();
-                        }                      
+                            this.PatientId = this.last_readed_tag.Value;
+                        }
                     }
                     if(this.last_readed_tag.TagLow == 0x10) {
                         if (this.last_readed_tag.Value) {
-                            this.PatientName = Functions.clearDCMImpairValue(this.last_readed_tag.Value).trim();
-                        }                      
+                            this.PatientName = this.last_readed_tag.Value;
+                        }
                     }
                     if(this.last_readed_tag.TagLow == 0x40) {
                       if (this.last_readed_tag.Value) {
@@ -232,6 +284,29 @@ export class DCMFileReader {
                 break;
             }
         }
+        this.decodeTexts();
+    }
+
+    /**
+     * Textos que enseña el visor, decodificados con (0008,0005) cuando ya se ha leído todo el dataset (no depende del
+     * orden de las etiquetas). El relleno (espacios, NUL) se quita de los bytes ANTES de decodificar: un trim() sobre el
+     * binary string se comería bytes 0x85 o 0xA0 que en UTF-8 son parte de una letra ("Å", "à").
+     */
+    private decodeTexts(): void {
+        this.PatientName = this.text(this.PatientName, true);
+        this.PatientId = this.text(this.PatientId);
+        this.StudyDescription = this.text(this.StudyDescription);
+        this.SeriesDescription = this.text(this.SeriesDescription);
+    }
+
+    /**
+     * Valor de texto del dataset (binary string) -> texto Unicode sin relleno. En los nombres (PN) sobran los "="
+     * finales: "Wang^XiaoDong=王^小東=" (grupo fonético vacío) es el mismo nombre que sin él (PS3.5 6.2.1).
+     */
+    public text(raw: string | undefined | null, isPN: boolean = false): string {
+        const unpadded = (raw ?? '').replace(/^[ \0]+|[ \0]+$/g, '');
+        const value = DicomCharset.decode(unpadded, this.SpecificCharacterSet, isPN).replace(/\0/g, '').trim();
+        return isPN ? value.replace(/=+$/, '').trim() : value;
     }
 
     /**
@@ -286,7 +361,7 @@ export class DCMFileReader {
                     tag.VL = 0;
                 }
                 headerLength = 8;
-            } else if (tag.TagHigh == 2 || this.isVRExplicit) {
+            } else if (tag.TagHigh == 2 ? this.metaExplicit : this.isVRExplicit) {
                 tag.VR = raw.substring(pos + 4, pos + 6);
                 if (LONG_LENGTH_VRS.includes(tag.VR)) {
                     tag.setVL32(raw.substring(pos + 8, pos + 12), this.isLittleEndian);

@@ -304,7 +304,7 @@ export class DCMInterpreter {
         let tag = this.searchTopLevelFirst(0x0028,0x1055);
         let values: string[] = [];
         if (tag && tag.Value) {
-            values = Functions.clearDCMImpairValue(tag.Value).split('\\').map(v => v.trim());
+            values = this.reader.text(tag.Value).split('\\').map(v => v.trim()); // LO: con (0008,0005)
         }
         return values;
     }

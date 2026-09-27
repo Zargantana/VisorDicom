@@ -44,13 +44,20 @@ compara con pydicom cuando pydicom sabe decodificarlos y marca `SKIP` (no `FAIL`
 controlada con motivo (SR, RTSTRUCT, waveform, Float Pixel Data…) o cuando pydicom no puede dar la verdad.
 
 ```bash
-python tools/dicom-test/real/fetch_real_files.py          # → tools/dicom-test/out_real/real_*.dcm (158 ficheros; descarga pydicom-data a ~/.pydicom/data)
+python tools/dicom-test/real/fetch_real_files.py          # → tools/dicom-test/out_real/real_*.dcm (175: los 158 de pydicom y pydicom-data, que se descarga a ~/.pydicom/data, y sus 17 de juegos de caracteres)
 DICOM_TEST_OUT=tools/dicom-test/out_real node tools/dicom-test/run_harness.mjs
 DICOM_TEST_OUT=tools/dicom-test/out_real python tools/dicom-test/check_render.py
 ```
 
 Otras variables del harness: `DICOM_TEST_FILTER=<regex>` (solo esos ficheros) y `DICOM_TEST_VERBOSE=1` (traza de cada
 fichero).
+
+**Textos.** El harness guarda también los textos que enseña el visor ya decodificados con (0008,0005) (nombre, ID,
+descripciones) y si el cargador reconoce el fichero como DICOM (`isDicom`: con preámbulo o sin él). `check_render.py`
+compara esos textos con pydicom en una fila propia, `<fichero>#text` (sale en la lista solo si hay caracteres no ASCII
+o si difieren). Sin juego declarado, la verdad es el UTF-8 cuando los bytes lo son (el visor lo reconoce; pydicom los
+deja en Latin-1). Los ficheros sin preámbulo ni grupo 0002 se leen con `force=True` y la Transfer Syntax que deduce
+pydicom.
 
 ### Un corpus entero (carpetas anidadas, CD, archivos comprimidos)
 
@@ -76,7 +83,8 @@ Syntax y modalidad, y lista FAIL, CRASH, BIG y los motivos de los SKIP. `cd_brow
 por la interfaz ("Selecciona la unidad o carpeta"), compara el recuento del cargador y el árbol paciente → estudio →
 serie de la tabla de hallazgos con `expected_tree.py` (pydicom) y mide tiempos y memoria. El juego trae muestras NEMA WG04 (US1/RG1/RG3/MR2/693 en J2K y HTJ2K), Big Endian de todos los tipos (SC
 8/16/32 bits, paleta, RLE), JPEG de DCMTK y GDCM, Siemens con overlays, Aloka US, multiframe mejorado (`eCT_Supplemental`),
-mapas paramétricos en coma flotante, etc. Estado el 2026-09-26: **0 FAIL, 132 PASS, 29 SKIP** de 163 casos. Sigue sin
+mapas paramétricos en coma flotante, juegos de caracteres (árabe, hebreo, ruso, griego, japonés, coreano, chino), etc.
+Estado el 2026-09-27: **0 FAIL de 195 casos**, con los textos de los ficheros de juegos de caracteres iguales a pydicom. Sigue sin
 haber muestras públicas de las TS privadas (GE DLX, Papyrus, Sectra): `gdcmData` de SourceForge no se deja descargar en
 crudo (403), hay que bajarlo a mano.
 
@@ -123,6 +131,10 @@ crudo (403), hay que bajarlo a mano.
 | t75 | J2K con la **cabecera SIZ corrupta** (bytes de un delimitador FFFE,E0DD dentro del codestream, como en pydicom-data): rechazo con motivo; jpx.js no debe reservar memoria según un Xsiz absurdo |
 | t78 | **Multiframe mejorado** con functional groups de **longitud definida** (Siemens, Toshiba): rescale compartido y ventana distinta en cada frame (SIGMOID, LINEAR_EXACT). El lector entra en las secuencias de longitud definida y el pintado usa la ventana y el rescale del frame |
 | t79 | **VOI LUT Sequence** (0028,3010) de longitud definida en una CR MONOCHROME1 de 12 bits: LUT normalizada por su mínimo y máximo, buscada dentro de la secuencia (no en la Modality LUT) |
+| t89 | VOI LUT con **primer valor mapeado negativo** (descriptor US 63488 = -2048) en un CT de 12 bits con signo sin rescale (PS3.3 C.11.2.1.1: SS si la entrada de la LUT puede ser negativa). Antes salía negra |
+| t80-t84 | **Specific Character Set** (0008,0005): UTF-8 (ISO_IR 192), Latin-1 (ISO_IR 100), japonés con ISO 2022 (`\ISO 2022 IR 87`, nombre con los tres grupos), coreano con ISO 2022 (`\ISO 2022 IR 149`) y griego (ISO_IR 126). Los textos se comparan con pydicom (`#text`) |
+| t85 | UTF-8 **sin declarar** (0008,0005): el visor lo lee como UTF-8 porque los bytes lo son |
+| t86-t88 | DICOM **sin preámbulo**: dataset crudo en Implicit VR LE sin grupo 0002 (ACR-NEMA 2.0, MESA); grupo 0002 sin los 128 bytes ni "DICM"; "DICM" al principio sin los 128 bytes |
 | t77 | JPEG Baseline con **bytes de relleno 0xFF** delante de SOS y EOI (ISO 10918-1 B.1.1.2; las miniaturas "DicomObjects" de las láminas 3DHISTECH): el decoder los quita antes de JpegImage/libjpeg-turbo |
 | t76 (×2) | **Mismo estudio con dos Study Date distintas** (pasa en CD reales): el clasificador agrupa por Study Instance UID. Lo comprueba `real/classify_corpus.mjs tools/dicom-test/out` (árbol del visor frente a pydicom), que conviene pasar tras tocar `classifier-DCM.class.ts` |
 

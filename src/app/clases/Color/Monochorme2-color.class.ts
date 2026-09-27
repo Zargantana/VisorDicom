@@ -124,7 +124,18 @@ export class Monochorme2Color extends BaseColor {
                 if (lut[i] > lutMax) lutMax = lut[i];
             }
             const range = Math.max(1, lutMax - lutMin);
-            const first = this.VOIwindow.LUT.firstStoredPixelValueMapped;
+            // Primer valor mapeado (PS3.3 C.11.2.1.1): US o SS según la entrada de la VOI LUT. Es con signo si esa entrada
+            // puede ser negativa: la salida del rescale o, sin rescale, el píxel con Pixel Representation = 1. Entonces
+            // 63488 es -2048 (OFFIS vlut_09/vlut_10); antes se tomaba sin signo y la imagen salía negra.
+            const bits = this.reader.BitsStored || this.reader.BitsAllocated || 16;
+            const signedPixels = !!this.reader.PixelRepresentation;
+            const lowest = signedPixels ? -(2 ** (bits - 1)) : 0;
+            const highest = signedPixels ? 2 ** (bits - 1) - 1 : 2 ** bits - 1;
+            const signedInput = Math.min(this.applyRescale(lowest), this.applyRescale(highest)) < 0;
+            let first = this.VOIwindow.LUT.firstStoredPixelValueMapped;
+            if (signedInput && first >= 0x8000) {
+                first -= 0x10000;
+            }
             return (v) => {
                 const m = Math.round(this.applyRescale(v));
                 const index = Math.min(Math.max(m - first, 0), lut.length - 1);

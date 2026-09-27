@@ -35,8 +35,12 @@ export class SOPClassTranslator {
         return name;
     }
 
+    /**
+     * Comparación exacta. Antes era `DICOMDIR.includes(valor)`, y una cadena vacía siempre "está incluida": un fichero
+     * sin SOP Class (sin grupo 0002: ACR-NEMA, datasets crudos) se tomaba por DICOMDIR y no se clasificaba.
+     */
     public static isDICOMDIR(identifier:string): boolean{
-        let clean = Functions.clearDCMImpairValue(identifier);
-        return SOPClass_dictionary[0][0].includes(clean, 0);
+        const clean = Functions.clearDCMImpairValue(identifier ?? '').replace(/\0/g, '').trim();
+        return clean !== '' && clean === SOPClass_dictionary[0][0];
     }
 }

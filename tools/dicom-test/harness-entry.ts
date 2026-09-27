@@ -28,6 +28,15 @@ export async function renderBinaryString(bin: string, windowIndex: number = 0, m
     windowCount: typeof image.windowCount === 'number' ? image.windowCount : undefined,
     rgba: [] as Uint8ClampedArray[], error: undefined as string | undefined,
     decoded: 0, written: undefined as number[] | undefined,
+    // ¿Lo reconoce el cargador como DICOM? (con preámbulo o, sin él, un dataset que se deja leer)
+    isDicom: typeof (DCMFile as any).datasetOffset === 'function' ? (DCMFile as any).datasetOffset(bin) !== null : bin.substring(128, 132) === 'DICM',
+    noFileMeta: (reader as any).noFileMeta ?? false,
+    // Textos que enseña el visor, ya decodificados con (0008,0005): check_render.py los compara con pydicom
+    text: {
+      PatientName: reader.PatientName, PatientID: reader.PatientId,
+      StudyDescription: reader.StudyDescription, SeriesDescription: reader.SeriesDescription,
+      charset: ((reader as any).SpecificCharacterSet ?? []).join('\\'),
+    },
   };
   try {
     if (typeof image.renderFrameRGBA === 'function') {       // codigo nuevo

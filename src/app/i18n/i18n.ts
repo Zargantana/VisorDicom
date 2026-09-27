@@ -1,5 +1,6 @@
 import { CA } from './ca';
 import { DE } from './de';
+import { EL } from './el';
 import { EN } from './en';
 import { ES } from './es';
 import { EU } from './eu';
@@ -7,10 +8,15 @@ import { FR } from './fr';
 import { GL } from './gl';
 import { IT } from './it';
 import { JA } from './ja';
+import { KO } from './ko';
 import { PT } from './pt';
+import { RU } from './ru';
 import { Lang, LANGS, Texts } from './texts';
+import { ZH } from './zh';
 
-const DICTIONARIES: Record<Lang, Texts> = { es: ES, en: EN, ca: CA, eu: EU, gl: GL, pt: PT, fr: FR, it: IT, de: DE, ja: JA };
+const DICTIONARIES: Record<Lang, Texts> = {
+  es: ES, en: EN, ca: CA, eu: EU, gl: GL, pt: PT, fr: FR, it: IT, de: DE, ja: JA, zh: ZH, ru: RU, ko: KO, el: EL,
+};
 
 /**
  * Idioma de la interfaz. Estático como `ThemeService`: no hay que inyectar nada y el pipe `t` (impuro) vuelve a leer
@@ -75,8 +81,8 @@ export class I18n {
   }
 
   /**
-   * Idioma para el Managed Login de Cognito, que solo tiene un puñado (en, es, pt-BR, fr, de, it, ja…): catalán,
-   * euskera y gallego caen al español.
+   * Idioma para el Managed Login de Cognito, que solo tiene un puñado (en, es, pt-BR, fr, de, it, ja, ko, zh-CN…):
+   * catalán, euskera y gallego caen al español; ruso y griego, que Cognito no tiene, al inglés.
    */
   public static cognitoLang(): string {
     switch (this.current) {
@@ -86,6 +92,10 @@ export class I18n {
       case 'it': return 'it';
       case 'de': return 'de';
       case 'ja': return 'ja';
+      case 'ko': return 'ko';
+      case 'zh': return 'zh-CN';
+      case 'ru':
+      case 'el': return 'en';
       default: return 'es';
     }
   }

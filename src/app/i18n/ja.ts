@@ -1,6 +1,6 @@
 import { Texts } from './texts';
 
-/** 日本語. Traducción hecha sin hablante nativo: conviene que la revise uno. */
+/** 日本語. */
 export const JA: Texts = {
   'topbar.login': 'ログイン',
   'topbar.kind.doctor': '医師',
@@ -79,7 +79,7 @@ export const JA: Texts = {
   'news.h5.b': 'CD を丸ごと一度に:', 'news.h5.t': 'フォルダーをドラッグすると、読み込みながら患者・シリーズ順に検査が並んでいきます。',
   'news.h6.b': 'より多くの検査を表示:', 'news.h6.t': '対応する画像・カラー形式が増え、複数のコントラスト設定を持つ検査ではそれを選べます。',
   'news.h7.b': 'あらゆる端末で:', 'news.h7.t': 'Windows、Linux、Mac、Android、iOS。PC、タブレット、スマートフォン。',
-  'news.h8.b': 'お好きな言語で:', 'news.h8.t': 'スペイン語、英語、カタルーニャ語、バスク語、ガリシア語、ポルトガル語、フランス語、イタリア語、ドイツ語、日本語。右上の地球儀ボタンで選べます。',
+  'news.h8.b': 'お好きな言語で:', 'news.h8.t': 'スペイン語、英語、カタルーニャ語、バスク語、ガリシア語、ポルトガル語、フランス語、イタリア語、ドイツ語、日本語、中国語、ロシア語、韓国語、ギリシャ語。右上の地球儀ボタンで選べます。',
   'news.more': 'もっと見る...',
   'news.less': '...閉じる',
   'news.hist.1': 'ビューアーの無料オープンソース版 VisorDicom が誕生。',

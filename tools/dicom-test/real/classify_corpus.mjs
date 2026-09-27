@@ -2,7 +2,7 @@
 /*
  * Clasifica una carpeta (CD) con el código del visor en Node y lo compara con pydicom (expected_tree.py).
  *   node tools/dicom-test/real/classify_corpus.mjs <carpeta> [--python <python con pydicom>]
- * Solo entran los ficheros con preámbulo "DICM" (los que reconoce el cargador del visor).
+ * Solo entran los ficheros que reconoce el cargador del visor (con preámbulo "DICM" o sin él: DCMFile.datasetOffset).
  */
 import fs from 'node:fs';
 import path from 'node:path';
@@ -30,7 +30,7 @@ const bundle = path.join(root, 'tools', 'dicom-test', 'out', 'classify.bundle.cj
 fs.mkdirSync(path.dirname(bundle), { recursive: true });
 await build({ entryPoints: [path.join(here, 'classify-entry.ts')], bundle: true, platform: 'node', format: 'cjs', outfile: bundle,
   logLevel: 'error', tsconfig: path.join(root, 'tsconfig.json'), external: ['@angular/core'] });
-const { classifyAll } = createRequire(import.meta.url)(bundle);
+const { classifyAll, isDicomHead } = createRequire(import.meta.url)(bundle);
 
 const files = [];
 // render/, ref/ y big/ son salidas del harness (out/): no forman parte de un "CD"
@@ -39,8 +39,8 @@ const walk = dir => { for (const e of fs.readdirSync(dir, { withFileTypes: true 
 walk(folder);
 const dicom = [];
 for (const p of files.sort()) {
-  const fd = fs.openSync(p, 'r'); const head = Buffer.alloc(132); const n = fs.readSync(fd, head, 0, 132, 0); fs.closeSync(fd);
-  if (n === 132 && head.toString('latin1', 128, 132) === 'DICM') dicom.push({ name: path.relative(folder, p), bin: fs.readFileSync(p).toString('latin1') });
+  const fd = fs.openSync(p, 'r'); const head = Buffer.alloc(2048); const n = fs.readSync(fd, head, 0, 2048, 0); fs.closeSync(fd);
+  if (isDicomHead(head.toString('latin1', 0, n))) dicom.push({ name: path.relative(folder, p), bin: fs.readFileSync(p).toString('latin1') });
 }
 const t0 = Date.now();
 const r = await classifyAll(dicom);

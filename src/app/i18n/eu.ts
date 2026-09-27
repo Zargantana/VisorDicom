@@ -1,6 +1,6 @@
 import { Texts } from './texts';
 
-/** Euskara. Traducción hecha sin hablante nativo: conviene que la revise uno. */
+/** Euskara. */
 export const EU: Texts = {
   'topbar.login': 'Hasi saioa',
   'topbar.kind.doctor': 'Medikua',
@@ -79,7 +79,7 @@ export const EU: Texts = {
   'news.h5.b': 'CD osoa aldi berean:', 'news.h5.t': 'arrastatu karpeta eta azterketak agertzen ikusiko dituzu, pazienteka eta serieka ordenatuta, irakurtzen diren bitartean.',
   'news.h6.b': 'Azterketa gehiago ikusten dira:', 'news.h6.t': 'irudi- eta kolore-formatu gehiago, eta kontrastea aukera dezakezu azterketak hainbat dakartzanean.',
   'news.h7.b': 'Edozein gailutan:', 'news.h7.t': 'Windows, Linux eta Mac; Android eta iOS. PC, tableta eta mugikorra.',
-  'news.h8.b': 'Zure hizkuntzan:', 'news.h8.t': 'gaztelania, ingelesa, katalana, euskara, galiziera, portugesa, frantsesa, italiera, alemana eta japoniera. Aukeratu goiko eskuineko globo-botoiarekin.',
+  'news.h8.b': 'Zure hizkuntzan:', 'news.h8.t': 'gaztelania, ingelesa, katalana, euskara, galiziera, portugesa, frantsesa, italiera, alemana, japoniera, txinera, errusiera, koreera eta greziera. Aukeratu goiko eskuineko globo-botoiarekin.',
   'news.more': 'gehiago...',
   'news.less': '...gutxiago',
   'news.hist.1': 'VisorDicom jaio da, ikustailearen bertsio libre eta doakoa.',

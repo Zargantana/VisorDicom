@@ -10,6 +10,18 @@ export const DEFLATED_EXPLICIT_VR_LITTLE_ENDIAN = '1.2.840.10008.1.2.1.99';
  * resultado vacio. Plan para superarlo: documentation/plan-carga-ficheros-grandes.md (lectura por trozos con File.slice).
  */
 export const MAX_BINARY_STRING_BYTES = (1 << 29) - 24;
+/**
+ * Bytes que se leen al principio para decidir si un fichero es DICOM: el preámbulo y "DICM" (132) o, sin preámbulo,
+ * los primeros elementos del dataset (ver DCMFile.sniffDataset).
+ */
+export const HEAD_BYTES = 2048;
+/** VRs con longitud de 4 bytes en Explicit VR (PS3.5 tabla 7.1-1); copia local para no importar el lector (ciclo). */
+const LONG_VRS = ['OB', 'OD', 'OF', 'OL', 'OV', 'OW', 'SQ', 'SV', 'UC', 'UN', 'UR', 'UT', 'UV'];
+const VRS = ['AE', 'AS', 'AT', 'CS', 'DA', 'DS', 'DT', 'FD', 'FL', 'IS', 'LO', 'LT', 'OB', 'OD', 'OF', 'OL', 'OV', 'OW',
+    'PN', 'SH', 'SL', 'SQ', 'SS', 'ST', 'SV', 'TM', 'UC', 'UI', 'UL', 'UN', 'UR', 'US', 'UT', 'UV'];
+
+/** Codificación de un dataset deducida de sus primeros elementos (ficheros sin File Meta Information). */
+export interface DatasetEncoding { explicit: boolean; littleEndian: boolean; }
 
 export enum FILEREAD_STATUS {
     NONE = 0,
@@ -74,7 +86,7 @@ export class DCMFile {
     public readContents(): void {
         this.resetReadResults();
         this.started = true;
-        let sliced = this.file.slice(0,132);
+        let sliced = this.file.slice(0, HEAD_BYTES);
         this.freader.readAsBinaryString(sliced);
     }
 
@@ -96,14 +108,108 @@ export class DCMFile {
         this.freader.readAsBinaryString(this.file);
     }
 
-    //TODO: Evitar reconocer un DICOMDIR como fichero DICOM.
+    /** DICOM con preámbulo y "DICM" o, sin preámbulo, un dataset que se deja leer (ACR-NEMA, datasets crudos). */
     private isDICOMFile(): boolean {
-        let DICOMLabel = this.rawData.substring(128, 132);
-        //console.log('Label found: ' + DICOMLabel);
-        //console.log('Id DICOM: ' + (DICOMLabel == DICOM_LABEL));
-        const result = (DICOMLabel == DICOM_LABEL);
+        const result = DCMFile.datasetOffset(this.rawData) !== null;
         this.isDCMSubscriber?.next(result);
         return result;
+    }
+
+    /**
+     * Dónde empieza el dataset (o el File Meta Information):
+     * - 132: preámbulo de 128 bytes + "DICM" (PS3.10 7.1), lo normal;
+     * - 4: "DICM" sin el preámbulo (algunos programas lo quitan);
+     * - 0: sin preámbulo ni "DICM" (ACR-NEMA 2.0, datasets escritos tal cual por MESA y otros): se acepta si los primeros
+     *   elementos forman un dataset (sniffDataset).
+     * null si no parece DICOM.
+     */
+    public static datasetOffset(raw: string): number | null {
+        if (raw.length >= 132 && raw.substring(128, 132) == DICOM_LABEL) {
+            return 132;
+        }
+        if (raw.startsWith(DICOM_LABEL) && DCMFile.sniffDataset(raw, 4)) {
+            return 4;
+        }
+        return DCMFile.sniffDataset(raw, 0) ? 0 : null;
+    }
+
+    /**
+     * ¿Hay un dataset en `start`? Se prueban Little y Big Endian, VR explícita e implícita, y vale la primera lectura en la
+     * que los elementos tienen sentido: primer grupo 0000, 0002 u 0008 (identificación), etiquetas en orden creciente, VR
+     * válidas (en explícita) y longitudes que caben. Hacen falta tres elementos, o dos si el siguiente ya no cabe en los
+     * bytes leídos. Un fichero que no es DICOM (texto, imagen, ejecutable) no pasa de ahí. El grupo 0002 va en Explicit VR
+     * Little Endian (en algunos datasets de MESA, en VR implícita); si lo hay, basta con él: la TS del dataset la dice él.
+     */
+    public static sniffDataset(raw: string, start: number): DatasetEncoding | null {
+        for (const littleEndian of [true, false]) {
+            for (const explicit of [true, false]) {
+                if (DCMFile.parsesAs(raw, start, explicit, littleEndian)) {
+                    return { explicit, littleEndian };
+                }
+            }
+        }
+        return null;
+    }
+
+    private static parsesAs(raw: string, start: number, explicit: boolean, le: boolean): boolean {
+        const b = (at: number) => raw.charCodeAt(at);
+        const u16 = (at: number, little: boolean) => little ? (b(at) | (b(at + 1) << 8)) : ((b(at) << 8) | b(at + 1));
+        const u32 = (at: number, little: boolean) => little
+            ? u16(at, true) + u16(at + 2, true) * 65536
+            : u16(at, false) * 65536 + u16(at + 2, false);
+        let pos = start;
+        let count = 0;
+        let last = -1;
+        while (pos + 8 <= raw.length) {
+            if (u16(pos, true) == 0x0002 && !le) {
+                return false; // el grupo 0002 va en Little Endian (a veces, mal escrito, en VR implícita)
+            }
+            const little = le;
+            const group = u16(pos, little);
+            const element = u16(pos + 2, little);
+            if (count == 0 && group != 0x0000 && group != 0x0002 && group != 0x0008) {
+                return false;
+            }
+            if (count > 0 && last >>> 16 == 0x0002 && group != 0x0002) {
+                return count >= 2; // File Meta Information completo: el dataset sigue con su propia TS
+            }
+            const tag = group * 65536 + element;
+            if (tag <= last || group == 0xFFFE) {
+                return false;
+            }
+            let header = 8;
+            let length: number;
+            if (explicit) {
+                const vr = raw.substring(pos + 4, pos + 6);
+                if (!VRS.includes(vr)) {
+                    return false;
+                }
+                if (LONG_VRS.includes(vr)) {
+                    if (pos + 12 > raw.length) {
+                        break;
+                    }
+                    length = u32(pos + 8, little);
+                    header = 12;
+                } else {
+                    length = u16(pos + 6, little);
+                }
+            } else {
+                length = u32(pos + 4, little);
+            }
+            count++;
+            last = tag;
+            if (length == 0xFFFFFFFF) {
+                return count >= 2; // secuencia de longitud indefinida: lo que había antes ya cuadraba
+            }
+            if (length > 0x7FFFFFFF) {
+                return false;
+            }
+            pos += header + length;
+            if (count >= 3) {
+                return true;
+            }
+        }
+        return count >= 2 && pos >= raw.length;
     }
 
     private resetReadResults(): void {
@@ -199,10 +305,11 @@ export class DCMFile {
      * y rawData queda como un Explicit VR Little Endian normal (el TS del meta header no se toca).
      */
     public async inflateIfDeflated(): Promise<void> {
-        if (this.inflated || this.rawData.length <= 132) {
+        const start = DCMFile.datasetOffset(this.rawData);
+        if (this.inflated || start === null || this.rawData.length <= start) {
             return;
         }
-        const meta = DCMFile.scanFileMetaInformation(this.rawData);
+        const meta = DCMFile.scanFileMetaInformation(this.rawData, start);
         if (!meta || meta.transferSyntax !== DEFLATED_EXPLICIT_VR_LITTLE_ENDIAN) {
             return;
         }
@@ -241,10 +348,10 @@ export class DCMFile {
     }
 
     /** Recorre el grupo 0002 (siempre Explicit VR LE) y devuelve el TS y el offset donde empieza el dataset. */
-    public static scanFileMetaInformation(raw: string): { transferSyntax: string, end: number } | null {
+    public static scanFileMetaInformation(raw: string, start: number = 132): { transferSyntax: string, end: number } | null {
         const u16 = (at: number) => raw.charCodeAt(at) | (raw.charCodeAt(at + 1) << 8);
         const u32 = (at: number) => (u16(at) + u16(at + 2) * 65536);
-        let pos = 132;
+        let pos = start;
         let transferSyntax = '';
         while (pos + 8 <= raw.length && u16(pos) == 0x0002) {
             const element = u16(pos + 2);
@@ -257,7 +364,7 @@ export class DCMFile {
             }
             pos += header + vl;
         }
-        return (pos > 132) ? { transferSyntax, end: pos } : null;
+        return (pos > start) ? { transferSyntax, end: pos } : null;
     }
 
     public static bytesToBinaryString(bytes: Uint8Array): string {

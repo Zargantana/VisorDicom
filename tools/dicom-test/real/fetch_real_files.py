@@ -15,7 +15,7 @@ import shutil
 import sys
 
 import pydicom.data as pdata
-from pydicom.data import get_testdata_file, get_testdata_files
+from pydicom.data import get_charset_files, get_testdata_file, get_testdata_files
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 OUT = os.path.abspath(sys.argv[1]) if len(sys.argv) > 1 else os.path.join(HERE, "..", "out_real")
@@ -39,6 +39,14 @@ for name in sorted(names):
         missing.append(name)
         continue
     dst = os.path.join(OUT, "real_" + name)
+    if not os.path.exists(dst) or os.path.getsize(dst) != os.path.getsize(src):
+        shutil.copyfile(src, dst)
+    copied += 1
+
+# Juegos de caracteres (chrArab, chrH31, chrKoreanMulti, chrX1…): nombres en árabe, hebreo, ruso, griego, japonés,
+# coreano y chino con y sin extensiones ISO 2022. check_render compara los textos del visor con los de pydicom.
+for src in get_charset_files("*.dcm"):
+    dst = os.path.join(OUT, "real_charset_" + os.path.basename(src))
     if not os.path.exists(dst) or os.path.getsize(dst) != os.path.getsize(src):
         shutil.copyfile(src, dst)
     copied += 1

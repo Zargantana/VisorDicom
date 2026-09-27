@@ -79,7 +79,7 @@ export const GL: Texts = {
   'news.h5.b': 'O CD enteiro dunha vez:', 'news.h5.t': 'arrastra o cartafol e verás como aparecen os estudos, ordenados por paciente e serie, mentres se len.',
   'news.h6.b': 'Vense máis estudos:', 'news.h6.t': 'máis formatos de imaxe e de cor, e podes escoller o contraste cando o estudo trae varios.',
   'news.h7.b': 'En calquera dispositivo:', 'news.h7.t': 'Windows, Linux e Mac; Android e iOS. PC, tableta e móbil.',
-  'news.h8.b': 'No teu idioma:', 'news.h8.t': 'castelán, inglés, catalán, éuscaro, galego, portugués, francés, italiano, alemán e xaponés. Escólleo co botón do globo, arriba á dereita.',
+  'news.h8.b': 'No teu idioma:', 'news.h8.t': 'castelán, inglés, catalán, éuscaro, galego, portugués, francés, italiano, alemán, xaponés, chinés, ruso, coreano e grego. Escólleo co botón do globo, arriba á dereita.',
   'news.more': 'máis...',
   'news.less': '...menos',
   'news.hist.1': 'Nace VisorDicom, a versión libre e gratuíta do visor.',

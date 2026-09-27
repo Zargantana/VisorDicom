@@ -116,9 +116,14 @@ export class FindingsTableComponent {
     return (value ?? '').replace(/\0/g, '').trim();
   }
 
-  /** PN "Apellidos^Nombre^Segundo" -> "Apellidos Nombre Segundo" (sin los separadores del estándar). */
+  /**
+   * PN "Apellidos^Nombre^Segundo" -> "Apellidos Nombre Segundo" (sin los separadores del estándar). Con varios grupos
+   * ("Yamada^Tarou=山田^太郎=やまだ^たろう": alfabético, ideográfico, fonético), el primero que no esté vacío.
+   */
   private static personName(value: string | undefined | null): string {
-    return FindingsTableComponent.clean(value).split('=')[0].split('^').map(p => p.trim()).filter(Boolean).join(' ');
+    const groups = FindingsTableComponent.clean(value).split('=')
+      .map(g => g.split('^').map(p => p.trim()).filter(Boolean).join(' '));
+    return groups.find(Boolean) ?? '';
   }
 
   /** DA "AAAAMMDD" -> "DD/MM/AAAA"; cualquier otra cosa se enseña tal cual. */

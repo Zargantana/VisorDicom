@@ -248,7 +248,9 @@ export class classifierDCM {
       let studySplitSerie: DCMFileReader[];
       let modalitySplitSerie: DCMFileReader[];
 
-      if (!SOPClassTranslator.isDICOMDIR(reader.SOPClass)) {
+      // Sin SOP Class (ni en 0002 ni en 0008: ACR-NEMA 1.0) solo entra si trae imagen; el DICOMDIR nunca
+      const hasSopClass = !!reader.SOPClass.replace(/\0/g, '').trim();
+      if (!SOPClassTranslator.isDICOMDIR(reader.SOPClass) && (hasSopClass || reader.Rows > 0)) {
         studySplitPatient = this.searchPatient(this.studySplit, reader.PatientId);
         studySplitStudy =  this.searchStudySplitStudy(studySplitPatient, reader);
         studySplitModality = this.searchStudySplitModality(studySplitStudy, reader);

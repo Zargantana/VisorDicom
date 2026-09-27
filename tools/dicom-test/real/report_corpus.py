@@ -20,8 +20,9 @@ def main():
     by_rel = {r["rel"]: r for r in inventory}
 
     def status_of(key):
-        """Estado final de un fichero (clave sin #w): FAIL manda; luego CRASH, BIG, TILES, SIN_META, SKIP, PASS, PENDIENTE."""
-        keys = [k for k in check if k.split("#w")[0] == key]
+        """Estado final de un fichero (clave sin #w ni #text): FAIL manda; luego CRASH, BIG, TILES, SIN_META, SKIP, PASS,
+        PENDIENTE. Las filas "#text" (textos decodificados frente a pydicom) cuentan como las de píxeles."""
+        keys = [k for k in check if k.split("#")[0] == key]
         meta = render.get(key)
         inv = by_rel.get(manifest[key]["rel"], {})
         if meta is None:
@@ -32,14 +33,14 @@ def main():
             return "BIG", meta.get("unsupportedReason", "")
         if meta.get("skippedTiles"):
             return "TILES", meta.get("unsupportedReason", "")
-        # Sin preámbulo "DICM" (ACR-NEMA, datasets crudos): el cargador del visor ni los reconoce; no cuentan aunque
-        # el harness los haya decodificado (pydicom tampoco da verdad sin meta header)
-        if not inv.get("part10", True):
-            return "SIN_META", "sin preámbulo DICM: el cargador no lo reconoce como DICOM"
+        # Sin preámbulo "DICM" (ACR-NEMA, datasets crudos): desde el 2026-09-27 el cargador los reconoce si sus primeros
+        # elementos forman un dataset (DCMFile.sniffDataset); SIN_META queda para los que ni así (isDicom del harness)
+        if not inv.get("part10", True) and not meta.get("isDicom"):
+            return "SIN_META", "sin preámbulo DICM y sin un dataset reconocible: el cargador no lo reconoce como DICOM"
         if not keys:
             return "PENDIENTE", "sin comparar"
         sts = [check[k]["status"] for k in keys]
-        det = "; ".join(f"{k.split('#w')[1] if '#w' in k else 'w0'}: {check[k]['detail']}" for k in keys)
+        det = "; ".join(f"{k.split('#', 1)[1] if '#' in k else 'w0'}: {check[k]['detail']}" for k in keys)
         if "FAIL" in sts:
             return "FAIL", det
         if all(s == "SKIP" for s in sts):
@@ -59,7 +60,8 @@ def main():
     lines = ["# Corpus de imágenes reales: resultado del visor", "",
              f"Imágenes: {len(rows)} · " + " · ".join(f"{s}: {tot.get(s, 0)}" for s in order), "",
              "PASS = píxeles iguales a pydicom (±3, o tolerancia de compresión con pérdida). SKIP = rechazo controlado con motivo o sin verdad "
-             "de pydicom. SIN_META = sin preámbulo DICM (el cargador del visor no los reconoce). BIG = mayor que el tope de la versión actual "
+             "de pydicom. SIN_META = sin preámbulo DICM ni dataset reconocible (el cargador del visor no los reconoce). "
+             "Los textos (nombre, ID, descripciones) se comparan también con pydicom. BIG = mayor que el tope de la versión actual "
              "(string del navegador). TILES = lámina de patología por tiles (miles de frames), fuera del alcance. CRASH = tumbó el proceso de "
              "Node. FAIL = se pinta pero distinto de pydicom, o error.", ""]
 
