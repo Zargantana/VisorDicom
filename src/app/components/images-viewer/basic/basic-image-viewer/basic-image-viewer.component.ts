@@ -2,6 +2,7 @@ import { AfterViewInit, Component, DoCheck, ElementRef, EventEmitter, HostListen
 import { DCMFileReader } from 'src/app/clases/DCM/DCM-file-reader.class';
 import { classifierDCM } from 'src/app/clases/Images/classifier-DCM.class';
 import { ImageDCM, VOIWindowOption } from 'src/app/clases/Images/image-DCM.class';
+import { I18n } from 'src/app/i18n/i18n';
 import { ThemeService } from 'src/app/services/theme.service';
 import { VIEWER_UPLOAD_HANDLER, ViewerUploadHandler } from '../../viewer-upload-handler';
 import { ViewerFullscreen } from '../../viewer-fullscreen';
@@ -187,6 +188,49 @@ export class BasicImageViewerComponent implements AfterViewInit, DoCheck, OnDest
   public infoClick() {
     this.imageInfo = !this.imageInfo;
     this.enqueueRatioRecalc();
+  }
+
+  /** El botón de copiar acaba de copiar (icono de check un momento) */
+  public copied = false;
+
+  /**
+   * Copia al portapapeles la imagen tal como se ve (PNG con la ventana aplicada) junto con la línea de datos
+   * (paciente, fecha, serie, imagen): como PNG, como texto y como HTML, para que Word o el correo peguen las dos
+   * cosas. Si el navegador no admite varios formatos (Safari), se copia solo la imagen.
+   */
+  public async copyImage(): Promise<void> {
+    const img = this.imageDisplay?.nativeElement;
+    if (!img || !img.naturalWidth || typeof ClipboardItem === 'undefined' || !navigator.clipboard?.write) return;
+    try {
+      const canvas = document.createElement('canvas');
+      canvas.width = img.naturalWidth;
+      canvas.height = img.naturalHeight;
+      canvas.getContext('2d')!.drawImage(img, 0, 0);
+      const png = await new Promise<Blob>((resolve, reject) => canvas.toBlob((b) => (b ? resolve(b) : reject(new Error('sin imagen'))), 'image/png'));
+      const caption = this.caption();
+      const escape = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+      const html = `<p>${escape(caption)}</p><img src="${canvas.toDataURL('image/png')}" alt="${escape(caption)}">`;
+      try {
+        await navigator.clipboard.write([new ClipboardItem({
+          'image/png': png,
+          'text/plain': new Blob([caption], { type: 'text/plain' }),
+          'text/html': new Blob([html], { type: 'text/html' }),
+        })]);
+      } catch {
+        await navigator.clipboard.write([new ClipboardItem({ 'image/png': png })]);
+      }
+      this.copied = true;
+      setTimeout(() => { this.copied = false; }, 1500);
+    } catch (e) {
+      console.warn('No se pudo copiar la imagen', e);
+    }
+  }
+
+  /** La línea de datos que se muestra sobre la imagen, en el idioma de la interfaz */
+  private caption(): string {
+    const r = this.reader;
+    if (!r) return '';
+    return `${I18n.t('viewer.patientId')} ${r.PatientId} ${I18n.t('viewer.studyDate')} ${r.StudyDate} ${I18n.t('viewer.seriesNumber')} #${r.SeriesNumber} ${I18n.t('viewer.image')} #${r.InstanceNumber}`;
   }
 
   public enqueueRatioRecalc() {

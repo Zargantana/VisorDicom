@@ -2,6 +2,7 @@ import { Component } from '@angular/core';
 import { DCMFile } from 'src/app/clases/DCM/DCM-file.class';
 import { ViewSeriesRequest } from 'src/app/components/images-loader/images-loader.component';
 import { ImagesViewerComponent } from 'src/app/components/images-viewer/images-viewer.component';
+import { ViewerFullscreen } from 'src/app/components/images-viewer/viewer-fullscreen';
 import { ThemeService } from 'src/app/services/theme.service';
 
 @Component({
@@ -15,10 +16,15 @@ import { ThemeService } from 'src/app/services/theme.service';
 })
 export class DirLoaderComponent {
   public foundDCMFiles: DCMFile[] = [];
-  /** El visor se muestra cuando el usuario lo pide con "Ver imágenes"; la lectura sigue mientras tanto. */
+  /** El visor se muestra cuando el usuario pulsa una serie del selector; la lectura sigue mientras tanto. */
   public showViewer: boolean = false;
 
   constructor() { }
+
+  /** En pantalla completa del visor no hay barra ("Estudios encontrados"): solo la imagen */
+  public viewerFullscreen(): boolean {
+    return ViewerFullscreen.active;
+  }
 
   /** Muestra el visor. Como estaba oculto, sus medidas eran cero: se le avisa como si la ventana cambiara de tamaño. */
   public openViewer(): void {

@@ -49,6 +49,10 @@
                 <i class="fa-solid fa-box-archive fa-1x"></i>
               </button>
             }
+            <!-- Copiar la imagen pintada (PNG) con sus datos al portapapeles: se pega en Word, correo, etc. -->
+            <button (click)="copyImage()" [title]="(copied ? 'viewer.copied' : 'viewer.copy') | t">
+              <i class="fa-solid fa-1x" [class.fa-copy]="!copied" [class.fa-check]="copied"></i>
+            </button>
             <button (click)="infoClick()">
               <i class="fa-solid fa-info-circle fa-1x"></i>
             </button>

@@ -2,9 +2,10 @@
     <!-- Barra siempre visible: elegir, y pasar al visor cuando se quiera (la lectura sigue por detrás) -->
     <!-- A la izquierda: el botón de elegir antes de leer; después, "Ver imágenes" o "Carga" -->
     <!-- La barra solo aparece antes de elegir (botón de elegir) y en el visor (volver a los estudios encontrados). En la
-         pantalla de carga el acceso al visor es el selector de estudios: sin botón "Ver imágenes" (2026-09-27). -->
+         pantalla de carga el acceso al visor es el selector de estudios: sin botón "Ver imágenes" (2026-09-27). En
+         pantalla completa tampoco: solo la imagen. -->
     <input type="file" id="dirPicker" name="dirPicker" class="d-none" (change)="imgsLoader.onSelected($event)" #dirUpload webkitDirectory multiple/>
-    @if (imgsLoader.totalFiles == 0 || showViewer) {
+    @if ((imgsLoader.totalFiles == 0 || showViewer) && !viewerFullscreen()) {
         <div class="loader-bar d-flex align-items-center justify-content-start flex-wrap px-3 py-2 border-bottom" [class.border-dark]="!isDark()" [class.border-light]="isDark()">
             @if (imgsLoader.totalFiles == 0) {
                 <label for="dirPicker" class="btn btn-primary loader-choose m-0"><i class="fa-solid fa-folder-open"></i> {{'loader.chooseFolder' | t}}</label>

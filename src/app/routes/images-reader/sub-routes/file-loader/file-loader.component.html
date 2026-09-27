@@ -2,9 +2,16 @@
     <!-- Barra siempre visible: elegir, y pasar al visor cuando se quiera (la lectura sigue por detrás) -->
     <!-- A la izquierda: el botón de elegir antes de leer; después, "Ver imágenes" o "Carga" -->
     <!-- La barra solo aparece antes de elegir (botón de elegir) y en el visor (volver a los estudios encontrados). En la
-         pantalla de carga el acceso al visor es el selector de estudios: sin botón "Ver imágenes" (2026-09-27). -->
+         pantalla de carga el acceso al visor es el selector de estudios: sin botón "Ver imágenes" (2026-09-27). En
+         pantalla completa tampoco: solo la imagen. -->
     <input type="file" id="file" name="file" class="d-none" multiple (change)="imgsLoader.onSelected($event)" #fileUpload/>
-    @if (imgsLoader.totalFiles == 0 || showViewer) {
+    @if (remoteStatus) {
+        <!-- Enlace QR: descargando la serie, o enlace caducado -->
+        <div class="loader-remote px-3 py-2 text-center" [class.text-danger]="remoteError" [class.blink_me]="!remoteError">
+            <i class="fa-solid" [class.fa-qrcode]="!remoteError" [class.fa-triangle-exclamation]="remoteError"></i> {{remoteStatus}}
+        </div>
+    }
+    @if ((imgsLoader.totalFiles == 0 || showViewer) && !viewerFullscreen()) {
         <div class="loader-bar d-flex align-items-center justify-content-start flex-wrap px-3 py-2 border-bottom" [class.border-dark]="!isDark()" [class.border-light]="isDark()">
             @if (imgsLoader.totalFiles == 0) {
                 <label for="file" class="btn btn-primary loader-choose m-0"><i class="fa-solid fa-file-circle-plus"></i> {{'loader.chooseFiles' | t}}</label>
@@ -22,7 +29,7 @@
         <div class="d-flex slab-flex-1 m-0 p-0" [class.d-none]="showViewer">
             <images-loader #imgsLoader [foundDCMFiles]="foundDCMFiles" [classifier]="imgsViewer.classifier" pickerId="file"
                 class="d-flex slab-flex-1 m-0 p-0"
-                (allFilesReaded)="imgsViewer.StartWatchingDCMFile();"
+                (allFilesReaded)="onAllRead(imgsViewer)"
                 (someDCMFound)="imgsViewer.Classify();"
                 (openViewer)="openViewer()"
                 (viewSeries)="openSeries(imgsViewer, $event)">

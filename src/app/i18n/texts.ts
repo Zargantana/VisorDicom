@@ -44,6 +44,8 @@ export interface Texts {
   'loader.chooseFolder': string;
   'loader.back': string;
   'loader.chooseOther': string;
+  'loader.qrLoading': string;
+  'loader.qrExpired': string;
   'loader.drop.1': string;
   'loader.drop.or': string;
   'loader.drop.drag': string;
@@ -83,6 +85,10 @@ export interface Texts {
   'viewer.loading': string;
   'viewer.fullscreen': string;
   'viewer.exitFullscreen': string;
+  'viewer.copy': string;
+  'viewer.copied': string;
+  'viewer.qr': string;
+  'viewer.qrLabel': string;
   // Novedades
   'news.title': string;
   'news.headline': string;
