@@ -12,7 +12,7 @@ import { ImageDCM } from 'src/app/clases/Images/image-DCM.class';
 export class ImageIconComponent implements OnInit {
 
   @ViewChild('imageIconDisplay')
-  private imageIconDisplay: ElementRef<HTMLImageElement> | undefined;
+  private imageIconDisplay: ElementRef<HTMLCanvasElement> | undefined;
 
   @Input() theDICOMFile: DCMFile | undefined;
   @Input() aReadedDICOMFile: DCMFileReader | undefined;
@@ -31,6 +31,7 @@ export class ImageIconComponent implements OnInit {
       this.reader = (this.theDICOMFile)?new DCMFileReader(this.theDICOMFile):this.aReadedDICOMFile;
       if (this.reader) {
         this.image = new ImageDCM(this.reader);
+        this.image.prefetch = false; // miniatura: solo el primer frame
         this.image.paintImage(this.imageIconDisplay);
       }
     }    

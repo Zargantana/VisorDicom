@@ -1,3 +1,4 @@
+import { FrameBytes } from "../DCM/pixel-data-access";
 import { BaseDecoder } from "./base-decoder-class";
 
 /**
@@ -6,25 +7,22 @@ import { BaseDecoder } from "./base-decoder-class";
  * Devuelve un ArrayBuffer little endian, entrelazado, por frame.
  */
 export class UncompressedDecoder extends BaseDecoder {
-    public Decode(): any[] {
+    public override readonly encapsulated: boolean = false;
+
+    public decodeFrame(frame: FrameBytes): ArrayBuffer {
         if (this.reader.BitsAllocated == 1 && (this.reader.Frames || 1) > 1) {
             // 1 bit por pixel y varios frames: los frames van seguidos a nivel de BIT (PS3.5 8.2: sin relleno a byte
-            // entre frames), asi que no se puede trocear por bytes; se desempaqueta todo y se corta por pixeles.
-            const all = this.interpret.getPixelDatas()[0] ?? '';
-            const bytes = BaseDecoder.toBytes(all);
+            // entre frames); el frame empieza en el bit `bitOffset` de los bytes recibidos.
+            const bytes = BaseDecoder.toBytes(frame.data);
             const pixels = this.reader.Rows * this.reader.Columns * (this.reader.SamplesPerPixel || 1);
-            const frames: ArrayBuffer[] = [];
-            for (let f = 0; f < this.reader.Frames; f++) {
-                const unpacked = new Uint8Array(pixels);
-                for (let p = 0, bit = f * pixels; p < pixels; p++, bit++) {
-                    unpacked[p] = (bytes[bit >> 3] >> (bit & 7)) & 1;
-                }
-                frames.push(unpacked.buffer);
+            const unpacked = new Uint8Array(pixels);
+            for (let p = 0, bit = frame.bitOffset; p < pixels; p++, bit++) {
+                unpacked[p] = (bytes[bit >> 3] >> (bit & 7)) & 1;
             }
-            return frames;
+            return unpacked.buffer;
         }
-        // Nativo: getFramesData ya trocea por FrameSize; TODOS los frames son imagen (no hay BOT que saltar).
-        return this.interpret.getFramesData().map(frame => this.normalize(BaseDecoder.toBytes(frame)).buffer);
+        // Nativo: los bytes del frame (troceo por FrameSize); TODOS los frames son imagen (no hay BOT que saltar).
+        return this.normalize(BaseDecoder.toBytes(frame.data)).buffer as ArrayBuffer;
     }
 
     /** Deja el frame como lo esperan las clases de color: little endian, 1 muestra por byte si 1 bit, RGB entrelazado. */

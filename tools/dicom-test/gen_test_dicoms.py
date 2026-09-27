@@ -12,8 +12,10 @@ esperados que usa run_harness.mjs para comparar.
 """
 import io
 import json
+import struct
 import os
 import sys
+import zlib
 
 import numpy as np
 from PIL import Image
@@ -1097,6 +1099,37 @@ save_private(ds, "t73_sniff_jpeg_progressive.dcm", FAKE_TS, False, np.array(Imag
              fragments=[_b.getvalue()])
 expect("t73_sniff_jpeg_progressive.dcm", rows=R, cols=C, frames=1, windows=0, kind="ref",
        decoded_by="JPEG progresivo", lossy=True)
+
+# --- t90: Deflated grande (512x512 con ruido: el inflado sale en muchos trozos) con bytes tras el stream deflate -----
+# t90: el byte nulo de relleno de PS3.5 A.5; t90b: un trailer gzip de 8 bytes (CRC32 + tamaño), como image_dfl.dcm
+# de pydicom. El DecompressionStream de Chrome da error con esos bytes y descartaba los trozos inflados sin leer: se
+# perdía el final de la imagen (t04 es pequeño y cabe en un trozo).
+_rng80 = np.random.default_rng(80)
+_yy, _xx = np.mgrid[0:512, 0:512]
+_hu80 = (np.sin(_xx / 40.0) * 600 + np.cos(_yy / 25.0) * 300 + _rng80.normal(0, 40, (512, 512))).clip(-1000, 2000)
+_st80 = (_hu80 + 1024).astype(np.uint16)
+for _name80, _tail in (("t90_deflate_big_padding.dcm", b"\x00"), ("t90b_deflate_big_gzip_trailer.dcm", None)):
+    ds = base_ds("CT", "1.2.840.10008.5.1.4.1.1.2")
+    set_mono16(ds, _st80, signed=False)
+    ds.WindowCenter, ds.WindowWidth = 40, 400
+    ds.PixelData = _st80.tobytes()
+    _p80 = save(ds, _name80, DeflatedExplicitVRLittleEndian)
+    _raw80 = open(_p80, "rb").read()
+    _meta_end = 132
+    while struct.unpack("<H", _raw80[_meta_end:_meta_end + 2])[0] == 0x0002:
+        _vr = _raw80[_meta_end + 4:_meta_end + 6]
+        if _vr in (b"OB", b"OW", b"OF", b"SQ", b"UT", b"UN"):
+            _meta_end += 12 + struct.unpack("<I", _raw80[_meta_end + 8:_meta_end + 12])[0]
+        else:
+            _meta_end += 8 + struct.unpack("<H", _raw80[_meta_end + 6:_meta_end + 8])[0]
+    _dobj = zlib.decompressobj(-15)
+    _plain = _dobj.decompress(_raw80[_meta_end:])
+    _stream = _raw80[_meta_end:len(_raw80) - len(_dobj.unused_data)]   # el stream deflate exacto, sin nada detrás
+    if _tail is None:
+        _tail = struct.pack("<II", zlib.crc32(_plain) & 0xFFFFFFFF, len(_plain) & 0xFFFFFFFF)
+    with open(_p80, "wb") as fh:
+        fh.write(_raw80[:_meta_end] + _stream + _tail)
+    expect(_name80, rows=512, cols=512, frames=1, windows=1, kind="ct")
 
 with open(os.path.join(OUT, "expected.json"), "w") as fh:
     json.dump(EXPECTED, fh, indent=1)

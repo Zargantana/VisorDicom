@@ -80,6 +80,7 @@ export const EN: Texts = {
   'news.h6.b': 'More studies open:', 'news.h6.t': 'more image and colour formats, and you can pick the contrast when the study brings several.',
   'news.h7.b': 'On any device:', 'news.h7.t': 'Windows, Linux and Mac; Android and iOS. PC, tablet and phone.',
   'news.h8.b': 'In your language:', 'news.h8.t': 'Spanish, English, Catalan, Basque, Galician, Portuguese, French, Italian, German, Japanese, Chinese, Russian, Korean and Greek. Pick it with the globe button at the top right.',
+  'news.h9.b': "Studies of any size:", 'news.h9.t': "files of several GB open (tested with 2 GB) without loading them whole; images are decoded in the background and cine playback is smoother.",
   'news.more': 'more...',
   'news.less': '...less',
   'news.hist.1': 'VisorDicom is born, the free and open version of the viewer.',

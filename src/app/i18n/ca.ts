@@ -80,6 +80,7 @@ export const CA: Texts = {
   'news.h6.b': 'Es veuen més estudis:', 'news.h6.t': 'més formats d\'imatge i de color, i pots triar el contrast quan l\'estudi en porta diversos.',
   'news.h7.b': 'En qualsevol dispositiu:', 'news.h7.t': 'Windows, Linux i Mac; Android i iOS. PC, tauleta i mòbil.',
   'news.h8.b': 'En la teva llengua:', 'news.h8.t': 'castellà, anglès, català, basc, gallec, portuguès, francès, italià, alemany, japonès, xinès, rus, coreà i grec. Tria-la amb el botó del globus, a dalt a la dreta.',
+  'news.h9.b': "Estudis de qualsevol mida:", 'news.h9.t': "s'obren fitxers de diversos GB (provat amb 2 GB) sense carregar-los sencers; la imatge es descodifica en segon pla i el cinema va més fluid.",
   'news.more': 'més...',
   'news.less': '...menys',
   'news.hist.1': 'Neix VisorDicom, la versió lliure i gratuïta del visor.',

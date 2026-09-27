@@ -1,3 +1,4 @@
+import { FrameBytes } from "../DCM/pixel-data-access";
 import { BaseDecoder } from "./base-decoder-class";
 import { CodecRequiredError } from "./codec-loader";
 import { decodeWithEmscripten } from "./emscripten-codecs";
@@ -10,17 +11,15 @@ declare var jpeg: any;
  * Si falla un frame de 8 bits se reintenta con libjpeg-turbo 3 (asm.js), que tambien decodifica lossless (SOF3).
  */
 export class JPEGLosslessDecoder extends BaseDecoder {
-    public Decode(): any[] {
-        return this.interpret.getEncapsulatedFrames().map(frame => {
-            const bytes = BaseDecoder.toBytes(frame);
-            try {
-                return new jpeg.lossless.Decoder().decompress(bytes);
-            } catch (error) {
-                if (this.reader.BitsAllocated > 8 || error instanceof CodecRequiredError) {
-                    throw error;
-                }
-                return decodeWithEmscripten('libjpeg-turbo', 'JPEGDecoder', bytes).data;
+    public decodeFrame(frame: FrameBytes): any {
+        const bytes = BaseDecoder.toBytes(frame.data);
+        try {
+            return new jpeg.lossless.Decoder().decompress(bytes);
+        } catch (error) {
+            if (this.reader.BitsAllocated > 8 || error instanceof CodecRequiredError) {
+                throw error;
             }
-        });
+            return decodeWithEmscripten('libjpeg-turbo', 'JPEGDecoder', bytes).data;
+        }
     }
 }

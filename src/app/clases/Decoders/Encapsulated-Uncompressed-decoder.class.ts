@@ -1,3 +1,4 @@
+import { FrameBytes } from "../DCM/pixel-data-access";
 import { BaseDecoder } from "./base-decoder-class";
 import { UncompressedDecoder } from "./Uncompressed-decoder.class";
 
@@ -7,7 +8,9 @@ import { UncompressedDecoder } from "./Uncompressed-decoder.class";
  * a un frame sin leer el resto. Cada frame se trata igual que uno nativo.
  */
 export class EncapsulatedUncompressedDecoder extends UncompressedDecoder {
-    public override Decode(): any[] {
-        return this.interpret.getEncapsulatedFrames().map(frame => this.normalize(BaseDecoder.toBytes(frame)).buffer);
+    public override readonly encapsulated: boolean = true;
+
+    public override decodeFrame(frame: FrameBytes): ArrayBuffer {
+        return this.normalize(BaseDecoder.toBytes(frame.data)).buffer as ArrayBuffer;
     }
 }

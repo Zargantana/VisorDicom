@@ -1,18 +1,11 @@
 import { DCMFileReader } from "../DCM/DCM-file-reader.class";
-import { DCMInterpreter } from "../DCM/DCM-interpreter.class";
-import { BaseDecoder } from "./base-decoder-class";
-import { EncapsulatedUncompressedDecoder } from "./Encapsulated-Uncompressed-decoder.class";
-import { JPEG2000Decoder } from "./JPEG-2000-decoder.class";
-import { JPEGBaselineDecoder, JPEGRetiredProcessesDecoder } from "./JPEG-Baseline-decoder.class";
-import { JPEGLosslessDecoder } from "./JPEG-Lossless-decoder.class";
-import { JPEGLSDecoder } from "./JPEG-LS-decoder.class";
-import { RLEDecoder } from "./RLE-decoder.class";
-import { UncompressedDecoder } from "./Uncompressed-decoder.class";
+import { DecoderKind } from "./decoder-factory";
 
 export interface SniffedCodec {
     /** Qué se ha reconocido en el Pixel Data (para el log y la pantalla de información). */
     name: string;
-    decoder: BaseDecoder;
+    /** El decoder que le corresponde (ver createDecoder). */
+    kind: DecoderKind;
 }
 
 /**
@@ -26,58 +19,58 @@ export interface SniffedCodec {
  *    dicen Rows, Columns, Samples y BitsAllocated).
  *  - nativo: si mide exactamente lo esperado, se lee como Explicit VR Little Endian sin comprimir.
  * Si no se reconoce nada devuelve null y el visor explica por qué no puede mostrar la imagen.
+ *
+ * @param nativeLength longitud del valor del Pixel Data nativo (null si es encapsulado)
+ * @param firstFrame   bitstream del primer frame si es encapsulado (se lee solo ese; no hace falta el fichero entero)
  */
-export function sniffPixelData(reader: DCMFileReader): SniffedCodec | null {
-    const interpret = new DCMInterpreter(reader);
-    const items = interpret.getPixelDatas();
+export function sniffPixelData(reader: DCMFileReader, nativeLength: number | null, firstFrame: Uint8Array | string | null): SniffedCodec | null {
     const frameBytes = (reader.Rows * reader.Columns * (reader.SamplesPerPixel || 1) * reader.BitsAllocated) / 8;
     const fits = (length: number, expected: number) => expected > 0 && (length == expected || length == expected + 1);
 
-    if (items.length == 1) {
+    if (nativeLength !== null) {
         // Nativo (VL definida)
-        return fits(items[0].length, frameBytes * Math.max(1, reader.Frames || 1))
-            ? { name: 'sin comprimir (nativo)', decoder: new UncompressedDecoder(reader) }
+        return fits(nativeLength, frameBytes * Math.max(1, reader.Frames || 1))
+            ? { name: 'sin comprimir (nativo)', kind: 'native' }
             : null;
     }
-    const frames = interpret.getEncapsulatedFrames();
-    if (frames.length == 0 || frames[0].length < 4) {
+    if (!firstFrame || firstFrame.length < 4) {
         return null;
     }
-    const s = frames[0];
-    const b = (i: number) => s.charCodeAt(i) & 0xFF;
+    const s = firstFrame;
+    const b = typeof s === 'string' ? (i: number) => s.charCodeAt(i) & 0xFF : (i: number) => s[i] ?? 0;
     const u32 = (i: number) => (b(i) | (b(i + 1) << 8) | (b(i + 2) << 16) | (b(i + 3) << 24)) >>> 0;
 
     if (b(0) == 0xFF && b(1) == 0xD8) {
         switch (jpegFrameMarker(s)) {
-            case 0xC0: return { name: 'JPEG baseline', decoder: new JPEGBaselineDecoder(reader) };
-            case 0xC1: return { name: 'JPEG extendido', decoder: new JPEGBaselineDecoder(reader) };
-            case 0xC3: return { name: 'JPEG lossless', decoder: new JPEGLosslessDecoder(reader) };
-            case 0xC2: return { name: 'JPEG progresivo', decoder: new JPEGRetiredProcessesDecoder(reader) };
-            case 0xC9: return { name: 'JPEG aritmético', decoder: new JPEGRetiredProcessesDecoder(reader) };
-            case 0xCA: return { name: 'JPEG progresivo aritmético', decoder: new JPEGRetiredProcessesDecoder(reader) };
-            case 0xCB: return { name: 'JPEG lossless aritmético', decoder: new JPEGRetiredProcessesDecoder(reader) };
-            case 0xF7: return { name: 'JPEG-LS', decoder: new JPEGLSDecoder(reader) };
+            case 0xC0: return { name: 'JPEG baseline', kind: 'jpeg-baseline' };
+            case 0xC1: return { name: 'JPEG extendido', kind: 'jpeg-baseline' };
+            case 0xC3: return { name: 'JPEG lossless', kind: 'jpeg-lossless' };
+            case 0xC2: return { name: 'JPEG progresivo', kind: 'jpeg-retired' };
+            case 0xC9: return { name: 'JPEG aritmético', kind: 'jpeg-retired' };
+            case 0xCA: return { name: 'JPEG progresivo aritmético', kind: 'jpeg-retired' };
+            case 0xCB: return { name: 'JPEG lossless aritmético', kind: 'jpeg-retired' };
+            case 0xF7: return { name: 'JPEG-LS', kind: 'jpeg-ls' };
         }
         return null; // JPEG jerárquico o cabecera rota
     }
     if (b(0) == 0xFF && b(1) == 0x4F && b(2) == 0xFF && b(3) == 0x51) {
         const ht = (((b(6) << 8) | b(7)) & 0x4000) != 0; // Rsiz, bit 14: HTJ2K (ISO/IEC 15444-15)
-        return { name: ht ? 'HTJ2K' : 'JPEG 2000', decoder: new JPEG2000Decoder(reader, ht) };
+        return { name: ht ? 'HTJ2K' : 'JPEG 2000', kind: ht ? 'htj2k' : 'jpeg2000' };
     }
     const segments = u32(0);
     const expectedSegments = (reader.SamplesPerPixel || 1) * Math.ceil(reader.BitsAllocated / 8);
     if (s.length > 64 && segments == expectedSegments && segments <= 15 && u32(4) == 64) {
-        return { name: 'RLE', decoder: new RLEDecoder(reader) };
+        return { name: 'RLE', kind: 'rle' };
     }
-    if (frames.every(f => fits(f.length, frameBytes))) {
-        return { name: 'sin comprimir (encapsulado)', decoder: new EncapsulatedUncompressedDecoder(reader) };
+    if (fits(s.length, frameBytes)) {
+        return { name: 'sin comprimir (encapsulado)', kind: 'encapsulated-raw' };
     }
     return null;
 }
 
 /** Primer marcador SOF de un JPEG (C0-CF salvo DHT/JPG/DAC, o F7 = SOF55 de JPEG-LS); null si no lo hay. */
-function jpegFrameMarker(s: string): number | null {
-    const b = (i: number) => s.charCodeAt(i) & 0xFF;
+function jpegFrameMarker(s: Uint8Array | string): number | null {
+    const b = typeof s === 'string' ? (i: number) => s.charCodeAt(i) & 0xFF : (i: number) => s[i] ?? 0;
     let pos = 2;
     while (pos + 4 <= s.length) {
         if (b(pos) != 0xFF) {

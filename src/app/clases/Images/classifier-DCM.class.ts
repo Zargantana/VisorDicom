@@ -275,13 +275,14 @@ export class classifierDCM {
     }
 
     /**
-     * Mismo estudio: por Study Instance UID. Solo si alguno de los dos no lo trae se recurre a la fecha. Antes se
-     * exigian las dos cosas y los estudios reales cuyas imagenes no llevan todas la misma Study Date (o alguna no la
-     * lleva) salian partidos en varios estudios.
+     * Mismo estudio: por Study Instance UID. Solo si NINGUNO de los dos lo trae (ACR-NEMA 1.0, datasets sin UIDs) se
+     * recurre a la fecha. Antes se exigian las dos cosas y los estudios reales cuyas imagenes no llevan todas la misma
+     * Study Date salian partidos; y despues bastaba con que faltara en uno, asi que un estudio empezado por un fichero
+     * sin UID se tragaba otros estudios distintos del mismo dia (ficheros de prueba de pydicom: 45 estudios frente a 51).
      */
     private static sameStudy(a: DCMFileReader, b: DCMFileReader): boolean {
         const uidA = classifierDCM.normId(a.StudyInstanceUID), uidB = classifierDCM.normId(b.StudyInstanceUID);
-        if (uidA && uidB) {
+        if (uidA || uidB) {
             return uidA == uidB;
         }
         return classifierDCM.normId(a.StudyDate) == classifierDCM.normId(b.StudyDate);

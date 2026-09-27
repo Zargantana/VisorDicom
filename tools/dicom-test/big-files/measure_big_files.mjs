@@ -1,12 +1,14 @@
 #!/usr/bin/env node
 /*
  * Mide el visor con estudios pesados (ver gen_big_files.py): cuánto tarda en leer y en pintar la primera imagen,
- * y cuánta memoria residente añade el proceso renderer de Chromium. Sirve de línea base para la carga por
- * File.slice y para comprobar que no empeora.
+ * cuánta memoria residente añade el proceso renderer de Chromium y, en uso (cine o rueda), cuántas imágenes por
+ * segundo pinta y si la memoria se queda acotada por la caché de frames (FrameCache).
  *
  *   node tools/dicom-test/big-files/measure_big_files.mjs [dist] <fichero-o-carpeta> [...]
  *
- * Además comprueba el límite de FileReader.readAsBinaryString (lo que usa DCMFile hoy) con cada fichero suelto.
+ * Además comprueba el límite de FileReader.readAsBinaryString con cada fichero suelto (el visor ya no lo usa para
+ * los ficheros locales: lee la cabecera por bloques y el Pixel Data por rangos; sirve de referencia).
+ * MEASURE_NO_USAGE=1 salta la fase de uso.
  * La memoria se lee con `ps` (Linux/macOS). Requiere playwright (PLAYWRIGHT_MODULE=<package.json donde esté>)
  * y Chromium (CHROMIUM=<ruta>; por defecto /opt/pw-browsers/chromium).
  */
@@ -40,8 +42,8 @@ const server = http.createServer((req, res) => {
 const origin = 'http://127.0.0.1:' + server.address().port;
 // CHROMIUM=<ruta> (Linux: /opt/pw-browsers/chromium por defecto); en Windows sin CHROMIUM se usa el Chrome instalado
 const browser = process.env.CHROMIUM || process.platform !== 'win32'
-  ? await chromium.launch({ executablePath: process.env.CHROMIUM || '/opt/pw-browsers/chromium' })
-  : await chromium.launch({ channel: 'chrome' });
+  ? await chromium.launch({ executablePath: process.env.CHROMIUM || '/opt/pw-browsers/chromium', args: ['--js-flags=--expose-gc'] })
+  : await chromium.launch({ channel: 'chrome', args: ['--js-flags=--expose-gc'] });
 const MB = (bytes) => Math.round(bytes / 2 ** 20);
 
 /** Memoria residente (MB) de los procesos renderer de Chromium (ps en Linux/macOS, WMI en Windows). */
@@ -102,15 +104,58 @@ for (const f of args) {
   const notice = read ? '' : await page.locator('.loader-errors').innerText({ timeout: 2000 }).catch(() => '');
   if (notice) errors.unshift('aviso: ' + notice.replace(/\s+/g, ' ').trim().slice(0, 160));
   if (read) await page.locator('images-loader findings-table td.ft-view').first().click().catch(() => {});
-  const painted = read && await page.waitForFunction(() => [...document.querySelectorAll('basic-image-viewer img')]
-    .some((i) => i.src.startsWith('data:image') && !i.hasAttribute('data-unsupported')), null, { timeout: 180000 })
-    .then(() => true).catch(() => false);
+  // Pintada = el <canvas> del visor lleva data-painted (desde 2026-09-27) o, en versiones anteriores, el <img> un data: URL
+  const painted = read && await page.waitForFunction(() => [...document.querySelectorAll('basic-image-viewer canvas, basic-image-viewer img')]
+    .some((e) => e.tagName == 'CANVAS' ? e.hasAttribute('data-painted') : (e.src || '').startsWith('data:image') && !e.hasAttribute('data-unsupported')),
+    null, { timeout: 180000 }).then(() => true).catch(() => false);
   const msPaint = Date.now() - t0;
   await page.waitForTimeout(3000);
   const rss2 = rendererRSS();
+  // 3) Uso: cine 8 s en un multiframe (clic en la imagen) o 300 pasos de rueda en una serie. La memoria tiene que
+  //    quedarse acotada (caché de frames con presupuesto) y el visor tiene que seguir pintando.
+  let usage = '';
+  if (painted && !process.env.MEASURE_NO_USAGE) {
+    // Imágenes pintadas: el canvas cuenta sus pintadas en data-paint-count; con <img>, cada cambio de src
+    await page.evaluate(() => {
+      const w = window;
+      const canvas = document.querySelector('basic-image-viewer canvas[data-painted]');
+      if (canvas) {
+        const base = +(canvas.getAttribute('data-paint-count') || 0);
+        w.__paintCount = () => +(canvas.getAttribute('data-paint-count') || 0) - base;
+      } else {
+        w.__paints = 0;
+        new MutationObserver(() => { w.__paints++; }).observe(document.querySelector('basic-image-viewer img'), { attributes: true, attributeFilter: ['src'] });
+        w.__paintCount = () => w.__paints;
+      }
+    });
+    const area = page.locator('basic-image-viewer .clickable').first();
+    const tu = Date.now();
+    if (fs.statSync(f).isFile()) {
+      await area.click();                                   // reproducir
+      await page.waitForTimeout(8000);
+      await area.click();                                   // pausa
+    } else {
+      const box = await area.boundingBox();
+      await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+      for (let i = 0; i < 300; i++) { await page.mouse.wheel(0, 100); await page.waitForTimeout(30); }
+      await page.waitForTimeout(1500);
+    }
+    const secs = (Date.now() - tu) / 1000;
+    const paints = await page.evaluate(() => window.__paintCount());
+    await page.waitForTimeout(1500);
+    const rss3 = rendererRSS();
+    // Tras recoger la basura (Chromium con --js-flags=--expose-gc): lo que de verdad queda retenido
+    await page.evaluate(() => { for (let i = 0; i < 3; i++) window.gc?.(); });
+    for (const worker of page.workers()) await worker.evaluate(() => { for (let i = 0; i < 3; i++) self.gc?.(); }).catch(() => {});
+    await page.waitForTimeout(1500);
+    const rss4 = rendererRSS();
+    usage = `; uso (${fs.statSync(f).isFile() ? 'cine 8 s' : '300 pasos de rueda'}): ${paints} imágenes pintadas ` +
+      `(${(paints / secs).toFixed(1)}/s), renderer +${rss3 - rss0} MB, +${rss4 - rss0} MB tras recoger basura` +
+      `, Workers de decodificación: ${page.workers().length}`;
+  }
   console.log(`${path.basename(f)} (${MB(sizeOf(f))} MB): ` +
     `lectura ${read ? msRead + ' ms' : 'NO'}, primera imagen ${painted ? msPaint + ' ms' : 'NO'}, ` +
-    `renderer +${rss1 - rss0} MB tras leer, +${rss2 - rss0} MB tras pintar` + (errors.length ? `, errores: ${errors.slice(0, 2).join(' | ')}` : ''));
+    `renderer +${rss1 - rss0} MB tras leer, +${rss2 - rss0} MB tras pintar${usage}` + (errors.length ? `, errores: ${errors.slice(0, 2).join(' | ')}` : ''));
   await page.close();
 }
 await browser.close();

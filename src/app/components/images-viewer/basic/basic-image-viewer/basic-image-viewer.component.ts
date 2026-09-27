@@ -19,7 +19,7 @@ export class BasicImageViewerComponent implements AfterViewInit, DoCheck, OnDest
   private componentDiv: ElementRef<HTMLImageElement> | undefined;
 
   @ViewChild('imageDisplay')
-  private imageDisplay: ElementRef<HTMLImageElement> | undefined;
+  private imageDisplay: ElementRef<HTMLCanvasElement> | undefined;
 
   @ViewChild('imgContainer')
   private imgContainer: ElementRef<HTMLDivElement> | undefined;
@@ -199,13 +199,9 @@ export class BasicImageViewerComponent implements AfterViewInit, DoCheck, OnDest
    * cosas. Si el navegador no admite varios formatos (Safari), se copia solo la imagen.
    */
   public async copyImage(): Promise<void> {
-    const img = this.imageDisplay?.nativeElement;
-    if (!img || !img.naturalWidth || typeof ClipboardItem === 'undefined' || !navigator.clipboard?.write) return;
+    const canvas = this.imageDisplay?.nativeElement; // el visor pinta en un canvas: se copia tal cual
+    if (!canvas || !canvas.width || typeof ClipboardItem === 'undefined' || !navigator.clipboard?.write) return;
     try {
-      const canvas = document.createElement('canvas');
-      canvas.width = img.naturalWidth;
-      canvas.height = img.naturalHeight;
-      canvas.getContext('2d')!.drawImage(img, 0, 0);
       const png = await new Promise<Blob>((resolve, reject) => canvas.toBlob((b) => (b ? resolve(b) : reject(new Error('sin imagen'))), 'image/png'));
       const caption = this.caption();
       const escape = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');

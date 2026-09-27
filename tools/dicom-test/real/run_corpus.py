@@ -4,7 +4,7 @@ Pasa un corpus inventariado (scan_corpus.py) por el harness del visor y por la c
 informe. Relanza el harness si un fichero tumba el proceso de Node (memoria): ese fichero queda como CRASH y se sigue.
 
     python tools/dicom-test/real/run_corpus.py [--out tools/dicom-test/out_corpus] [--filter regex] [--fresh]
-        [--max-mb 480] [--frames-out 3] [--windows 2] [--heap-mb 8192]
+        [--max-mb N] [--frames-out 3] [--windows 2] [--heap-mb 8192]
 """
 import argparse
 import json
@@ -21,7 +21,7 @@ def main():
     ap.add_argument("--out", default=os.path.join(HERE, "..", "out_corpus"))
     ap.add_argument("--filter", default="")
     ap.add_argument("--fresh", action="store_true", help="empieza de cero (borra render.json)")
-    ap.add_argument("--max-mb", default="480")
+    ap.add_argument("--max-mb", default="", help="ficheros mayores (MB) se marcan BIG sin probarlos; por defecto ninguno: el visor lee por rangos y no tiene tope (480 = el tope de antes, del string del navegador)")
     ap.add_argument("--frames-out", default="3")
     ap.add_argument("--windows", default="2")
     ap.add_argument("--heap-mb", default="8192")
@@ -37,9 +37,11 @@ def main():
         os.remove(summary_path)
 
     env = dict(os.environ, DICOM_TEST_OUT=out, DICOM_TEST_MANIFEST=os.path.join(out, "manifest.json"),
-               DICOM_TEST_MAX_MB=args.max_mb, DICOM_TEST_MAX_FRAMES_OUT=args.frames_out,
+               DICOM_TEST_MAX_FRAMES_OUT=args.frames_out,
                DICOM_TEST_MAX_WINDOWS=args.windows, DICOM_TEST_RESUME="1", DICOM_TEST_VERBOSE="1",
                PYTHONUTF8="1")  # check_render escribe acentos: su stdout va a check.log en UTF-8 también en Windows
+    if args.max_mb:
+        env["DICOM_TEST_MAX_MB"] = args.max_mb
     if args.filter:
         env["DICOM_TEST_FILTER"] = args.filter
     if args.skip_multiframe:

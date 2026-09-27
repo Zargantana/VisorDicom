@@ -102,8 +102,10 @@ if (loaderTree) {
   check('selector en vivo del cargador presente', false, 'no se ha encontrado images-loader findings-table');
 }
 const t1 = Date.now();
-const painted = await page.waitForFunction(() => [...document.querySelectorAll('basic-image-viewer img')]
-  .some(i => i.src.startsWith('data:image') && !i.hasAttribute('data-unsupported')), null, { timeout: 300000 }).then(() => true).catch(() => false);
+// Pintada = <canvas data-painted> (visor desde 2026-09-27) o <img> con data: URL (versiones anteriores)
+const painted = await page.waitForFunction(() => [...document.querySelectorAll('basic-image-viewer canvas, basic-image-viewer img')]
+  .some(e => e.tagName == 'CANVAS' ? e.hasAttribute('data-painted') : e.src.startsWith('data:image') && !e.hasAttribute('data-unsupported')),
+  null, { timeout: 300000 }).then(() => true).catch(() => false);
 const msPaint = Date.now() - t1;
 await page.waitForTimeout(1500);
 // Hay dos tablas de hallazgos: la rama seleccionada (una serie) y el árbol completo (plegado con d-none, pero en el

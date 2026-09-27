@@ -1,3 +1,4 @@
+import { FrameBytes } from "../DCM/pixel-data-access";
 import { BaseDecoder } from "./base-decoder-class";
 
 /**
@@ -9,15 +10,15 @@ import { BaseDecoder } from "./base-decoder-class";
  */
 export class RLEDecoder extends BaseDecoder {
 
-    public Decode(): ArrayBuffer[] {
-        return this.interpret.getEncapsulatedFrames().map(frame => this.decodeFrame(BaseDecoder.toBytes(frame)));
+    public decodeFrame(frame: FrameBytes): ArrayBuffer {
+        return this.decodeRLE(BaseDecoder.toBytes(frame.data));
     }
 
     private read32(data: Uint8Array, at: number): number {
         return (data[at] | (data[at + 1] << 8) | (data[at + 2] << 16) | (data[at + 3] << 24)) >>> 0;
     }
 
-    private decodeFrame(data: Uint8Array): ArrayBuffer {
+    private decodeRLE(data: Uint8Array): ArrayBuffer {
         const bytesAllocated = Math.max(1, this.reader.BitsAllocated >> 3);
         const samples = this.reader.SamplesPerPixel || 1;
         const pixelCount = this.reader.Rows * this.reader.Columns;

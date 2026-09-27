@@ -80,6 +80,7 @@ export const GL: Texts = {
   'news.h6.b': 'Vense máis estudos:', 'news.h6.t': 'máis formatos de imaxe e de cor, e podes escoller o contraste cando o estudo trae varios.',
   'news.h7.b': 'En calquera dispositivo:', 'news.h7.t': 'Windows, Linux e Mac; Android e iOS. PC, tableta e móbil.',
   'news.h8.b': 'No teu idioma:', 'news.h8.t': 'castelán, inglés, catalán, éuscaro, galego, portugués, francés, italiano, alemán, xaponés, chinés, ruso, coreano e grego. Escólleo co botón do globo, arriba á dereita.',
+  'news.h9.b': "Estudos de calquera tamaño:", 'news.h9.t': "ábrense ficheiros de varios GB (probado con 2 GB) sen cargalos enteiros; a imaxe descodifícase en segundo plano e o cine vai máis fluído.",
   'news.more': 'máis...',
   'news.less': '...menos',
   'news.hist.1': 'Nace VisorDicom, a versión libre e gratuíta do visor.',

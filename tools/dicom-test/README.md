@@ -6,7 +6,7 @@ PS3.3 C.11 (Modality LUT → VOI → Presentation).
 
 ```bash
 pip install pydicom numpy pillow pyjpegls imagecodecs   # pyjpegls (t22) e imagecodecs (t24-t36) son opcionales
-npm ci                                                  # esbuild viene con @angular-devkit
+npm ci                                                  # esbuild viene con @angular-devkit; Node 20+ (fs.openAsBlob)
 
 python3 tools/dicom-test/gen_test_dicoms.py   # → tools/dicom-test/out/*.dcm + expected.json
 node    tools/dicom-test/run_harness.mjs      # → out/render/<fichero>[#wN].f<frame>.rgba + render.json
@@ -14,6 +14,17 @@ python3 tools/dicom-test/check_render.py      # → PASS/FAIL por caso + out/ren
 ```
 
 `check_render.py` devuelve un código de salida distinto de 0 si algún caso falla. `out/` está en `.gitignore`.
+
+El harness lee cada fichero **como el navegador**: entra como `Blob` (`fs.openAsBlob`), `DCMFile` lee la cabecera por
+bloques hasta el Pixel Data y cada frame por rangos (`render.json` lo dice en `partial`). Dos variables cambian el camino:
+
+| Variable | Qué hace |
+|---|---|
+| `DICOM_TEST_HEADER_CHUNK=600` | Primer bloque de cabecera de 600 bytes en vez de 256 KB. Los ficheros de la batería son pequeños y cabrían enteros en el primer bloque (en memoria); así se prueba de verdad la lectura por rangos del Pixel Data (índice de frames, BOT, EOT, fragmentos). Conviene pasarla con varios valores (512, 700, 1100…) tras tocar `DCM-file.class.ts` o `pixel-data-access.ts` |
+| `DICOM_TEST_INMEMORY=1` | El camino antiguo en memoria (string binario), el de los objetos antiguos en base64 del portal y la pantalla de test |
+
+La decodificación va siempre en el hilo principal: en Node no hay `Worker` (el pool de Workers del visor, `DecodePool`,
+se prueba en el navegador; ver abajo).
 
 **Dependencias opcionales.** Si falta una herramienta, `gen_test_dicoms.py` omite sus casos y lo dice en la salida. Un `0 FAIL` con casos omitidos **no prueba** esas TS:
 
@@ -29,12 +40,12 @@ python3 tools/dicom-test/check_render.py      # → PASS/FAIL por caso + out/ren
 | Fichero | Qué hace |
 |---|---|
 | `gen_test_dicoms.py` | Genera un caso por cada situación del estándar que ha dado guerra (ver la tabla) |
-| `harness-entry.ts` | Punto de entrada que se empaqueta con esbuild. Usa `ImageDCM.renderFrameRGBA()` (o el camino antiguo si no existe, para medir `main`) |
-| `run_harness.mjs` | Stubs mínimos de DOM (`FileReader`, `File`, `print` para CharLS), carga los codecs globales de `src/libs`, registra los códecs bajo demanda de `src/assets/codecs` como globales (en Node no hay `<script>`) y renderiza cada fichero con cada ventana VOI (`#w1`, `#w2`…). Llama a `ImageDCM.prepare()` antes de pintar |
+| `harness-entry.ts` | Punto de entrada que se empaqueta con esbuild. `renderDicom()`: el fichero como `Blob` (o string con `DICOM_TEST_INMEMORY`), `ImageDCM.prepare(f)` y `renderFrameRGBA(f)` frame a frame |
+| `run_harness.mjs` | `print` para CharLS (`File` y `Blob` son los de Node 20+), carga los codecs globales de `src/libs`, registra los códecs bajo demanda de `src/assets/codecs` como globales (en Node no hay `<script>`) y renderiza cada fichero con cada ventana VOI (`#w1`, `#w2`…) |
 | `check_render.py` | Verdad con pydicom (`pixel_array`, `apply_color_lut`, fórmula VOI LINEAR) y tolerancias (±3 lossless; más holgada para JPEG con pérdida). Si existe `out/ref/<fichero>.npy`, esa es la verdad (TS que pydicom no decodifica). `kind="expect_fail"`: pasa si el visor no decodifica ningún frame y no lanza (con `reason_contains`, además, el motivo que enseña el visor tiene que contenerlo). `decoded_by`: el códec que el visor tiene que reconocer por el contenido. `lossy`: tolerancia de compresión con pérdida |
 | `j2k-part2/j2k_part2_mct.c` | Genera un codestream J2K **Part 2** con MCT por matriz (`opj_set_MCT`) para t27 |
 | `browser-csp/run_browser_csp_test.mjs` | Prueba en Chromium del build de producción con la CSP de producción (ver abajo) |
-| `big-files/gen_big_files.py` + `big-files/measure_big_files.mjs` | Estudios sintéticos pesados (XA de 250 y 550 MB, CT de 600 cortes) y medidor de tiempos y memoria del renderer en Chromium (en Windows, canal `chrome` y memoria por WMI): línea base para la carga por trozos. No forman parte de la batería (tardan y ocupan disco). Con el XA de 550 MB imprime el `aviso:` del cargador (tope de ≈512 MiB por fichero) |
+| `big-files/gen_big_files.py` + `big-files/measure_big_files.mjs` | Estudios sintéticos pesados y medidor en Chromium (en Windows, canal `chrome` y memoria por WMI). No forman parte de la batería (tardan y ocupan disco). Ver "Ficheros grandes" abajo |
 | `real/fetch_real_files.py` | Ficheros DICOM **reales** (ver abajo) |
 
 ## Ficheros reales (pydicom y pydicom-data)
@@ -73,12 +84,12 @@ node tools/dicom-test/real/cd_browser_test.mjs <carpeta de un CD> --python <pyth
 `classify_corpus.mjs <carpeta>` monta el árbol paciente → estudio → modalidad → serie con el clasificador del visor en
 Node (sin navegador) y lo compara con pydicom; sirve para cualquier carpeta y para `out/`.
 
-`run_corpus.py` usa `DICOM_TEST_MANIFEST` (clave → ruta), `DICOM_TEST_MAX_MB` (480: los mayores se marcan BIG, como
-hace el visor con el tope del string del navegador), `DICOM_TEST_MAX_FRAMES_OUT` (3: en multiframes grandes solo se
+`run_corpus.py` usa `DICOM_TEST_MANIFEST` (clave → ruta), `DICOM_TEST_MAX_MB` (con `--max-mb N`: los mayores se marcan
+BIG sin probarlos; por defecto ninguno, el visor ya no tiene el tope de ≈512 MB del string), `DICOM_TEST_MAX_FRAMES_OUT` (3: en multiframes grandes solo se
 guardan y comparan el primer frame, el central y el último, `writtenFrames`; pydicom solo decodifica esos),
 `DICOM_TEST_MAX_WINDOWS` (2), `DICOM_TEST_RESUME` (si un fichero tumba Node, queda como CRASH y se relanza) y, con
 `--skip-multiframe frames,MB`, `DICOM_TEST_SKIP_MULTIFRAME` (las láminas de patología por tiles, con miles de frames,
-se marcan TILES sin decodificarlas: el visor decodifica todos los frames de golpe y tardaría minutos). El informe agrupa por carpeta, Transfer
+se marcan TILES sin decodificarlas: el visor las enseña como un cine de tiles, no como una lámina). El informe agrupa por carpeta, Transfer
 Syntax y modalidad, y lista FAIL, CRASH, BIG y los motivos de los SKIP. `cd_browser_test.mjs` carga la carpeta entera
 por la interfaz ("Selecciona la unidad o carpeta"), compara el recuento del cargador y el árbol paciente → estudio →
 serie de la tabla de hallazgos con `expected_tree.py` (pydicom) y mide tiempos y memoria. El juego trae muestras NEMA WG04 (US1/RG1/RG3/MR2/693 en J2K y HTJ2K), Big Endian de todos los tipos (SC
@@ -96,6 +107,7 @@ crudo (403), hay que bajarlo a mano.
 | t02 | CT Implicit VR, 1 ventana, con signo |
 | t03 | MR 12 bits sin ventana (auto min/max) |
 | t04 | **Deflated** Explicit VR LE, 3 ventanas, slope 0.5 (DS con decimales) |
+| t90, t90b | **Deflated** de 512x512 con ruido y bytes tras el stream deflate: el byte nulo de relleno de PS3.5 A.5 (t90) y un trailer gzip de 8 bytes (t80b, como `image_dfl.dcm` de pydicom). El `DecompressionStream` de Chrome da error con esos bytes y descartaba lo inflado sin leer (se perdía el final de la imagen); t04 es tan pequeño que no lo destapa. En Node pasan siempre: el fallo solo se ve en la prueba en navegador |
 | t05 | Explicit VR **Big Endian** |
 | t06 | US **RGB nativo multiframe** (5 frames) |
 | t07 | CR **MONOCHROME1** |
@@ -151,11 +163,50 @@ Sirve el `dist` con las mismas cabeceras de seguridad que producción (CSP, `nos
 - que la imagen se pinta y que sus píxeles son **iguales** a los del harness (`out/render/<fichero>.f0.rgba`);
 - que no hay violaciones de CSP ni errores de página;
 - qué códecs de `assets/codecs` se descargan y con qué `Content-Type`;
-- en los rechazos (`expect_fail`), que el visor pinta el cartel "Imagen no disponible" con el motivo (atributo `data-unsupported` del `<img>`, que también va en `title`).
+- en los rechazos (`expect_fail`), que el visor pinta el cartel "Imagen no disponible" con el motivo (atributo `data-unsupported` del `<canvas>`, que también va en `title`).
+
+El visor pinta en un `<canvas>` con `putImageData` (antes, un PNG en `data:` URL por frame en un `<img>`; las pruebas
+aceptan los dos para poder pasarse contra producción antes de desplegar). Atributos del canvas: `data-painted`
+(`<id del fichero>:<frame>` pintado), `data-paint-count` (pintadas) y `data-unsupported` (motivo del cartel).
+
+`[Worker]` al final de la línea: el frame se ha decodificado en el pool de Workers (`DecodePool`, JPEG, JPEG-LS,
+JPEG 2000, HTJ2K y RLE; lo nativo se queda en el hilo principal). Para comprobar la vuelta al hilo principal cuando los
+Workers no pueden arrancar: `CSP="<la de producción con worker-src 'none'>" CSP_ALLOW=worker node run_browser_csp_test.mjs`
+(`CSP_ALLOW=<regex>` tolera las violaciones que casen). Con `DICOM_TEST_OUT=tools/dicom-test/out_real` y el patrón
+`real_` se pasan los ficheros reales: sin `expected.json`, espera el cartel donde el harness no decodificó nada y salta
+(SKIP) los que no son imagen (Rows = 0: DICOMDIR, RTSTRUCT, SR…).
 
 Hay que pasarla si cambian los códecs, la forma de cargarlos o la CSP. Chromium: `CHROMIUM=<ruta>` (por defecto `/opt/pw-browsers/chromium`; en Windows sirve el `chrome.exe` de Chrome o el `msedge.exe` de Edge: la prueba se pasa en los dos).
 
 `browser-csp/check_production.mjs` hace lo mismo contra la web desplegada (`https://visordicom.es`, cabeceras reales de CloudFront) con los ficheros de `out/` que se le indiquen.
+
+## Ficheros grandes
+
+```bash
+python3 tools/dicom-test/big-files/gen_big_files.py [--2gb]      # → tools/dicom-test/out/big/ (≈4,5 GB; con --2gb, +2 GB)
+npx ng build --configuration production
+PLAYWRIGHT_MODULE=<package.json con playwright> node tools/dicom-test/big-files/measure_big_files.mjs [dist] [ficheros o carpetas]
+```
+
+Casos: XA nativos de 1000 frames (250 MB) y 2200 frames (550 MB), CT de 600 cortes (carpeta, 300 MB), XA JPEG baseline
+1024x1024 de 3000 frames (≈1,5 GB) con y sin Basic Offset Table, y con `--2gb` un XA nativo de 8000 frames (2 GB). Todo
+se escribe en *streaming* (no hace falta tener el fichero en memoria para generarlo).
+
+El medidor abre cada fichero (o carpeta) por la interfaz y da: lectura, primera imagen y memoria del renderer tras leer
+y tras pintar; luego una fase de uso (cine 8 s en un fichero, 300 pasos de rueda en una carpeta; `MEASURE_NO_USAGE=1`
+la salta) con imágenes pintadas por segundo, memoria antes y después de recoger basura (Chromium con `--expose-gc`,
+también en los Workers) y cuántos Workers de decodificación hay. La memoria tiene que quedarse cerca del presupuesto de
+la caché de frames (`FrameCache`: 256 MB en PC, 128 MB en móvil) más los Workers. También prueba
+`FileReader.readAsBinaryString` con cada fichero (≈512 MiB de tope en Chromium: a partir de ahí devuelve `null` sin
+error), como referencia: el visor ya no lo usa.
+
+Referencia (Linux, Chromium, 4 núcleos, 2026-09-27):
+
+| Fichero | Primera imagen | Uso | Memoria tras el uso |
+|---|---|---|---|
+| CT 600 cortes (carpeta) | ≈1 s | rueda, 10 imágenes/s | +208 MB |
+| XA nativo 250 MB / 550 MB / 2 GB | ≈0,25 s | cine 29,8 imágenes/s (FrameTime 33 ms) | +80 MB |
+| XA JPEG 1024x1024, 3000 frames (1,5 GB) | ≈0,4 s | cine 28 imágenes/s, 3 Workers | +303 MB (caché llena) |
 
 ## Añadir un caso
 

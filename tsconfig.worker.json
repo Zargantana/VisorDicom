@@ -1,0 +1,12 @@
+/* Worker de decodificación (src/app/clases/Decoders/decode.worker.ts). Usa la lib "dom" como el resto del núcleo
+   (DCMFile, CodecLoader) en vez de "webworker", que choca con ella; lo propio del Worker va por `self` sin tipar. */
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "outDir": "./out-tsc/worker",
+    "types": []
+  },
+  "include": [
+    "src/**/*.worker.ts"
+  ]
+}

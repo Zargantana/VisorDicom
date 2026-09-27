@@ -104,6 +104,7 @@ export interface Texts {
   'news.h6.b': string; 'news.h6.t': string;
   'news.h7.b': string; 'news.h7.t': string;
   'news.h8.b': string; 'news.h8.t': string;
+  'news.h9.b': string; 'news.h9.t': string;
   'news.more': string;
   'news.less': string;
   'news.hist.1': string;

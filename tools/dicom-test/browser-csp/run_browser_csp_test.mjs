@@ -20,7 +20,9 @@ import { createRequire } from 'node:module';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const root = path.resolve(here, '..', '..', '..');
-const outDir = path.resolve(here, '..', 'out');
+// DICOM_TEST_OUT: otra carpeta (p. ej. out_real, con patrón 'real_'); sin expected.json, se espera el cartel donde el
+// harness no decodificó nada (render/render.json) y la imagen del harness en el resto.
+const outDir = process.env.DICOM_TEST_OUT ? path.resolve(process.env.DICOM_TEST_OUT) : path.resolve(here, '..', 'out');
 const dist = path.resolve(process.argv[2] || path.join(root, 'dist/ready-doctor-web'));
 const pattern = new RegExp(process.argv[3] || '^t\\d{2}[a-z]?_.*\\.dcm$');
 const require = createRequire(process.env.PLAYWRIGHT_MODULE || path.join(root, 'package.json'));
@@ -28,7 +30,9 @@ const { chromium } = require('playwright');
 
 // Cabeceras de producción de visordicom.es (si cambian allí, cámbialas aquí). Única diferencia: producción añade a
 // connect-src el origen S3 del bucket de estudios del portal, que el visor no usa (los códecs van por script-src).
-// Para probar otra política: CSP="<política>" node run_browser_csp_test.mjs ...
+// Para probar otra política: CSP="<política>" node run_browser_csp_test.mjs ... Con CSP_ALLOW=<regex>, las violaciones
+// que casen se toleran (p. ej. CSP con worker-src 'none' y CSP_ALLOW=worker: comprueba que sin Workers de decodificación
+// el visor decodifica en el hilo principal y pinta lo mismo).
 const CSP = process.env.CSP || "default-src 'self'; script-src 'self' 'unsafe-hashes' 'sha256-MhtPZXr7+LpJUY5qtMutB+qWfQtMaPccfe7QXtCcEYc='; " +
   "style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self' https://*.visordicom.es; " +
   "worker-src 'self' blob:; manifest-src 'self'; frame-src 'self' https://*.visordicom.es; frame-ancestors 'self' https://*.visordicom.es; " +
@@ -45,12 +49,21 @@ const server = http.createServer((req, res) => {
   fs.createReadStream(p).pipe(res);
 }).listen(0);
 const origin = `http://127.0.0.1:${server.address().port}`;
-const expected = JSON.parse(fs.readFileSync(path.join(outDir, 'expected.json'), 'utf8'));
+const readJson = (file) => fs.existsSync(file) ? JSON.parse(fs.readFileSync(file, 'utf8')) : {};
+const expected = readJson(path.join(outDir, 'expected.json'));
+const rendered = readJson(path.join(outDir, 'render', 'render.json'));
 const files = fs.readdirSync(outDir).filter((f) => pattern.test(f)).sort();
 
 const browser = await chromium.launch({ executablePath: process.env.CHROMIUM || '/opt/pw-browsers/chromium' });
 let fails = 0;
+let skipped = 0;
 for (const name of files) {
+  if (!expected[name] && rendered[name] && !rendered[name].rows) {
+    // Ficheros reales sin imagen (DICOMDIR, RTSTRUCT, SR, sin meta header): el cargador no los ofrece como serie
+    console.log(`SKIP  ${name.padEnd(38)} sin imagen (Rows = 0)`);
+    skipped++;
+    continue;
+  }
   // locale es-ES: la interfaz sale en el idioma del navegador y la prueba busca los textos en español
   const page = await browser.newPage({ locale: 'es-ES', viewport: { width: 1400, height: 900 } });
   const problems = [];
@@ -67,7 +80,7 @@ for (const name of files) {
     if (await link.count()) { await link.click().catch(() => {}); await page.waitForTimeout(400); }
   }
   if (!(await page.locator('input#file').count())) { await page.goto(origin + '/file-loader'); await page.waitForTimeout(600); }
-  const expectFail = expected[name]?.kind === 'expect_fail';
+  const expectFail = expected[name] ? expected[name].kind === 'expect_fail' : !!rendered[name] && !rendered[name].decodedFrames;
   let pixels = null;
   try {
     await page.setInputFiles('input#file', path.join(outDir, name), { timeout: 10000 });
@@ -82,20 +95,26 @@ for (const name of files) {
     await firstSeries.click();
   } catch { /* fichero no reconocido (sin serie en el selector): se sigue igual */ }
   try {
-    await page.waitForFunction(() => [...document.querySelectorAll('basic-image-viewer img')].some((i) => i.src.startsWith('data:image')),
+    // El visor pinta en un <canvas> (data-painted) desde 2026-09-27; antes, en un <img> con data: URL. Vale lo uno o lo otro.
+    await page.waitForFunction(() => [...document.querySelectorAll('basic-image-viewer canvas, basic-image-viewer img')]
+      .some((e) => e.tagName == 'CANVAS' ? e.hasAttribute('data-painted') : (e.src || '').startsWith('data:image') && !e.hasAttribute('data-unsupported')),
       null, { timeout: expectFail ? 4000 : 20000 });
     pixels = await page.evaluate(async () => {
-      const img = [...document.querySelectorAll('basic-image-viewer img')].find((i) => i.src.startsWith('data:image'));
-      const im = new Image(); im.src = img.src; await im.decode();
-      const c = document.createElement('canvas'); c.width = im.naturalWidth; c.height = im.naturalHeight;
-      const ctx = c.getContext('2d'); ctx.drawImage(im, 0, 0);
-      return { w: c.width, h: c.height, data: Array.from(ctx.getImageData(0, 0, c.width, c.height).data) };
+      const shown = [...document.querySelectorAll('basic-image-viewer canvas, basic-image-viewer img')]
+        .find((e) => e.tagName == 'CANVAS' ? e.hasAttribute('data-painted') : (e.src || '').startsWith('data:image'));
+      let c = shown;
+      if (shown.tagName != 'CANVAS') {
+        const im = new Image(); im.src = shown.src; await im.decode();
+        c = document.createElement('canvas'); c.width = im.naturalWidth; c.height = im.naturalHeight;
+        c.getContext('2d').drawImage(im, 0, 0);
+      }
+      return { w: c.width, h: c.height, data: Array.from(c.getContext('2d').getImageData(0, 0, c.width, c.height).data) };
     });
   } catch { /* sin imagen */ }
   let verdict;
   if (expectFail) {
-    // En vez de la imagen el visor pinta un cartel con el motivo (atributos data-unsupported y title del <img>)
-    const reason = await page.evaluate(() => [...document.querySelectorAll('basic-image-viewer img')]
+    // En vez de la imagen el visor pinta un cartel con el motivo (atributos data-unsupported y title del canvas o <img>)
+    const reason = await page.evaluate(() => [...document.querySelectorAll('basic-image-viewer canvas, basic-image-viewer img')]
       .map((i) => i.getAttribute('data-unsupported')).find(Boolean) || '').catch(() => '');
     const want = expected[name]?.reason_contains || '';
     verdict = reason && reason.includes(want) ? `PASS (cartel: ${reason.slice(0, 60)}…)`
@@ -112,12 +131,16 @@ for (const name of files) {
     }
     verdict = maxdiff === 0 ? 'PASS (píxeles = harness)' : `FAIL (maxdiff ${maxdiff})`;
   }
-  if (problems.length) verdict = 'FAIL (' + problems.join(' | ') + ')';
+  const allow = process.env.CSP_ALLOW ? new RegExp(process.env.CSP_ALLOW, 'i') : null;
+  const blocking = problems.filter((p) => !(allow && p.startsWith('CSP: ') && allow.test(p)));
+  if (blocking.length) verdict = 'FAIL (' + blocking.join(' | ') + ')';
+  // [Worker]: se ha decodificado en el pool de Workers (DecodePool); los nativos se quedan en el hilo principal
+  if (page.workers().length) verdict += ' [Worker]';
   fails += verdict.startsWith('PASS') ? 0 : 1;
   console.log(`${verdict.startsWith('PASS') ? 'PASS' : 'FAIL'}  ${name.padEnd(38)} ${verdict}${codecs.length ? '  códecs: ' + codecs.join(', ') : ''}`);
   await page.close();
 }
 await browser.close();
 server.close();
-console.log(`\n${fails} FAIL / ${files.length} ficheros (CSP de producción)`);
+console.log(`\n${fails} FAIL / ${files.length - skipped} ficheros (CSP de producción)${skipped ? `, ${skipped} SKIP` : ''}`);
 process.exit(fails ? 1 : 0);

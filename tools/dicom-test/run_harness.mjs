@@ -21,21 +21,24 @@ fs.mkdirSync(renderDir, { recursive: true });
 // Stubs minimos de DOM que usa DCMFile en su constructor.
 globalThis.FileReader = class { readAsBinaryString() {} };
 globalThis.print = (...a) => console.log(...a); globalThis.printErr = (...a) => console.error(...a); // CharLS (emscripten) en modo "shell"
-globalThis.File = class { constructor(parts, name) { this.name = name; this.size = 0; } slice() { return this; } };
+// File y Blob son los de Node (20+): el harness lee los ficheros por rangos igual que el navegador (fs.openAsBlob).
 
 // Librerias de codecs que en Angular se cargan como <script> globales (angular.json -> scripts).
 for (const lib of ['src/libs/lossless.js',
                    'src/libs/jpeg-baseline.js', 'src/libs/jpeg-ls.js', 'src/libs/jpx.js']) {
   vm.runInThisContext(fs.readFileSync(path.join(root, lib), 'utf8'), { filename: lib });
 }
-// Códecs bajo demanda (src/assets/codecs): en el navegador los carga CodecLoader con un <script>; aquí se registra
-// el mismo global (factoría emscripten) para que CodecLoader lo encuentre sin DOM.
+// Códecs bajo demanda (src/assets/codecs): en el navegador los carga CodecLoader con un <script>; aquí se registran
+// sus factorías emscripten en globalThis.__visordicomCodecs (CODEC_REGISTRY_GLOBAL de codec-loader.ts), que
+// CodecLoader mira antes que los globales. No se escriben como globales: `CharLS` ya es el de src/libs/jpeg-ls.js y
+// pisarlo escondía que en el navegador el códec de reserva no se cargaba (JPEG-LS de 7 bits).
 {
   const { createRequire } = await import('node:module');
   const requireFromRoot = createRequire(path.join(root, 'package.json'));
+  globalThis.__visordicomCodecs = globalThis.__visordicomCodecs ?? {};
   for (const [file, globalName] of [['openjpegjs_decode.js', 'OpenJPEGJS'], ['libjpegturbojs_decode.js', 'libjpegturbojs_decode'], ['libjpegturbo12js.js', 'libjpegturbo12js'], ['charlsjs_decode.js', 'CharLS']]) {
     const codec = path.join(root, 'src/assets/codecs', file);
-    if (fs.existsSync(codec)) globalThis[globalName] = requireFromRoot(codec);
+    if (fs.existsSync(codec)) globalThis.__visordicomCodecs[globalName] = requireFromRoot(codec);
   }
 }
 
@@ -46,25 +49,32 @@ await build({
   external: ['@angular/core'],
 });
 const { createRequire } = await import('node:module');
-const { renderBinaryString } = createRequire(import.meta.url)(bundle);
+const { renderDicom } = createRequire(import.meta.url)(bundle);
+// DICOM_TEST_INMEMORY=1: camino antiguo en memoria (string binario, como los ficheros descargados del portal). Por
+// defecto, el del navegador: cabecera por bloques y Pixel Data por rangos.
+const inMemory = !!process.env.DICOM_TEST_INMEMORY;
+// DICOM_TEST_HEADER_CHUNK=512: primer bloque de cabecera de 512 bytes (en vez de 256 KB). Los ficheros de la batería
+// son pequeños y cabrían enteros en el primer bloque; así también se prueba la lectura del Pixel Data por rangos.
+const headerChunk = +(process.env.DICOM_TEST_HEADER_CHUNK || 0) || undefined;
 
 const summary = {};
 // DICOM_TEST_FILTER: expresión regular para procesar solo algunos ficheros; DICOM_TEST_VERBOSE=1 avisa por stderr
 // antes de cada fichero (para saber cuál revienta si el proceso se queda sin memoria)
 const filter = process.env.DICOM_TEST_FILTER ? new RegExp(process.env.DICOM_TEST_FILTER) : null;
 // DICOM_TEST_MANIFEST: JSON {clave: {path}} (real/scan_corpus.py) para procesar ficheros de cualquier carpeta sin
-// copiarlos; las salidas llevan la clave. DICOM_TEST_MAX_MB (480): los mayores se marcan como el visor (tope del
-// string del navegador) sin leerlos. DICOM_TEST_MAX_FRAMES_OUT (0 = todos): en multiframes grandes solo se
+// copiarlos; las salidas llevan la clave. DICOM_TEST_MAX_MB: los mayores se marcan BIG sin leerlos (por defecto sin tope;
+// 480 con DICOM_TEST_INMEMORY, el tope del string del navegador). DICOM_TEST_MAX_FRAMES_OUT (0 = todos): en multiframes grandes solo se
 // renderizan y guardan el primer frame, el central y el último (writtenFrames). DICOM_TEST_MAX_WINDOWS (3).
 const manifest = process.env.DICOM_TEST_MANIFEST ? JSON.parse(fs.readFileSync(process.env.DICOM_TEST_MANIFEST, 'utf8')) : null;
 const entries = manifest
   ? Object.entries(manifest).filter(([k]) => !filter || filter.test(k)).sort(([a], [b]) => a.localeCompare(b)).map(([k, v]) => ({ name: k, file: v.path ?? v, frames: v.frames, modality: v.modality }))
   : fs.readdirSync(outDir).filter(f => f.endsWith('.dcm') && (!filter || filter.test(f))).sort().map(f => ({ name: f, file: path.join(outDir, f) }));
-const maxMB = +(process.env.DICOM_TEST_MAX_MB || 480);
+// En memoria hay tope de string (~512 MB); leyendo por rangos no hay tope salvo el que se pida.
+const maxMB = +(process.env.DICOM_TEST_MAX_MB || (inMemory ? 480 : Infinity));
 const maxFramesOut = +(process.env.DICOM_TEST_MAX_FRAMES_OUT || 0);
 // DICOM_TEST_SKIP_MULTIFRAME="frames,MB": los multiframes con MÁS frames y MÁS MB que eso (láminas de patología por
-// tiles: miles de frames JPEG) se marcan como fuera del alcance sin decodificarlos; el visor decodifica todos los
-// frames de golpe y con ellos tarda minutos. Solo con manifiesto (el número de frames sale del inventario).
+// tiles: miles de frames JPEG) se marcan como fuera del alcance sin decodificarlos (el visor los ve como un cine de
+// tiles, no como una lámina). Solo con manifiesto (el número de frames sale del inventario).
 const skipMultiframe = (process.env.DICOM_TEST_SKIP_MULTIFRAME || '').split(',').map(Number);
 const skipFrames = skipMultiframe.length === 2 && skipMultiframe.every(n => n > 0) ? skipMultiframe : null;
 // DICOM_TEST_SKIP_SM_FRAMES=N: microscopía (modalidad SM, láminas completas) con más de N frames también es TILES,
@@ -87,27 +97,27 @@ for (const { name: f, file, frames, modality } of entries) {
   const mb = fs.statSync(file).size / 1048576;
   if ((skipFrames && frames > skipFrames[0] && mb > skipFrames[1]) || (skipSmFrames && modality === 'SM' && frames > skipSmFrames)) {
     summary[f] = { frames, decodedFrames: 0, windows: 0, skippedTiles: true,
-                   unsupportedReason: `multiframe de ${frames} frames y ${Math.round(mb)} MB (lámina por tiles): fuera del alcance de esta versión del visor, que decodifica todos los frames de golpe` };
+                   unsupportedReason: `multiframe de ${frames} frames y ${Math.round(mb)} MB (lámina por tiles): fuera del alcance de la batería (DICOM_TEST_SKIP_MULTIFRAME / DICOM_TEST_SKIP_SM_FRAMES)` };
     continue;
   }
   if (mb > maxMB) {
     summary[f] = { frames: undefined, decodedFrames: 0, windows: 0,
-                   unsupportedReason: `fichero de ${Math.round(mb)} MB: supera el tope de ${maxMB} MB por fichero de esta versión del visor (string del navegador)`,
+                   unsupportedReason: `fichero de ${Math.round(mb)} MB: supera el tope de ${maxMB} MB por fichero de esta prueba (DICOM_TEST_MAX_MB)`,
                    skippedBig: true };
     continue;
   }
-  const bin = fs.readFileSync(file).toString('latin1');
+  const bin = inMemory ? fs.readFileSync(file).toString('latin1') : null;
   const variants = [0, 1, 2].slice(0, maxWindows);
   for (const w of variants) {
     let r;
     const tf = Date.now();
-    try { r = await renderBinaryString(bin, w, maxFramesOut); }
+    try { r = await renderDicom(inMemory ? { bin } : { blob: await fs.openAsBlob(file), name: path.basename(file), headerChunk }, w, maxFramesOut); }
     catch (e) { r = { error: 'THROW ' + (e?.message ?? e), rgba: [], written: [] }; }
     if (w > 0 && !(r.windows > w)) continue; // solo renderizamos ventanas que existen
     const key = w === 0 ? f : `${f}#w${w}`;
     summary[key] = { rows: r.rows, cols: r.cols, frames: r.frames, ts: r.ts, tsName: r.tsName,
                      windows: r.windows, windowCount: r.windowCount, decodedFrames: r.decoded ?? r.rgba.length, error: r.error,
-                     unsupportedReason: r.unsupportedReason, decodedBy: r.decodedBy, ms: Date.now() - tf };
+                     unsupportedReason: r.unsupportedReason, decodedBy: r.decodedBy, partial: r.partial, ms: Date.now() - tf };
     if (r.written) summary[key].writtenFrames = r.written;
     if (w === 0) Object.assign(summary[key], { isDicom: r.isDicom, noFileMeta: r.noFileMeta || undefined, text: r.text });
     r.rgba.forEach((buf, i) => fs.writeFileSync(path.join(renderDir, `${key}.f${r.written ? r.written[i] : i}.rgba`), Buffer.from(buf.buffer)));

@@ -1,3 +1,4 @@
+import { FrameBytes } from "../DCM/pixel-data-access";
 import { BaseDecoder } from "./base-decoder-class";
 import { CodecLoader, CodecRequiredError } from "./codec-loader";
 import { decodeWithEmscripten } from "./emscripten-codecs";
@@ -26,27 +27,23 @@ export class JPEG2000Decoder extends BaseDecoder {
         super(reader);
     }
 
-    public Decode(): any[] {
-        const frames = this.interpret.getEncapsulatedFrames();
-        const useJpx = !this.htj2k && CodecLoader.isUnavailable('openjpeg');
-        return frames.map(frame => {
-            const bytes = BaseDecoder.toBytes(frame);
-            if (JPEG2000Decoder.usesPart2ArrayMCT(bytes)) {
-                throw new Error('JPEG 2000 Part 2 con transformación multicomponente por matriz (MCT): no soportado');
+    public decodeFrame(frame: FrameBytes): any {
+        const bytes = BaseDecoder.toBytes(frame.data);
+        if (JPEG2000Decoder.usesPart2ArrayMCT(bytes)) {
+            throw new Error('JPEG 2000 Part 2 con transformación multicomponente por matriz (MCT): no soportado');
+        }
+        if (!this.htj2k && CodecLoader.isUnavailable('openjpeg')) {
+            return this.decodeWithJpx(bytes);
+        }
+        try {
+            return decodeWithEmscripten('openjpeg', 'J2KDecoder', bytes).data;
+        } catch (error) {
+            if (error instanceof CodecRequiredError || this.htj2k) {
+                throw error;
             }
-            if (useJpx) {
-                return this.decodeWithJpx(bytes);
-            }
-            try {
-                return decodeWithEmscripten('openjpeg', 'J2KDecoder', bytes).data;
-            } catch (error) {
-                if (error instanceof CodecRequiredError || this.htj2k) {
-                    throw error;
-                }
-                console.warn('OpenJPEG no pudo decodificar el frame; se intenta con jpx.js', error);
-                return this.decodeWithJpx(bytes);
-            }
-        });
+            console.warn('OpenJPEG no pudo decodificar el frame; se intenta con jpx.js', error);
+            return this.decodeWithJpx(bytes);
+        }
     }
 
     /** SOC (FF4F) + SIZ (FF51): Rsiz con el bit de Part 2 (0x8000) y la extension MCT (0x0100). */

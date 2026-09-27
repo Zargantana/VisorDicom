@@ -69,7 +69,8 @@ export class FileLoaderComponent implements AfterViewInit {
       for (const entry of entries) {
         const resp = await fetch(entry.url, { method: 'GET', credentials: 'omit', cache: 'no-store' });
         if (!resp.ok) throw new Error('S3 ha respondido ' + resp.status);
-        files.push(new File([await resp.arrayBuffer()], entry.fileName || 'imagen.dcm', { type: 'application/dicom' }));
+        // Blob y no ArrayBuffer: el navegador puede guardarlo en disco y el visor lo lee por rangos (sin tope de tamaño)
+        files.push(new File([await resp.blob()], entry.fileName || 'imagen.dcm', { type: 'application/dicom' }));
       }
       if (!files.length) throw new Error('sin ficheros');
       this.autoOpen = true;

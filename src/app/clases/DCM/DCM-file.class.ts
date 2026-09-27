@@ -1,13 +1,14 @@
 import { Observable } from "rxjs";
+import { DCMFileReader } from "./DCM-file-reader.class";
 
 export const DICOM_LABEL = "DICM";
 export const VR_UL = "UL";
 export const LITTLE_ENDIANT_FIRST_KNOWN_TAG_BYTE = 2; //BE = 0
 export const DEFLATED_EXPLICIT_VR_LITTLE_ENDIAN = '1.2.840.10008.1.2.1.99';
 /**
- * Tope de FileReader.readAsBinaryString: la longitud maxima de un string en V8 (2^29 - 24 caracteres; Chrome y Edge).
- * Por encima, result es null SIN evento de error. Firefox y Safari tienen otros limites, por eso se comprueba ademas el
- * resultado vacio. Plan para superarlo: documentation/plan-carga-ficheros-grandes.md (lectura por trozos con File.slice).
+ * La longitud maxima de un string en V8 (2^29 - 24 caracteres; Chrome y Edge). Solo limita lo que se lee ENTERO en
+ * rawData: Deflated Explicit VR LE (hay que inflar el dataset entero) y la pantalla de test (fullRead). El resto se lee
+ * por rangos: la cabecera por bloques hasta el Pixel Data y cada frame cuando hace falta (ver readHeader).
  */
 export const MAX_BINARY_STRING_BYTES = (1 << 29) - 24;
 /**
@@ -30,11 +31,42 @@ export enum FILEREAD_STATUS {
     ABORT = 3
 }
 
+/** Primer bloque de cabecera que se lee (se amplía x4 hasta llegar al Pixel Data). */
+export const HEADER_CHUNK_BYTES = 256 * 1024;
+
+/** Acceso por rangos a los bytes de un fichero (File, Blob o, en Node, fs.openAsBlob). */
+export interface ByteSource {
+    readonly size: number;
+    read(offset: number, length: number): Promise<Uint8Array>;
+}
+
+/** File o Blob: cada lectura es un slice().arrayBuffer(); nunca se carga el fichero entero. */
+export class BlobSource implements ByteSource {
+    constructor(private blob: Blob) {}
+
+    public get size(): number {
+        return this.blob.size;
+    }
+
+    public async read(offset: number, length: number): Promise<Uint8Array> {
+        const start = Math.max(0, offset), end = Math.min(this.blob.size, offset + length);
+        if (end <= start) {
+            return new Uint8Array(0);
+        }
+        return new Uint8Array(await this.blob.slice(start, end).arrayBuffer());
+    }
+}
+
 export class DCMFile {
 
     // public static HIGH_PRIOR = 0;
+    private static nextId = 1;
+    /** Primer bloque de cabecera (bytes). La batería lo baja para forzar la lectura por rangos en ficheros pequeños. */
+    public static headerChunkBytes: number = HEADER_CHUNK_BYTES;
 
-    private freader: FileReader;
+    /** Identificador único del fichero (clave de la caché de frames decodificados). */
+    public readonly id: number = DCMFile.nextId++;
+
     private readStatusSubscriber: any;
     private readStatusTrkSubscriber: any;
     private isDCMSubscriber: any;
@@ -50,6 +82,10 @@ export class DCMFile {
     });
 
     public readStatus: FILEREAD_STATUS = FILEREAD_STATUS.NONE;
+    /**
+     * Contenido como "binary string" (1 char = 1 byte). Con `partial` = true es SOLO la cabecera (hasta donde empieza
+     * el valor del Pixel Data): el Pixel Data se lee por rangos con readRange() cuando se va a ver un frame.
+     */
     public rawData: string = '';
     public length: number = 0;
     public length$: Observable<number> = new Observable<number>((subscriber) =>  {
@@ -59,6 +95,8 @@ export class DCMFile {
     public isDCM: boolean | null = null;
     /** true si el dataset venia en Deflated Explicit VR LE y ya se ha inflado en rawData. */
     public inflated: boolean = false;
+    /** true si rawData tiene solo la cabecera y el Pixel Data se lee del fichero bajo demanda. */
+    public partial: boolean = false;
     /** true desde que empieza la lectura (el cargador encola los ficheros y solo lee unos pocos a la vez). */
     public started: boolean = false;
     /** Motivo, para el usuario, cuando readStatus es ERROR (p. ej. fichero mayor que el tope del navegador). */
@@ -68,9 +106,13 @@ export class DCMFile {
         subscriber.next(this.isDCM);
     });
 
+    /** Bytes del fichero por rangos; null en los descargados del portal (todo está ya en rawData). */
+    public readonly source: ByteSource | null;
+
     public static downloadedDCMFile(value: string): DCMFile {
       var file = new File([], 'emptyFile');
       var dcmFile = new DCMFile(file);
+      (dcmFile as any).source = null;
       dcmFile.rawData = value;
       dcmFile.length = value.length;
       dcmFile.isDCM = true;
@@ -78,16 +120,133 @@ export class DCMFile {
       return dcmFile;
     }
 
-    constructor(public file: File) {
-        this.freader = new FileReader();
-        this.addListeners();
+    /**
+     * @param fullRead lee el fichero entero en rawData (como antes de la lectura por trozos): la pantalla de test lo
+     *   usa porque llama a los decoders de forma síncrona. Tope: MAX_BINARY_STRING_BYTES.
+     */
+    constructor(public file: File, private fullRead: boolean = false) {
+        this.source = new BlobSource(file);
     }
-    
+
     public readContents(): void {
         this.resetReadResults();
         this.started = true;
-        let sliced = this.file.slice(0, HEAD_BYTES);
-        this.freader.readAsBinaryString(sliced);
+        this.load().catch((error) => this.failRead(String((error as any)?.message ?? error)));
+    }
+
+    /** Lee (asíncrono) lo necesario para clasificar y ver el fichero; emite readStatus$ al terminar. */
+    public async load(): Promise<void> {
+        const source = this.source!;
+        // Lo justo para decidir si es DICOM: preámbulo + "DICM" o, sin preámbulo, los primeros elementos (sniffDataset)
+        const head = await source.read(0, Math.min(source.size, HEAD_BYTES));
+        this.rawData = DCMFile.bytesToBinaryString(head);
+        this.setLength(this.rawData.length);
+        this.isDCM = this.isDICOMFile();
+        if (!this.isDCM) {
+            this.succeed();
+            return;
+        }
+        if (this.fullRead) {
+            await this.readWhole();
+        } else {
+            await this.readHeader();
+        }
+        if (this.readStatus == FILEREAD_STATUS.ERROR) {
+            return;
+        }
+        await this.inflateIfDeflated().catch((error) => console.warn('No se pudo inflar ' + this.file.name + ': ' + error));
+        this.succeed();
+    }
+
+    /**
+     * Cabecera por bloques: 256 KB, x4 cada vez, hasta que el Pixel Data del dataset raíz empieza dentro del bloque.
+     * Se corta rawData justo donde empieza su valor (partial). Si el fichero cabe entero en el bloque, o no tiene
+     * Pixel Data, o es Deflated (hay que inflar el dataset entero), queda completo en rawData.
+     */
+    private async readHeader(): Promise<void> {
+        const source = this.source!;
+        let size = Math.min(source.size, Math.max(256, DCMFile.headerChunkBytes));
+        for (;;) {
+            if (size > MAX_BINARY_STRING_BYTES) {
+                this.failRead(`${this.sizeMB} MB sin Pixel Data en los primeros ${Math.floor(MAX_BINARY_STRING_BYTES / 1048576)} MB: ` +
+                    'cabecera demasiado grande para el navegador');
+                return;
+            }
+            const bytes = await source.read(0, size);
+            this.rawData = DCMFile.bytesToBinaryString(bytes);
+            this.setLength(this.rawData.length);
+            if (size >= source.size) {
+                this.partial = false;
+                return;
+            }
+            const meta = DCMFile.scanFileMetaInformation(this.rawData, DCMFile.datasetOffset(this.rawData) ?? 132);
+            if (meta?.transferSyntax === DEFLATED_EXPLICIT_VR_LITTLE_ENDIAN) {
+                await this.readWhole(); // deflate: no se puede leer por rangos
+                return;
+            }
+            const cut = DCMFile.pixelDataValueStart(this);
+            if (cut >= 0) {
+                // String NUEVO con solo la cabecera: un substring de V8 retendría el bloque leído entero (256 KB o más
+                // por fichero; en un CD de 600 cortes, ~150 MB de memoria sin usar).
+                this.rawData = DCMFile.bytesToBinaryString(bytes.subarray(0, cut));
+                this.setLength(cut);
+                this.partial = true;
+                return;
+            }
+            size = Math.min(source.size, size * 4);
+        }
+    }
+
+    /** Fichero entero en rawData (Deflate, pantalla de test). */
+    private async readWhole(): Promise<void> {
+        const source = this.source!;
+        if (source.size > MAX_BINARY_STRING_BYTES) {
+            // En Chrome y Edge un string no puede pasar de ~512 MB
+            this.failRead(`${this.sizeMB} MB: demasiado grande para leerlo entero en el navegador ` +
+                `(tope de ${Math.floor(MAX_BINARY_STRING_BYTES / 1048576)} MB por fichero en esta Transfer Syntax)`);
+            return;
+        }
+        this.rawData = DCMFile.bytesToBinaryString(await source.read(0, source.size));
+        this.setLength(this.rawData.length);
+        this.partial = false;
+    }
+
+    /**
+     * Posición (en el fichero) donde empieza el VALOR del Pixel Data (7FE0,0010) del dataset raíz, si su cabecera está
+     * entera en rawData; -1 si no. Usa el parser de siempre sobre el bloque leído.
+     */
+    private static pixelDataValueStart(file: DCMFile): number {
+        const info = new DCMFileReader(file).pixelDataInfo;
+        return (info && info.valueOffset <= file.rawData.length) ? info.valueOffset : -1;
+    }
+
+    /** Bytes [offset, offset + length) del fichero: por rangos del File o, si todo está en memoria, de rawData. */
+    public async readRange(offset: number, length: number): Promise<Uint8Array> {
+        if (this.source && this.partial) {
+            return this.source.read(offset, length);
+        }
+        const end = Math.min(this.rawData.length, offset + length);
+        const out = new Uint8Array(Math.max(0, end - offset));
+        for (let i = 0; i < out.length; i++) {
+            out[i] = this.rawData.charCodeAt(offset + i);
+        }
+        return out;
+    }
+
+    /** Tamaño real del fichero (con partial, rawData es solo la cabecera). */
+    public get size(): number {
+        return (this.source && this.partial) ? this.source.size : this.rawData.length;
+    }
+
+    private setLength(length: number): void {
+        this.length = length;
+        this.lengthSubscriber?.next(this.length);
+    }
+
+    private succeed(): void {
+        this.readStatus = FILEREAD_STATUS.SUCCESS;
+        this.readStatusSubscriber?.next(this.readStatus);
+        this.readStatusTrkSubscriber?.next(this.readStatus);
     }
 
     /** Fallo controlado: guarda el motivo, lo deja en la consola y avisa a los suscriptores con ERROR. */
@@ -102,10 +261,6 @@ export class DCMFile {
 
     private get sizeMB(): number {
         return Math.round(this.file.size / 1048576);
-    }
-
-    private readCompleteFile(): void {
-        this.freader.readAsBinaryString(this.file);
     }
 
     /** DICOM con preámbulo y "DICM" o, sin preámbulo, un dataset que se deja leer (ACR-NEMA, datasets crudos). */
@@ -218,78 +373,12 @@ export class DCMFile {
         this.readStatusTrkSubscriber?.next(this.readStatus);
         this.rawData = '';
         this.readError = '';
+        this.partial = false;
+        this.inflated = false;
         this.length = 0;
         this.lengthSubscriber?.next(this.length);
         this.isDCM = null;
         this.isDCMSubscriber?.next(this.isDCM);
-    }
-
-    private addListeners(): void {
-        this.freader.onloadstart = (ev: ProgressEvent<FileReader>) => { this.handleEvent(ev); }
-        this.freader.onload = (ev: ProgressEvent<FileReader>) => { this.handleEvent(ev); }
-        this.freader.onloadend = (ev: ProgressEvent<FileReader>) => { this.handleEvent(ev); }
-        this.freader.onprogress = (ev: ProgressEvent<FileReader>) => { this.handleEvent(ev); }
-        this.freader.onerror = (ev: ProgressEvent<FileReader>) => { this.handleEvent(ev); }
-        this.freader.onabort = (ev: ProgressEvent<FileReader>) => { this.handleEvent(ev); }
-    }
-
-    public handleEvent(event: any) {
-        // if (DCMFile.HIGH_PRIOR && !this.isDCM) {
-        //     setTimeout(() => this.handleEvent(event), 100);
-        //     return;
-        // }
-        //console.log(`${event.type}: ${event.loaded} bytes transferred\n`);
-        this.length = event.loaded;
-        this.lengthSubscriber?.next(this.length);
-        
-        if (event.type === "loadend") {
-            //console.log('Read Ended.');
-            this.rawData = this.freader.result?this.freader.result.toString():'';
-            this.length = this.rawData.length;
-            this.lengthSubscriber?.next(this.length);
-            if (this.isDCM) {
-                if (this.rawData.length == 0 && this.file.size > 0) {
-                    // El navegador no ha devuelto nada (ni error): el fichero no cabe en un string.
-                    this.failRead(`no se ha podido cargar entero en memoria (${this.sizeMB} MB); ` +
-                        'el navegador no admite ficheros tan grandes en esta versión del visor');
-                    return;
-                }
-                // DCMFile.HIGH_PRIOR--;
-                this.inflateIfDeflated()
-                    .catch((error) => console.warn('No se pudo inflar ' + this.file.name + ': ' + error))
-                    .then(() => {
-                        this.readStatus = FILEREAD_STATUS.SUCCESS;
-                        this.readStatusSubscriber?.next(this.readStatus);
-                        this.readStatusTrkSubscriber?.next(this.readStatus);
-                    });
-            } else {
-                this.isDCM = this.isDICOMFile();
-                if (this.isDCM) {
-                    // DCMFile.HIGH_PRIOR++;
-                    if (this.file.size > MAX_BINARY_STRING_BYTES) {
-                        // Ni se intenta: en Chrome y Edge readAsBinaryString devolveria null tras leerlo entero.
-                        this.failRead(`${this.sizeMB} MB: demasiado grande para esta versión del visor ` +
-                            `(tope de ${Math.floor(MAX_BINARY_STRING_BYTES / 1048576)} MB por fichero)`);
-                    } else {
-                        this.readCompleteFile();
-                    }
-                } else {
-                    this.readStatus = FILEREAD_STATUS.SUCCESS;
-                    this.readStatusSubscriber?.next(this.readStatus);
-                    this.readStatusTrkSubscriber?.next(this.readStatus);
-                }
-            }
-        } else if (event.type === "error") {
-            console.log('Read Error.');
-            this.readStatus = FILEREAD_STATUS.ERROR;
-            this.readStatusSubscriber?.next(this.readStatus);
-            this.readStatusTrkSubscriber?.next(this.readStatus);
-        } else if (event.type === "abort") {
-            console.log('Read Abort.');
-            this.readStatus = FILEREAD_STATUS.ABORT;
-            this.readStatusSubscriber?.next(this.readStatus);
-            this.readStatusTrkSubscriber?.next(this.readStatus);
-        }
     }
 
     public isLittleEndian(): boolean {
@@ -322,10 +411,37 @@ export class DCMFile {
         for (let i = 0; i < compressed.length; i++) {
             compressed[i] = this.rawData.charCodeAt(meta.end + i);
         }
-        const stream = new Blob([compressed]).stream().pipeThrough(new Decompression('deflate-raw'));
-        // Se lee por trozos en lugar de new Response(stream).arrayBuffer(): PS3.5 A.5 permite un byte nulo de
-        // relleno tras el stream deflate (pydicom lo escribe) y el DecompressionStream de Chrome lo considera
-        // "junk" y falla DESPUES de haber entregado todo el dataset. Si ya hay datos, se aceptan.
+        // Tras el stream deflate puede haber bytes de más: el byte nulo de relleno de PS3.5 A.5 (pydicom lo escribe si la
+        // longitud es impar) o un trailer gzip de 8 bytes (CRC32 + tamaño; visto en image_dfl.dcm de pydicom). El
+        // DecompressionStream de Chrome los toma por basura y da error, y al dar error DESCARTA los trozos inflados que
+        // aún no se habían leído: en un fichero grande se perdía el final de la imagen. Se prueba entero y quitando de
+        // 1 a 8 bytes del final: quitar de más deja el stream incompleto (error), así que el primero que infla sin
+        // error es el bueno. Si ninguno, lo que se haya podido inflar (como antes).
+        let inflated: Uint8Array | null = null;
+        let firstError: any = null;
+        for (const trim of [0, 1, 8, 2, 3, 4, 5, 6, 7]) {
+            if (trim >= compressed.length) {
+                continue;
+            }
+            try {
+                inflated = await DCMFile.inflateRaw(Decompression, compressed.subarray(0, compressed.length - trim), false);
+                break;
+            } catch (error) {
+                firstError ??= error;
+            }
+        }
+        if (!inflated) {
+            inflated = await DCMFile.inflateRaw(Decompression, compressed, true);
+            console.debug('Deflate: stream dañado o con datos de más en ' + this.file.name + ': ' + firstError);
+        }
+        this.rawData = this.rawData.substring(0, meta.end) + DCMFile.bytesToBinaryString(inflated);
+        this.length = this.rawData.length;
+        this.inflated = true;
+    }
+
+    /** Infla un stream deflate crudo. Con `partial`, si falla a medias devuelve lo inflado hasta ahí (si hay algo). */
+    private static async inflateRaw(Decompression: any, compressed: Uint8Array, partial: boolean): Promise<Uint8Array> {
+        const stream = new Blob([compressed as BlobPart]).stream().pipeThrough(new Decompression('deflate-raw'));
         const reader = (stream as ReadableStream<Uint8Array>).getReader();
         const chunks: Uint8Array[] = [];
         let total = 0;
@@ -336,15 +452,12 @@ export class DCMFile {
                 if (value) { chunks.push(value); total += value.length; }
             }
         } catch (error) {
-            if (total === 0) throw error;
-            console.debug('Deflate: datos tras el final del stream (relleno) en ' + this.file.name + ': ' + error);
+            if (!partial || total === 0) throw error;
         }
         const inflated = new Uint8Array(total);
         let offset = 0;
         for (const chunk of chunks) { inflated.set(chunk, offset); offset += chunk.length; }
-        this.rawData = this.rawData.substring(0, meta.end) + DCMFile.bytesToBinaryString(inflated);
-        this.length = this.rawData.length;
-        this.inflated = true;
+        return inflated;
     }
 
     /** Recorre el grupo 0002 (siempre Explicit VR LE) y devuelve el TS y el offset donde empieza el dataset. */

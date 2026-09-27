@@ -121,6 +121,19 @@ export class DCMFileReader {
     }
 
     /**
+     * Pixel Data (7FE0,0010) del dataset raiz: donde empieza su valor en el fichero y cuanto mide (null = encapsulado,
+     * longitud indefinida). null si el fichero no tiene Pixel Data. Con DCMFile.partial el valor no esta en rawData:
+     * se lee por rangos (ver PixelDataAccess).
+     */
+    public get pixelDataInfo(): { valueOffset: number; length: number | null; vr: string } | null {
+        const tag = this.readed_tags.find(t => t.TagHigh == 0x7FE0 && t.TagLow == 0x0010 && t.depth == 0);
+        if (!tag || tag.position === undefined || tag.dataOffset === undefined) {
+            return null;
+        }
+        return { valueOffset: tag.position + tag.dataOffset, length: tag.undefinedLength ? null : (tag.VL ?? 0), vr: (tag.VR ?? '').trim() };
+    }
+
+    /**
      * Dónde empieza y cómo va codificado lo primero que se lee. Con preámbulo, en 132 y como siempre. Sin preámbulo
      * (DCMFile.datasetOffset), en 0 o en 4; si no hay grupo 0002, la TS sale de los propios elementos: Implicit VR LE
      * (lo habitual en ACR-NEMA), Explicit VR LE o Explicit VR Big Endian.
@@ -385,6 +398,7 @@ export class DCMFileReader {
             if (tag.VL == UNDEFINED_LENGTH) {
                 tag.VL = 0;
                 undefinedLength = true;
+                tag.undefinedLength = true;
             } else if (isItem) {
                 descend = (tag.VL ?? 0) > 0 && top?.kind != 'pixel'; // dentro del Pixel Data, un item es un fragmento
             } else if (tag.TagHigh != 0xFFFE && tag.VR == VR_SQ && (tag.VL ?? 0) > 0) {

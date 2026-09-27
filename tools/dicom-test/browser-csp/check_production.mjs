@@ -46,10 +46,13 @@ for (const name of files) {
   const firstSeries = page.locator('images-loader findings-table td.ft-view').first();
   await firstSeries.waitFor({ timeout: 60000 });
   await firstSeries.click();
-  const ok = await page.waitForFunction(() => [...document.querySelectorAll('img')]
-    .some(i => i.src.startsWith('data:image') || i.hasAttribute('data-unsupported')), null, { timeout: 90000 }).then(() => true).catch(() => false);
+  // Imagen = <canvas data-painted> (visor desde 2026-09-27) o <img> con data: URL (versiones anteriores); cartel = data-unsupported
+  // (sin new Function/eval: la CSP de producción lo bloquearía y saldría como violación)
+  const ok = await page.waitForFunction(() => [...document.querySelectorAll('img, canvas')]
+    .some(e => e.hasAttribute('data-unsupported') || (e.tagName == 'CANVAS' ? e.hasAttribute('data-painted') : e.src.startsWith('data:image'))),
+    null, { timeout: 90000 }).then(() => true).catch(() => false);
   const state = await page.evaluate(() => {
-    const imgs = [...document.querySelectorAll('img')].filter(i => i.src.startsWith('data:image') || i.hasAttribute('data-unsupported'));
+    const imgs = [...document.querySelectorAll('img, canvas')].filter(i => i.hasAttribute('data-unsupported') || (i.tagName == 'CANVAS' ? i.hasAttribute('data-painted') : i.src.startsWith('data:image')));
     const cartel = imgs.map(i => i.getAttribute('data-unsupported')).find(Boolean) || '';
     return { painted: imgs.filter(i => !i.hasAttribute('data-unsupported')).length, cartel, csp: window.__csp.splice(0) };
   });

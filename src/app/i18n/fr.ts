@@ -80,6 +80,7 @@ export const FR: Texts = {
   'news.h6.b': 'Plus d\'examens s\'ouvrent :', 'news.h6.t': 'plus de formats d\'image et de couleur, et vous pouvez choisir le contraste quand l\'examen en propose plusieurs.',
   'news.h7.b': 'Sur tous les appareils :', 'news.h7.t': 'Windows, Linux et Mac ; Android et iOS. PC, tablette et mobile.',
   'news.h8.b': 'Dans votre langue :', 'news.h8.t': 'espagnol, anglais, catalan, basque, galicien, portugais, français, italien, allemand, japonais, chinois, russe, coréen et grec. Choisissez-la avec le bouton du globe, en haut à droite.',
+  'news.h9.b': "Examens de toute taille :", 'news.h9.t': "les fichiers de plusieurs Go s'ouvrent (testé avec 2 Go) sans être chargés en entier ; les images sont décodées en arrière-plan et le ciné est plus fluide.",
   'news.more': 'plus...',
   'news.less': '...moins',
   'news.hist.1': 'Naissance de VisorDicom, la version libre et gratuite de la visionneuse.',

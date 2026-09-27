@@ -1,3 +1,4 @@
+import { FrameBytes } from "../DCM/pixel-data-access";
 import { BaseDecoder } from "./base-decoder-class";
 import { CodecLoader } from "./codec-loader";
 import { decodeWithEmscripten } from "./emscripten-codecs";
@@ -41,24 +42,22 @@ export function stripJpegFillBytes(bytes: Uint8Array): Uint8Array {
 export class JPEGBaselineDecoder extends BaseDecoder {
     public override outputIsRGB: boolean = true;
 
-    public Decode(): any[] {
-        return this.interpret.getEncapsulatedFrames().map(frame => {
-            const bytes = stripJpegFillBytes(BaseDecoder.toBytes(frame));
-            if (this.reader.BitsAllocated > 8 && !CodecLoader.isUnavailable('libjpeg-turbo-12')) {
-                return decodeWithEmscripten('libjpeg-turbo-12', 'JPEGDecoder', bytes).data; // lanza CodecRequiredError hasta cargarse
-            }
-            try {
-                const decoder = new JpegImage();
-                decoder.parse(bytes);
-                decoder.colorTransform = JPEGBaselineDecoder.wantsColorTransform(decoder, this.reader.PhotometricInterpretation);
-                return (this.reader.BitsAllocated > 8)
-                    ? decoder.getData16(decoder.width, decoder.height)
-                    : decoder.getData(decoder.width, decoder.height);
-            } catch (error) {
-                const codec = (this.reader.BitsAllocated > 8) ? 'libjpeg-turbo-12' : 'libjpeg-turbo';
-                return decodeWithEmscripten(codec, 'JPEGDecoder', bytes).data;
-            }
-        });
+    public decodeFrame(frame: FrameBytes): any {
+        const bytes = stripJpegFillBytes(BaseDecoder.toBytes(frame.data));
+        if (this.reader.BitsAllocated > 8 && !CodecLoader.isUnavailable('libjpeg-turbo-12')) {
+            return decodeWithEmscripten('libjpeg-turbo-12', 'JPEGDecoder', bytes).data; // lanza CodecRequiredError hasta cargarse
+        }
+        try {
+            const decoder = new JpegImage();
+            decoder.parse(bytes);
+            decoder.colorTransform = JPEGBaselineDecoder.wantsColorTransform(decoder, this.reader.PhotometricInterpretation);
+            return (this.reader.BitsAllocated > 8)
+                ? decoder.getData16(decoder.width, decoder.height)
+                : decoder.getData(decoder.width, decoder.height);
+        } catch (error) {
+            const codec = (this.reader.BitsAllocated > 8) ? 'libjpeg-turbo-12' : 'libjpeg-turbo';
+            return decodeWithEmscripten(codec, 'JPEGDecoder', bytes).data;
+        }
     }
 
     /**
@@ -91,21 +90,19 @@ export class JPEGBaselineDecoder extends BaseDecoder {
 export class JPEGRetiredProcessesDecoder extends BaseDecoder {
     public override outputIsRGB: boolean = true;
 
-    public Decode(): any[] {
-        return this.interpret.getEncapsulatedFrames().map(frame => {
-            const bytes = stripJpegFillBytes(BaseDecoder.toBytes(frame));
-            if (this.reader.BitsAllocated <= 8) {
-                return decodeWithEmscripten('libjpeg-turbo', 'JPEGDecoder', bytes).data;
-            }
-            if (!CodecLoader.isUnavailable('libjpeg-turbo-12')) {
-                // Lanza CodecRequiredError hasta que ImageDCM.prepare() cargue el codec y reintente
-                return decodeWithEmscripten('libjpeg-turbo-12', 'JPEGDecoder', bytes).data;
-            }
-            const decoder = new JpegImage();
-            decoder.parse(bytes);
-            decoder.colorTransform = JPEGBaselineDecoder.wantsColorTransform(decoder, this.reader.PhotometricInterpretation);
-            return decoder.getData16(decoder.width, decoder.height);
-        });
+    public decodeFrame(frame: FrameBytes): any {
+        const bytes = stripJpegFillBytes(BaseDecoder.toBytes(frame.data));
+        if (this.reader.BitsAllocated <= 8) {
+            return decodeWithEmscripten('libjpeg-turbo', 'JPEGDecoder', bytes).data;
+        }
+        if (!CodecLoader.isUnavailable('libjpeg-turbo-12')) {
+            // Lanza CodecRequiredError hasta que ImageDCM.prepare() cargue el codec y reintente
+            return decodeWithEmscripten('libjpeg-turbo-12', 'JPEGDecoder', bytes).data;
+        }
+        const decoder = new JpegImage();
+        decoder.parse(bytes);
+        decoder.colorTransform = JPEGBaselineDecoder.wantsColorTransform(decoder, this.reader.PhotometricInterpretation);
+        return decoder.getData16(decoder.width, decoder.height);
     }
 }
 

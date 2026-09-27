@@ -40,6 +40,8 @@ This document is the DICOM Conformance Statement for the \textbf{Web DICOM Viewe
 \subsection*{2.2 Functional Definition}
 The Web DICOM Viewer is a \textbf{VIEWER} application that does not establish network communication via DICOM protocol (no SCU/SCP roles). It operates solely on files provided through user upload.
 
+Large files are read in ranges: only the Data Set up to the Pixel Data element is loaded to build the list of studies and series; each frame is read from the file when it is needed (locating it through the Extended or Basic Offset Table, or the fragment structure, for encapsulated Pixel Data) and compressed frames are decoded in background Web Workers. Decoded frames are kept in a memory cache of bounded size (256 MB on desktop computers, 128 MB on mobile devices). There is no file size limit other than those of the browser and the operating system, except for Deflated Explicit VR Little Endian, which has to be inflated whole and is limited to about 512 MB per file.
+
 \section*{3. AE Specifications}
 
 \subsection*{3.1 Web DICOM Viewer AE}

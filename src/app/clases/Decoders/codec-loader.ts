@@ -4,10 +4,11 @@
  * - Son builds asm.js/wasm2js (JS puro): funcionan con la CSP de producción (script-src 'self', sin
  *   'wasm-unsafe-eval' ni 'unsafe-eval').
  * - Se cargan con un <script src="assets/codecs/..."> del mismo origen la primera vez que un fichero los necesita
- *   (no van en el bundle inicial). No se importan con import(): llevan require("fs") en la rama de Node de
+ *   (no van en el bundle inicial); dentro del Worker de decodificación, con importScripts (ver decode.worker.ts). No se importan con import(): llevan require("fs") en la rama de Node de
  *   emscripten y webpack intentaría resolverlo.
- * - Cada script define un global con la factoría emscripten (p. ej. OpenJPEGJS). Si el global ya existe
- *   (el harness de Node lo registra antes), no se carga nada.
+ * - Cada script define un global con la factoría emscripten (p. ej. OpenJPEGJS). Si el global ya existe, no se carga
+ *   nada, salvo que el nombre lo comparta otra librería (sharedGlobal: `CharLS`). El harness de Node registra las
+ *   factorías en globalThis.__visordicomCodecs, que se mira primero.
  * - Los decoders piden el módulo con CodecLoader.require(): si aún no está cargado lanzan CodecRequiredError,
  *   ImageDCM lo carga (asíncrono) y reintenta. Si la carga falla, isUnavailable() lo indica y el decoder usa
  *   su alternativa (si la tiene).
@@ -17,6 +18,11 @@ export type CodecName = 'openjpeg' | 'libjpeg-turbo' | 'libjpeg-turbo-12' | 'cha
 interface CodecSpec {
     file: string;
     globalName: string;
+    /**
+     * El nombre del global ya lo usa otra librería: no vale el que haya, hay que cargar el script, quedarse con lo que
+     * defina y devolver el global anterior a su sitio.
+     */
+    sharedGlobal?: boolean;
 }
 
 const CODECS: Record<CodecName, CodecSpec> = {
@@ -24,9 +30,18 @@ const CODECS: Record<CodecName, CodecSpec> = {
     'libjpeg-turbo': { file: 'libjpegturbojs_decode.js', globalName: 'libjpegturbojs_decode' },
     // Build de 12 bits (WITH12BIT): solo decodifica JPEG de 12 bits; el de 8 bits solo los de 8
     'libjpeg-turbo-12': { file: 'libjpegturbo12js.js', globalName: 'libjpegturbo12js' },
-    // CharLS 2.x: de reserva para los JPEG-LS que el CharLS 1.x de src/libs/jpeg-ls.js rechaza (p. ej. 7 bits)
-    'charls': { file: 'charlsjs_decode.js', globalName: 'CharLS' },
+    // CharLS 2.x: de reserva para los JPEG-LS que el CharLS 1.x de src/libs/jpeg-ls.js rechaza (p. ej. 7 bits).
+    // src/libs/jpeg-ls.js define también un global `CharLS` (su propio CharLS.js, que JpegLS llama al decodificar):
+    // antes se tomaba ese por el códec de reserva y el JPEG-LS de 7 bits no se veía nunca en el navegador (en Node sí,
+    // porque el harness lo sobrescribía).
+    'charls': { file: 'charlsjs_decode.js', globalName: 'CharLS', sharedGlobal: true },
 };
+
+/**
+ * Registro de factorías ya cargadas por fuera (el harness de Node: tools/dicom-test/run_harness.mjs), por nombre de
+ * global. Se mira antes que los globales, así el harness no pisa el `CharLS` de src/libs/jpeg-ls.js.
+ */
+export const CODEC_REGISTRY_GLOBAL = '__visordicomCodecs';
 
 /** Ruta (relativa al base href) donde se sirven los códecs. */
 export const CODECS_BASE_PATH = 'assets/codecs/';
@@ -39,6 +54,8 @@ export class CodecRequiredError extends Error {
 }
 
 export class CodecLoader {
+    /** Dentro de un Worker no hay document.baseURI: el Worker lo recibe del hilo principal y lo fija aquí. */
+    public static baseURI: string | null = null;
     private static instances = new Map<CodecName, any>();
     private static loading = new Map<CodecName, Promise<any>>();
     private static failed = new Set<CodecName>();
@@ -83,19 +100,45 @@ export class CodecLoader {
     }
 
     private static factory(spec: CodecSpec): Promise<any> {
-        const existing = (globalThis as any)[spec.globalName];
-        if (typeof existing === 'function') {
+        const g = globalThis as any;
+        const registered = g[CODEC_REGISTRY_GLOBAL]?.[spec.globalName];
+        if (typeof registered === 'function') {
+            return Promise.resolve(registered);
+        }
+        const existing = g[spec.globalName];
+        if (typeof existing === 'function' && !spec.sharedGlobal) {
             return Promise.resolve(existing);
         }
+        // Lo que define el script; con sharedGlobal, el global vuelve a ser el de antes
+        const previous = existing;
+        const take = (): any => {
+            const loaded = g[spec.globalName];
+            if (spec.sharedGlobal && loaded !== previous) {
+                g[spec.globalName] = previous;
+            }
+            return loaded !== previous || !spec.sharedGlobal ? loaded : undefined;
+        };
         if (typeof document === 'undefined') {
-            return Promise.reject(new Error('Sin DOM: registra globalThis.' + spec.globalName + ' antes de decodificar'));
+            const importScripts = g.importScripts;
+            if (typeof importScripts === 'function' && CodecLoader.baseURI) {
+                // Worker clásico: carga síncrona, mismo origen (script-src 'self' de la CSP también rige en el Worker)
+                const url = new URL(CODECS_BASE_PATH + spec.file, CodecLoader.baseURI).href;
+                try {
+                    importScripts(url);
+                } catch (error) {
+                    return Promise.reject(new Error('No se pudo cargar ' + url + ': ' + ((error as any)?.message ?? error)));
+                }
+                const loaded = take();
+                return typeof loaded === 'function' ? Promise.resolve(loaded) : Promise.reject(new Error(spec.file + ' no definió ' + spec.globalName));
+            }
+            return Promise.reject(new Error('Sin DOM: registra ' + CODEC_REGISTRY_GLOBAL + '.' + spec.globalName + ' antes de decodificar'));
         }
         return new Promise((resolve, reject) => {
             const script = document.createElement('script');
             script.src = new URL(CODECS_BASE_PATH + spec.file, document.baseURI).href;
             script.async = true;
             script.onload = () => {
-                const loaded = (globalThis as any)[spec.globalName];
+                const loaded = take();
                 if (typeof loaded === 'function') {
                     resolve(loaded);
                 } else {

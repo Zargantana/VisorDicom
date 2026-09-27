@@ -15,20 +15,20 @@ import { VIEWER_UPLOAD_HANDLER, ViewerUploadHandler } from '../../viewer-upload-
 export class ScrollImageViewerComponent implements OnInit {
 
   @ViewChild('imageIconDisplaySub1')
-  private imageIconDisplaySub1: ElementRef<HTMLImageElement> | undefined;
+  private imageIconDisplaySub1: ElementRef<HTMLCanvasElement> | undefined;
   @ViewChild('imageIconDisplaySub2')
-  private imageIconDisplaySub2: ElementRef<HTMLImageElement> | undefined;
+  private imageIconDisplaySub2: ElementRef<HTMLCanvasElement> | undefined;
 
   @ViewChild('imageIconDisplay')
-  private imageIconDisplay: ElementRef<HTMLImageElement> | undefined;
+  private imageIconDisplay: ElementRef<HTMLCanvasElement> | undefined;
   @ViewChild('imageIconDisplay2')
-  private imageIconDisplay2: ElementRef<HTMLImageElement> | undefined;
+  private imageIconDisplay2: ElementRef<HTMLCanvasElement> | undefined;
   @ViewChild('imageIconDisplay3')
-  private imageIconDisplay3: ElementRef<HTMLImageElement> | undefined;
+  private imageIconDisplay3: ElementRef<HTMLCanvasElement> | undefined;
   @ViewChild('imageIconDisplay4')
-  private imageIconDisplay4: ElementRef<HTMLImageElement> | undefined;
+  private imageIconDisplay4: ElementRef<HTMLCanvasElement> | undefined;
   @ViewChild('imageIconDisplay5')
-  private imageIconDisplay5: ElementRef<HTMLImageElement> | undefined;
+  private imageIconDisplay5: ElementRef<HTMLCanvasElement> | undefined;
 
   @ViewChild('display')
   public display: BasicImageViewerComponent | undefined;
@@ -121,7 +121,7 @@ export class ScrollImageViewerComponent implements OnInit {
     }
   }
 
-  private tryToViewImage(image: ElementRef<HTMLImageElement>, imgNum: number) {
+  private tryToViewImage(image: ElementRef<HTMLCanvasElement>, imgNum: number) {
     this.getImageFromList(imgNum).paintImage(image);
   }
 

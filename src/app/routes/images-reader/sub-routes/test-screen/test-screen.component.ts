@@ -187,7 +187,7 @@ export class TestScreenComponent implements OnInit {
     const file:File = event.target.files[0];
 
     if (file) {
-        this.foundFiles = [new DCMFile(file)];
+        this.foundFiles = [new DCMFile(file, true)]; // entero: esta pantalla llama a los decoders de forma síncrona
         this.foundFiles[0].readContents();
     }
   }
@@ -198,7 +198,7 @@ export class TestScreenComponent implements OnInit {
       let item = file.webkitRelativePath;
       //const path = file.webkitRelativePath.split('/');
       console.log('File: ' + item);
-      const dicomFile = new DCMFile(file);
+      const dicomFile = new DCMFile(file, true);
       dicomFile.readContents();
       this.foundFiles.push(dicomFile);
     };

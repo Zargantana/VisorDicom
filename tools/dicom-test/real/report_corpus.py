@@ -61,8 +61,8 @@ def main():
              f"Imágenes: {len(rows)} · " + " · ".join(f"{s}: {tot.get(s, 0)}" for s in order), "",
              "PASS = píxeles iguales a pydicom (±3, o tolerancia de compresión con pérdida). SKIP = rechazo controlado con motivo o sin verdad "
              "de pydicom. SIN_META = sin preámbulo DICM ni dataset reconocible (el cargador del visor no los reconoce). "
-             "Los textos (nombre, ID, descripciones) se comparan también con pydicom. BIG = mayor que el tope de la versión actual "
-             "(string del navegador). TILES = lámina de patología por tiles (miles de frames), fuera del alcance. CRASH = tumbó el proceso de "
+             "Los textos (nombre, ID, descripciones) se comparan también con pydicom. BIG = mayor que el tope pedido con --max-mb "
+             "(sin probar). TILES = lámina de patología por tiles (miles de frames), fuera del alcance. CRASH = tumbó el proceso de "
              "Node. FAIL = se pinta pero distinto de pydicom, o error.", ""]
 
     def table(title, group):

@@ -80,6 +80,7 @@ export const EU: Texts = {
   'news.h6.b': 'Azterketa gehiago ikusten dira:', 'news.h6.t': 'irudi- eta kolore-formatu gehiago, eta kontrastea aukera dezakezu azterketak hainbat dakartzanean.',
   'news.h7.b': 'Edozein gailutan:', 'news.h7.t': 'Windows, Linux eta Mac; Android eta iOS. PC, tableta eta mugikorra.',
   'news.h8.b': 'Zure hizkuntzan:', 'news.h8.t': 'gaztelania, ingelesa, katalana, euskara, galiziera, portugesa, frantsesa, italiera, alemana, japoniera, txinera, errusiera, koreera eta greziera. Aukeratu goiko eskuineko globo-botoiarekin.',
+  'news.h9.b': "Edozein tamainatako azterketak:", 'news.h9.t': "hainbat GB-ko fitxategiak irekitzen dira (2 GB-rekin probatua) osorik kargatu gabe; irudia atzeko planoan deskodetzen da eta zinema arinago doa.",
   'news.more': 'gehiago...',
   'news.less': '...gutxiago',
   'news.hist.1': 'VisorDicom jaio da, ikustailearen bertsio libre eta doakoa.',
