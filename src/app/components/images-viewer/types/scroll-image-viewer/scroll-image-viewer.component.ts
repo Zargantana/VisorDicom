@@ -33,7 +33,21 @@ export class ScrollImageViewerComponent implements OnInit {
   @ViewChild('display')
   public display: BasicImageViewerComponent | undefined;
 
-  @Input() classifier: classifierDCM | undefined;
+  /**
+   * La serie (o rama) que se ve. Al cambiarla se vuelve a la primera imagen: antes el puntero se quedaba donde
+   * estaba en la serie anterior (B0001: "128 / 67").
+   */
+  @Input() set classifier(value: classifierDCM | undefined) {
+    if (value !== this._classifier) {
+      this._classifier = value;
+      this.mainImagePointer = 0;
+      this.deltasAccumulator = 0;
+    }
+  }
+  get classifier(): classifierDCM | undefined {
+    return this._classifier;
+  }
+  private _classifier: classifierDCM | undefined;
 
   public get isResizing(): boolean {
     return this.display?.issemiResizing??false;

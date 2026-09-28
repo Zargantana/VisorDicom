@@ -1,4 +1,4 @@
-import { Component, Inject, Input, Optional, ViewChild } from '@angular/core';
+import { AfterViewChecked, Component, ElementRef, Inject, Input, Optional, ViewChild } from '@angular/core';
 import { DCMFileReader } from 'src/app/clases/DCM/DCM-file-reader.class';
 import { Cine } from 'src/app/clases/Images/cine';
 import { classifierDCM } from 'src/app/clases/Images/classifier-DCM.class';
@@ -13,12 +13,31 @@ import { VIEWER_UPLOAD_HANDLER, ViewerUploadHandler } from '../../viewer-upload-
     styleUrls: ['./list-image-viewer.component.scss'],
     standalone: false
 })
-export class ListImageViewerComponent{
+export class ListImageViewerComponent implements AfterViewChecked {
 
   @ViewChild('display')
   public display: BasicImageViewerComponent | undefined;
 
-  @Input() classifier: classifierDCM | undefined;
+  /**
+   * La rama que se ve. Al cambiarla, la lista de miniaturas vuelve arriba, donde está la imagen que se abre: antes se
+   * quedaba desplazada como en el estudio anterior (B0008). No vale un scrollTo inmediato: al cambiar de serie el visor
+   * se redimensiona y oculta la lista un momento (isResizing), y al volver a mostrarla el navegador le devuelve el
+   * desplazamiento que tenía. Se hace en ngAfterViewChecked, cuando ya se ve.
+   */
+  @Input() set classifier(value: classifierDCM | undefined) {
+    if (value !== this._classifier) {
+      this._classifier = value;
+      this.iconListToTop = true;
+    }
+  }
+  get classifier(): classifierDCM | undefined {
+    return this._classifier;
+  }
+  private _classifier: classifierDCM | undefined;
+  private iconListToTop = false;
+
+  @ViewChild('iconList')
+  private iconList: ElementRef<HTMLDivElement> | undefined;
 
   public reader: DCMFileReader | undefined;
 
@@ -43,6 +62,14 @@ export class ListImageViewerComponent{
   }
 
   constructor(@Optional() @Inject(VIEWER_UPLOAD_HANDLER) private uploadHandler: ViewerUploadHandler | null) { }
+
+  ngAfterViewChecked(): void {
+    const list = this.iconList?.nativeElement;
+    if (this.iconListToTop && list && list.offsetParent !== null) {
+      list.scrollTop = 0;
+      this.iconListToTop = false;
+    }
+  }
 
   public isDark(): boolean {
     return (ThemeService.current === 'dark');
@@ -99,6 +126,10 @@ export class ListImageViewerComponent{
 
   public NextFrameClick() {
     if (this.currentImage && this.display) {
+      if (this.currentImage.frames <= 1) {
+        this.stepImage(1); // una sola imagen por fichero (XA, CR…): deslizar el dedo pasa a la siguiente de la lista
+        return;
+      }
       this.currentImage.NextFrame();
       this.enqueueRepaint();
     }
@@ -106,8 +137,25 @@ export class ListImageViewerComponent{
 
   public FrameBeforeClick() {
     if (this.currentImage && this.display) {
+      if (this.currentImage.frames <= 1) {
+        this.stepImage(-1);
+        return;
+      }
       this.currentImage.FrameBefore();
       this.enqueueRepaint();
+    }
+  }
+
+  /** Imagen siguiente o anterior de la lista (con vuelta al principio), como pulsar su miniatura. */
+  private stepImage(delta: 1 | -1) {
+    const count = this.classifier?.numberOfImages ?? 0;
+    if (count <= 1 || !this.classifier) {
+      return;
+    }
+    const index = ((this.viewingImage - 1 + delta) % count + count) % count;
+    const reader = this.classifier.searchImageByIndex(index);
+    if (reader) {
+      this.ViewImage(reader.SOPInstanceUID);
     }
   }
 

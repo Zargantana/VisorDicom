@@ -13,3 +13,39 @@
     text-overflow: ellipsis;
     text-align: left;
 }
+
+// Ventana arrastrada con el ratón: se distingue de las del fichero
+.window-manual {
+    font-style: italic;
+}
+
+.window-reset {
+    flex-shrink: 0;
+}
+
+// Visor táctil (doc 06 V3): los gestos sobre la imagen son del visor (pasar de imagen, zoom, contraste), no de la
+// página. El resto de la pantalla se desplaza como siempre.
+.viewer-touch {
+    touch-action: none;
+}
+
+// Pantallas estrechas (móvil): el selector de ventana baja a su propia fila, a lo ancho, y la etiqueta se ajusta. Sin
+// esto, en TC (que ofrece presets) la barra medía 772 px en un móvil de 412 y sacaba de la pantalla los botones.
+@media (max-width: 767.98px) {
+    .viewer-bar.with-window {
+        flex-wrap: wrap;
+    }
+
+    .viewer-bar .window-selector {
+        order: 10;
+        flex-basis: 100%;
+        justify-content: center;
+        min-width: 0;
+    }
+
+    .viewer-bar .window-label {
+        width: auto;
+        min-width: 0;
+        flex: 1 1 auto;
+    }
+}

@@ -1,5 +1,6 @@
 import { ElementRef } from "@angular/core";
 import { cleanUID, TRANSFER_SYNTAX, TX_Map, TXTranslator } from "src/app/dictionaries/transfer-syntaxes";
+import { ManualWindow } from "../Color/base-color.class";
 import { ColorFactory } from "../Color/color-factory.class";
 import { DCMFileReader } from "../DCM/DCM-file-reader.class";
 import { DCMInterpreter } from "../DCM/DCM-interpreter.class";
@@ -9,6 +10,10 @@ import { CodecLoader, CodecRequiredError } from "../Decoders/codec-loader";
 import { SniffedCodec, sniffPixelData } from "../Decoders/codec-sniffer";
 import { DecodePool, WorkerUnavailableError } from "../Decoders/decode-pool";
 import { createDecoder, DecoderKind, decodesInWorker } from "../Decoders/decoder-factory";
+import { AnnexB, VideoFamily, VideoStreamInfo } from "../Decoders/video/annexb";
+import { Mp4 } from "../Decoders/video/mp4";
+import { VideoStreamDecoder } from "../Decoders/video/video-stream-decoder";
+import { Cine } from "./cine";
 import { FrameCache } from "./frame-cache";
 
 /** Una ventana VOI (0028,1050/1051/1055) tal y como se ofrece en el visor. */
@@ -31,6 +36,8 @@ export class ImageDCM  {
     public frames: number;
     /** Indice de la ventana VOI a aplicar (0 = la primera definida en el fichero). */
     public selectedWindow: number = 0;
+    /** Ventana del usuario (arrastrando el ratón o con un preset): manda sobre la del fichero. Solo en monocromo. */
+    public manualWindow: ManualWindow | null = null;
     /** Precargar los frames siguientes al pintar (cine). Las miniaturas lo desactivan. */
     public prefetch: boolean = true;
     private decodeFailed: boolean = false;
@@ -49,6 +56,10 @@ export class ImageDCM  {
     /** Resultado del reconocimiento por contenido (undefined = aún no se ha mirado). */
     private sniffed: SniffedCodec | null | undefined = undefined;
     private readonly access: PixelDataAccess;
+    /** Vídeo (H.264/HEVC): el flujo partido en frames y su decodificador (WebCodecs), una vez por imagen. */
+    private video: Promise<VideoStreamDecoder> | null = null;
+    /** Lo que se sabe del flujo de vídeo (unidades, IDR, códec); también sin WebCodecs (lo mira la batería en Node). */
+    public videoInfo: { family: VideoFamily; codec: string; frames: number; keys: number } | null = null;
     /** Último frame pedido para cada elemento: una decodificación que acaba tarde no pinta encima de otra imagen. */
     private static requested = new WeakMap<HTMLElement, string>();
 
@@ -150,6 +161,105 @@ export class ImageDCM  {
         return null;
     }
 
+    /** Transfer Syntaxes de vídeo (PS3.5 8.2.5-8.2.8): el Pixel Data es un flujo, no un frame por fragmento. */
+    private videoFamily(): VideoFamily | 'mpeg2' | null {
+        switch (new TX_Map().getClean(this.reader.TransferSyntax)) {
+            case TRANSFER_SYNTAX.MPEG_4_AVC_H_264_High_Profile_Level_4_1:
+            case TRANSFER_SYNTAX.MPEG_4_AVC_H_264_BD_compatible_High_Profile_Level_4_1:
+            case TRANSFER_SYNTAX.Fragmentable_MPEG_4_AVC_H_264_High_Profile_Level_4_1:
+            case TRANSFER_SYNTAX.Fragmentable_MPEG_4_AVC_H_264_BD_compatible_High_Profile_Level_4_1:
+            case TRANSFER_SYNTAX.MPEG_4_AVC_H_264_High_Profile_Level_4_2_2D:
+            case TRANSFER_SYNTAX.Fragmentable_MPEG_4_AVC_H_264_High_Profile_Level_4_2_2D:
+            case TRANSFER_SYNTAX.MPEG_4_AVC_H_264_High_Profile_Level_4_2_3D:
+            case TRANSFER_SYNTAX.Fragmentable_MPEG_4_AVC_H_264_High_Profile_Level_4_2_3D:
+            case TRANSFER_SYNTAX.MPEG_4_AVC_H_264_Stereo_High_Profile_Level_4_2:
+            case TRANSFER_SYNTAX.Fragmentable_MPEG_4_AVC_H_264_Stereo_High_Profile_Level_4_2:
+                return 'h264';
+            case TRANSFER_SYNTAX.HEVC_H_265_Main_Profile_Level_5_1:
+            case TRANSFER_SYNTAX.HEVC_H_265_Main_10_Profile_Level_5_1:
+                return 'hevc';
+            case TRANSFER_SYNTAX.MPEG2_Main_Profile_Main_Level:
+            case TRANSFER_SYNTAX.Fragmentable_MPEG2_Main_Profile_Main_Level:
+            case TRANSFER_SYNTAX.MPEG2_Main_Profile_High_Level:
+            case TRANSFER_SYNTAX.Fragmentable_MPEG2_Main_Profile_High_Level:
+                return 'mpeg2';
+        }
+        return null;
+    }
+
+    /** No se puede ver, con un motivo claro (sin el "No se pudo decodificar" de los errores). */
+    private reject(reason: string): false {
+        this.decodeFailed = true;
+        this.unsupportedReason = reason;
+        console.warn(reason);
+        return false;
+    }
+
+    /**
+     * Frame de un vídeo H.264/HEVC: el flujo entero se lee una vez, se parte en frames (AnnexB) y se decodifica en
+     * orden con WebCodecs (VideoStreamDecoder), que deja cada frame RGB en FrameCache. MPEG-2 no: ningún navegador lo
+     * decodifica.
+     */
+    private async decodeVideo(f: number, family: VideoFamily | 'mpeg2'): Promise<boolean> {
+        const name = this.reader.TransferSyntaxName;
+        if (family == 'mpeg2') {
+            return this.reject('Vídeo MPEG-2 (' + name + '): los navegadores no lo decodifican. Descarga el fichero para verlo con un reproductor.');
+        }
+        try {
+            this.video ??= this.openVideo(family);
+            const video = await this.video;
+            await video.decodeUntil(f);
+            return FrameCache.has(this.fileId, f);
+        } catch (error: any) {
+            if (error instanceof VideoUnsupportedError) {
+                return this.reject(error.message);
+            }
+            if (error?.name == 'NotSupportedError' || /unsupported configuration/i.test(error?.message ?? '')) {
+                // El navegador dijo que sí al preguntar y después no abre el decodificador (Chrome: "Unsupported configuration")
+                return this.reject(this.videoUnsupportedText(family, this.videoInfo?.codec ?? ''));
+            }
+            this.fail(error);
+            return false;
+        }
+    }
+
+    private videoUnsupportedText(family: VideoFamily, codec: string): string {
+        const label = family == 'h264' ? 'H.264' : 'HEVC (H.265)';
+        return 'Vídeo ' + label + ' (' + codec + ', ' + this.reader.Columns + 'x' + this.reader.Rows + '): este navegador o este equipo no lo decodifica' +
+            (family == 'hevc' ? ' (HEVC depende de la tarjeta gráfica y del sistema).' : '.');
+    }
+
+    private async openVideo(family: VideoFamily): Promise<VideoStreamDecoder> {
+        const label = family == 'h264' ? 'H.264' : 'HEVC (H.265)';
+        const stream = await this.access.getStream();
+        // El flujo elemental (Annex B) o, en algunos equipos, un .mp4 entero
+        const mp4 = Mp4.is(stream);
+        const info: VideoStreamInfo = mp4 ? Mp4.parse(stream, family) : AnnexB.parse(stream, family);
+        this.videoInfo = { family, codec: info.codec, frames: info.units.length, keys: info.units.filter(u => u.key).length };
+        if (!info.units.length || !info.codec) {
+            throw new Error(mp4 ? 'el MP4 del Pixel Data no tiene una pista de vídeo que el visor sepa leer'
+                : 'el Pixel Data no contiene un flujo ' + label + ' reconocible');
+        }
+        this.frames = info.units.length;
+        // Si la cabecera no dice cuántos frames hay ni a qué velocidad van (hay equipos que no lo ponen), mandan los
+        // del vídeo: el contador, el cine y su velocidad los leen del reader
+        if (!(this.reader.Frames > 1)) {
+            this.reader.Frames = info.units.length;
+        }
+        if (!Cine.fileFrameTime(this.reader) && info.frameMs) {
+            this.reader.FrameTime = info.frameMs;
+        }
+        const cols = this.reader.Columns, rows = this.reader.Rows;
+        if (!VideoStreamDecoder.available) {
+            throw new VideoUnsupportedError('Vídeo ' + label + ': este navegador no tiene WebCodecs (VideoDecoder). Se ve en Chrome o Edge.');
+        }
+        if (!(await VideoStreamDecoder.supports(info.codec, cols, rows))) {
+            throw new VideoUnsupportedError(this.videoUnsupportedText(family, info.codec));
+        }
+        const sink = { has: (i: number) => FrameCache.has(this.fileId, i), put: (i: number, rgb: Uint8Array) => FrameCache.put(this.fileId, i, rgb, true) };
+        return new VideoStreamDecoder(stream, info, cols, rows, Cine.frameTime(this.reader) * 1000, sink);
+    }
+
     /** El decoder de la imagen (una vez): por TS o, si la TS no está en la tabla, por el contenido del Pixel Data. */
     private ensureDecoder(): Promise<BaseDecoder | null> {
         this.decoderPromise ??= this.resolveDecoder().then((deco) => (this.decoder = deco));
@@ -243,6 +353,10 @@ export class ImageDCM  {
     }
 
     private async decodeOne(f: number): Promise<boolean> {
+        const video = this.videoFamily();
+        if (video) {
+            return this.decodeVideo(f, video);
+        }
         for (let attempt = 0; attempt < 4; attempt++) {
             try {
                 const deco = await this.ensureDecoder();
@@ -323,8 +437,26 @@ export class ImageDCM  {
         for (let i = 3; i < data.length; i += 4) {
             data[i] = 255; // opaco (antes: fillRect negro)
         }
-        new ColorFactory(this.reader).pixelDataTo32BitBuffer(data, decoded.data, this.selectedWindow, decoded.isRGB, f);
+        new ColorFactory(this.reader).pixelDataTo32BitBuffer(data, decoded.data, this.selectedWindow, decoded.isRGB, f, this.manualWindow);
         return data;
+    }
+
+    /** true si es monocromo: se le puede ajustar la ventana (contraste y brillo) con el ratón o con presets. */
+    public get grayscale(): boolean {
+        return new ColorFactory(this.reader).grayscale;
+    }
+
+    /**
+     * La ventana que se ve ahora en el frame indicado (manual, del fichero, VOI LUT o automática), en unidades de
+     * modalidad: el punto de partida al arrastrar. null si no es monocromo o el frame aún no está decodificado.
+     */
+    public currentWindow(frameIndex: number = this.currentFrame): ManualWindow | null {
+        const f = this.frameIndex(frameIndex);
+        const decoded = FrameCache.get(this.fileId, f);
+        if (!decoded) {
+            return null;
+        }
+        return new ColorFactory(this.reader).currentWindow(decoded.data, this.selectedWindow, f, this.manualWindow);
     }
 
     /**
@@ -521,3 +653,6 @@ export class ImageDCM  {
         }
     }
 }
+
+/** El navegador no puede decodificar el vídeo (sin WebCodecs o sin ese códec): se explica en vez de dar un error. */
+class VideoUnsupportedError extends Error { }

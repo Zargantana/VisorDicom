@@ -4,6 +4,15 @@ import { DCMInterpreter, RescaleParameters, VOIData, VOIFunction } from "../DCM/
 export type PixelSamples = Uint8Array | Int8Array | Uint16Array | Int16Array | Uint32Array | Int32Array;
 
 /**
+ * Ventana elegida por el usuario (arrastrando el ratón o con un preset), en unidades de modalidad (HU en CT). En
+ * monocromo manda sobre la ventana del fichero, la VOI LUT y la auto-ventana; se aplica como LINEAR (PS3.3 C.11.2.1.2.1).
+ */
+export interface ManualWindow {
+    center: number;
+    width: number;
+}
+
+/**
  * Base de las conversiones "pixel data decodificado -> RGBA de 8 bits" (buffer de un ImageData de canvas).
  *
  * El pixel data puede llegar en varias formas segun el decoder:
@@ -17,6 +26,8 @@ export abstract class BaseColor {
     protected interpret: DCMInterpreter;
     protected VOIwindow: VOIData;
     protected RescaleParams: RescaleParameters;
+    /** Ventana manual (null = la del fichero o la automática). Solo la usan las imágenes monocromo. */
+    public manualWindow: ManualWindow | null = null;
 
     /**
      * @param windowIndex ventana VOI a aplicar (0028,1050/1051 son multivalor). Por defecto la primera.
@@ -153,11 +164,17 @@ export abstract class BaseColor {
         } else if (VOIfunc == VOIFunction.LINEAR_EXACT) {
             y = (pixel - c) / (w || 1) + 0.5;
         } else {
-            if (w <= 1) {
-                return pixel < c - 0.5 ? 0 : 255;
-            }
-            y = (pixel - (c - 0.5)) / (w - 1) + 0.5;
+            return BaseColor.linearWindow(pixel, c, w);
         }
+        return y <= 0 ? 0 : (y >= 1 ? 255 : y * 255);
+    }
+
+    /** LINEAR (PS3.3 C.11.2.1.2.1): la de las ventanas del fichero y la de la ventana manual. Devuelve 0..255. */
+    public static linearWindow(pixel: number, c: number, w: number): number {
+        if (w <= 1) {
+            return pixel < c - 0.5 ? 0 : 255;
+        }
+        const y = (pixel - (c - 0.5)) / (w - 1) + 0.5;
         return y <= 0 ? 0 : (y >= 1 ? 255 : y * 255);
     }
 }

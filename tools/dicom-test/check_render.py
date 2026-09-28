@@ -164,7 +164,7 @@ def voi_lut_gray(x, item, signed_input):
     return (lut[idx] - lo) * 255 / max(1, hi - lo)
 
 
-def expected_frames(path, win, indices=None):
+def expected_frames(path, win, indices=None, manual=None):
     """Frames esperados (RGB 0..255). Con `indices` (writtenFrames del harness en multiframes grandes) solo se
     decodifican esos frames con pydicom, frame a frame: una lámina de 5.000 tiles o una tomosíntesis de 700 MB no
     hace falta decodificarla entera para comparar tres frames."""
@@ -251,7 +251,9 @@ def expected_frames(path, win, indices=None):
                 p1 = int(ds.get("PixelPaddingRangeLimit", p0))
                 padmask = (fr >= min(p0, p1)) & (fr <= max(p0, p1))
             wcv, wwv = first_value(wc, win), first_value(ww, win)
-            if wcv is not None and wwv is not None:
+            if manual is not None:  # ventana del usuario (variante "#m"): LINEAR, manda sobre el fichero
+                y = voi_linear(x, float(manual[0]), float(manual[1]))
+            elif wcv is not None and wwv is not None:
                 y = voi_window(x, wcv, wwv, func)
             elif "VOILUTSequence" in ds:  # VOI LUT (0028,3010) como la aplica el visor
                 bs = int(getattr(ds, "BitsStored", ds.BitsAllocated))
@@ -307,7 +309,8 @@ rows = []
 tiles = []
 fails = 0
 for key, meta in summary.items():
-    name, _, w = key.partition("#w")
+    manual_variant = key.endswith("#m")
+    name, _, w = (key[:-2] if manual_variant else key).partition("#w")
     win = int(w) if w else 0
     if FILTER and not FILTER.search(name):
         continue
@@ -315,7 +318,7 @@ for key, meta in summary.items():
         continue
     path = source_path(name)
     exp_meta = EXPECTED.get(name, {})
-    if not w and meta.get("text") is not None:
+    if not w and not manual_variant and meta.get("text") is not None:
         # Textos (juego de caracteres): fila propia "<fichero>#text", para que un fallo de texto no tape el de píxeles
         try:
             exp_text = expected_texts(path)
@@ -327,7 +330,7 @@ for key, meta in summary.items():
                 rows.append((name + "#text", "PASS", ("texto: " + " | ".join(v for v in exp_text.values() if v))[:120]))
         except Exception as e:  # noqa: BLE001
             rows.append((name + "#text", "SKIP", f"sin verdad de texto: {e}"[:90]))
-    if not w and meta.get("cine") is not None:
+    if not w and not manual_variant and meta.get("cine") is not None:
         # Multiframe: cine o frame a frame, y la velocidad (fila "<fichero>#cine")
         try:
             got, exp = meta["cine"], expected_cine(path, meta.get("frames") or 1)
@@ -340,6 +343,20 @@ for key, meta in summary.items():
                 rows.append((name + "#cine", "PASS", how))
         except Exception as e:  # noqa: BLE001
             rows.append((name + "#cine", "SKIP", f"sin verdad de cine: {e}"[:90]))
+    if exp_meta.get("kind") == "video":
+        # Vídeo H.264/HEVC: en Node no hay WebCodecs; se comprueba el troceo del flujo en frames (unidades de acceso),
+        # las IDR y la cadena de códec, y que el visor lo explica sin romperse. Los píxeles, en Chrome/Edge
+        # (browser-ui/run_video_test.mjs).
+        video = meta.get("video") or {}
+        reason = meta.get("unsupportedReason") or ""
+        ok = video.get("family") == exp_meta["family"] and video.get("frames") == exp_meta["units"] \
+            and video.get("keys") == exp_meta["keys"] and (video.get("codec") or "").startswith(exp_meta["codec_prefix"]) \
+            and (meta["decodedFrames"] == exp_meta["units"] or "WebCodecs" in reason) \
+            and not (meta.get("error") or "").startswith("THROW")
+        fails += 0 if ok else 1
+        rows.append((key, "PASS" if ok else "FAIL",
+                     f"vídeo {video.get('codec')}: {video.get('frames')} frames, {video.get('keys')} IDR" if ok else f"vídeo: {meta}"[:300]))
+        continue
     if exp_meta.get("kind") == "expect_fail":
         # Debe fallar de forma controlada: sin frames decodificados y sin excepción que tumbe el visor. Con
         # reason_contains, además, el motivo que enseña el visor tiene que mencionarlo (p. ej. "Sectra").
@@ -357,7 +374,7 @@ for key, meta in summary.items():
     # decodifica esos
     written = meta.get("writtenFrames")
     try:
-        exp = expected_frames(path, win, written)
+        exp = expected_frames(path, win, written, exp_meta.get("manual") if manual_variant else None)
     except Exception as e:
         if os.environ.get("DICOM_TEST_VERBOSE"):
             import traceback

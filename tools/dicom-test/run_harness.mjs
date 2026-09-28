@@ -87,6 +87,10 @@ const summaryPath = path.join(renderDir, 'render.json');
 const inProgress = path.join(renderDir, 'inprogress.txt');
 if (process.env.DICOM_TEST_RESUME && fs.existsSync(summaryPath)) Object.assign(summary, JSON.parse(fs.readFileSync(summaryPath, 'utf8')));
 const done = new Set(Object.keys(summary).map(k => k.split('#w')[0]));
+// Ventana manual (arrastrar el ratón o un preset): expected.json dice en qué ficheros y con qué centro/anchura
+// ("manual": [c, w]); se renderiza además la variante "<fichero>#m" y check_render.py la compara con pydicom.
+const expectedPath = path.join(outDir, 'expected.json');
+const expectedJson = fs.existsSync(expectedPath) ? JSON.parse(fs.readFileSync(expectedPath, 'utf8')) : {};
 const t0 = Date.now();
 let sinceFlush = 0;
 for (const { name: f, file, frames, modality } of entries) {
@@ -107,17 +111,19 @@ for (const { name: f, file, frames, modality } of entries) {
     continue;
   }
   const bin = inMemory ? fs.readFileSync(file).toString('latin1') : null;
-  const variants = [0, 1, 2].slice(0, maxWindows);
+  const manual = expectedJson[f]?.manual;
+  const variants = [0, 1, 2].slice(0, maxWindows).concat(manual ? ['m'] : []);
   for (const w of variants) {
     let r;
     const tf = Date.now();
-    try { r = await renderDicom(inMemory ? { bin } : { blob: await fs.openAsBlob(file), name: path.basename(file), headerChunk }, w, maxFramesOut); }
+    const manualWindow = w === 'm' ? { center: manual[0], width: manual[1] } : null;
+    try { r = await renderDicom(inMemory ? { bin } : { blob: await fs.openAsBlob(file), name: path.basename(file), headerChunk }, w === 'm' ? 0 : w, maxFramesOut, manualWindow); }
     catch (e) { r = { error: 'THROW ' + (e?.message ?? e), rgba: [], written: [] }; }
-    if (w > 0 && !(r.windows > w)) continue; // solo renderizamos ventanas que existen
-    const key = w === 0 ? f : `${f}#w${w}`;
+    if (w !== 'm' && w > 0 && !(r.windows > w)) continue; // solo renderizamos ventanas que existen
+    const key = w === 0 ? f : (w === 'm' ? `${f}#m` : `${f}#w${w}`);
     summary[key] = { rows: r.rows, cols: r.cols, frames: r.frames, ts: r.ts, tsName: r.tsName,
                      windows: r.windows, windowCount: r.windowCount, decodedFrames: r.decoded ?? r.rgba.length, error: r.error,
-                     unsupportedReason: r.unsupportedReason, decodedBy: r.decodedBy, partial: r.partial, ms: Date.now() - tf };
+                     unsupportedReason: r.unsupportedReason, decodedBy: r.decodedBy, partial: r.partial, video: r.video, ms: Date.now() - tf };
     if (r.written) summary[key].writtenFrames = r.written;
     if (w === 0) Object.assign(summary[key], { isDicom: r.isDicom, noFileMeta: r.noFileMeta || undefined, text: r.text,
                                                 cine: r.frames > 1 ? r.cine : undefined });

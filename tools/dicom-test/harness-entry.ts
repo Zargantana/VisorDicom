@@ -15,9 +15,11 @@ import { ImageDCM } from 'src/app/clases/Images/image-DCM.class';
  *
  * @param maxFramesOut 0 = renderiza todos los frames; N > 0 = solo el primero, el central y el último (hasta N), para
  *   multiframes grandes (tomosíntesis, cine largos): se decodifican SOLO esos. `decoded` es el total de frames.
+ * @param manualWindow ventana del usuario (centro y anchura en unidades de modalidad), como la del visor al arrastrar.
  */
 export async function renderDicom(input: { blob?: Blob; name?: string; bin?: string; headerChunk?: number },
-                                  windowIndex: number = 0, maxFramesOut: number = 0) {
+                                  windowIndex: number = 0, maxFramesOut: number = 0,
+                                  manualWindow: { center: number; width: number } | null = null) {
   let file: DCMFile;
   if (input.headerChunk) {
     DCMFile.headerChunkBytes = input.headerChunk;              // bloque pequeño: fuerza la lectura por rangos
@@ -56,6 +58,7 @@ export async function renderDicom(input: { blob?: Blob; name?: string; bin?: str
   };
   try {
     image.selectedWindow = windowIndex;
+    image.manualWindow = manualWindow;                        // variante "#m": ventana del usuario (ratón o preset)
     await image.prepare(0);                                   // decoder, códecs bajo demanda y primer frame
     let selected: number[] | null = null;
     if (maxFramesOut > 0 && image.frames > maxFramesOut) {
@@ -79,6 +82,7 @@ export async function renderDicom(input: { blob?: Blob; name?: string; bin?: str
   }
   result.unsupportedReason = image.unsupportedReason ?? undefined; // por qué no se puede mostrar (si no se puede)
   result.decodedBy = image.decodedBy ?? undefined;                 // códec reconocido por contenido (TS privadas)
+  result.video = image.videoInfo ?? undefined;                     // vídeo: frames del flujo, IDR y códec (sin WebCodecs en Node)
   return result;
 }
 

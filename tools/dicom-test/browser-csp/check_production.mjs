@@ -20,7 +20,10 @@ const missing = names.filter(n => !fs.existsSync(path.join(outDir, n)));
 if (missing.length) console.warn('No están en out/ (¿batería sin generar?):', missing.join(', '));
 const files = names.filter(n => !missing.includes(n));
 if (!files.length) throw new Error('No hay ficheros: genera la batería (gen_test_dicoms.py)');
-const expectsCartel = n => /sectra|bad_siz/.test(n);
+// Cartel esperado: los de siempre y los rechazos controlados de la batería (expected.json: MPEG-2, TS privadas opacas…)
+const expectedJson = path.join(outDir, 'expected.json');
+const expected = fs.existsSync(expectedJson) ? JSON.parse(fs.readFileSync(expectedJson, 'utf8')) : {};
+const expectsCartel = n => /sectra|bad_siz/.test(n) || expected[n]?.kind === 'expect_fail';
 
 const require = createRequire(process.env.PLAYWRIGHT_MODULE || path.join(root, 'package.json'));
 let chromium;

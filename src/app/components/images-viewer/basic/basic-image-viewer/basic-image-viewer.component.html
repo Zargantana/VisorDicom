@@ -1,7 +1,7 @@
 <div class="d-flex slab-flex-1 p-0 m-0" #componentDiv (window:resize)="onResize()">
   <div class="d-flex flex-row slab-flex-1 p-0 m-0">
     <div class="d-flex flex-column slab-flex-1 p-0 m-0 bg-black">
-      <div class="d-flex flex-row justify-content-between m-0 p-0">
+      <div class="d-flex flex-row justify-content-between m-0 p-0 viewer-bar" [class.with-window]="showWindowSelector">
         <div class="d-flex m-0 p-0 user-select-none">
           <div [class.d-none]="!pointerControls" class="d-flex flex-row text-center p-0 m-0">
             <button (click)="BeforeClick()">
@@ -26,18 +26,26 @@
           </div>
         </div>
         <div class="d-flex flex-row text-center p-0 m-0"> <small class="m-0 p-1 text-light">{{'viewer.patientId' | t}} {{reader?.PatientId}} {{'viewer.studyDate' | t}} {{reader?.StudyDate}} {{'viewer.seriesNumber' | t}} #{{reader?.SeriesNumber}} {{'viewer.image' | t}} #{{reader?.InstanceNumber}}</small></div>
-        <!-- Selector de ventana VOI (0028,1050/1051/1055): una posicion por ventana; oculto si hay 0 o 1 -->
-        @if (windows.length > 1) {
+        <!-- Selector de ventana: las del fichero (0028,1050/1051/1055) y los presets de la modalidad (TC), una posición
+             cada una; oculto si hay 0 o 1 y no se ha arrastrado. Arrastrando sobre la imagen se ajusta a mano (Manual). -->
+        @if (showWindowSelector) {
           <div class="d-flex flex-row align-items-center p-0 m-0 px-2 user-select-none window-selector"
-            [title]="('viewer.window' | t) + ' ' + (effectiveWindow + 1) + '/' + windows.length + ': ' + windowLabel(effectiveWindow)">
+            [title]="('viewer.window' | t) + ' ' + (optionIndex + 1) + '/' + optionCount + ': ' + currentWindowLabel + '. ' + ('viewer.windowHint' | t)">
             <i class="fa-solid fa-circle-half-stroke fa-1x text-light me-1"></i>
-            <small class="m-0 p-1 text-light text-nowrap">{{effectiveWindow + 1}}/{{windows.length}}</small>
-            <input type="range" class="form-range window-range" min="0" [max]="windows.length - 1" step="1"
-              [value]="effectiveWindow" (input)="onWindowSelected($any($event.target).value)"
-              [attr.aria-label]="'viewer.windowVOI' | t" [attr.aria-valuetext]="windowLabel(effectiveWindow)"/>
-              <small class="m-0 ms-1 p-1 text-light text-nowrap window-label">{{windowLabel(effectiveWindow)}}</small>
-            </div>
-          }
+            @if (optionCount > 1) {
+              <small class="m-0 p-1 text-light text-nowrap">{{optionIndex + 1}}/{{optionCount}}</small>
+              <input type="range" class="form-range window-range" min="0" [max]="optionCount - 1" step="1"
+                [value]="optionIndex" (input)="onWindowSelected($any($event.target).value)"
+                [attr.aria-label]="'viewer.windowVOI' | t" [attr.aria-valuetext]="currentWindowLabel"/>
+            }
+            <small class="m-0 ms-1 p-1 text-light text-nowrap window-label" [class.window-manual]="!!manualWindow">{{currentWindowLabel}}</small>
+            @if (manualWindow || selectedPreset) {
+              <button type="button" class="window-reset" (click)="resetWindow()" [title]="'viewer.windowReset' | t" [attr.aria-label]="'viewer.windowReset' | t">
+                <i class="fa-solid fa-rotate-left fa-1x"></i>
+              </button>
+            }
+          </div>
+        }
           <div class="d-flex flex-row justify-content-end text-center p-0 m-0" style="width: 165px;">
             @if (canUpload && !FileUploaded) {
               <button (click)="Upload()">
@@ -66,9 +74,12 @@
           </div>
 
         </div>
-        <div class="d-flex slab-flex-1 justify-content-center p-0 m-0 bg-black clickable overflow-auto" (wheel)="ImageWheel($event)" #imgContainer (click)="ImageClicked()">
+        <div class="d-flex slab-flex-1 justify-content-center p-0 m-0 bg-black clickable viewer-touch" [class.overflow-auto]="zoom <= 1" [class.overflow-hidden]="zoom > 1"
+          (wheel)="ImageWheel($event)" #imgContainer (click)="ImageClicked()"
+          (pointerdown)="onPointerDown($event)" (pointermove)="onPointerMove($event)" (pointerup)="onPointerUp($event)"
+          (pointercancel)="onPointerUp($event)" (contextmenu)="onContextMenu($event)">
           <!-- [class.slab-flex-1]="fitScreen" -->
-          <canvas class="d-flex p-0 m-0 bg-black border border-light viewer-image" [style.height.px]="styleHeightPixels()" [style.width.px]="styleWidthPixels()" #imageDisplay [class.d-none]="isResizing"></canvas>
+          <canvas class="d-flex p-0 m-0 bg-black border border-light viewer-image" [style.height.px]="styleHeightPixels()" [style.width.px]="styleWidthPixels()" [style.transform]="canvasTransform" #imageDisplay [class.d-none]="isResizing"></canvas>
         </div>
       </div>
       @if (reader && imageInfo) {

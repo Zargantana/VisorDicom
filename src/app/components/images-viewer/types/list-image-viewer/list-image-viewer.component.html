@@ -1,5 +1,5 @@
 <div class="d-flex flex-row slab-flex-1 p-0 m-0">
-  <div [id]="isDark()?'style-14':'style-8'" class="d-flex p-0 m-0 overflow-auto" [style.max-height.px]="maxIconListHeight()" [class.d-none]="isResizing || ((classifier?.numberOfImages??0) <= 1)">
+  <div [id]="isDark()?'style-14':'style-8'" class="d-flex p-0 m-0 overflow-auto" [style.max-height.px]="maxIconListHeight()" #iconList [class.d-none]="isResizing || ((classifier?.numberOfImages??0) <= 1)">
     <div class="d-flex flex-column p-0 m-0">
       <div class="container p-0 m-0">
         @if (NotAllUploaded) {

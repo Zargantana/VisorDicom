@@ -73,6 +73,12 @@ Large files are read in ranges: only the Data Set up to the Pixel Data element i
     \item RLE Lossless (1.2.840.10008.1.2.5)
   \end{itemize}
 
+  \item \textbf{Video Transfer Syntaxes} (decoding only, with the WebCodecs API of the browser; verified with synthetic files and a real H.264 study in Chrome and Edge). Some devices store a complete MP4 file (ISO/IEC 14496-12) in the Pixel Data instead of the elementary stream: the viewer reads its sample tables (non-fragmented MP4 only) and decodes it the same way; when the header has no Number of Frames or Frame Time, the values of the video are used.
+  \begin{itemize}
+    \item MPEG-4 AVC/H.264 High Profile / Level 4.1, BD-compatible, Level 4.2 for 2D and 3D video and Stereo High Profile, and their fragmentable variants (1.2.840.10008.1.2.4.102 to .106, and .102.1 to .106.1). The whole stream is read once, split into access units and decoded in order; each frame can be displayed, stepped forwards and backwards (decoding restarts at the previous IDR picture) and played as a cine loop.
+    \item HEVC/H.265 Main and Main 10 Profile / Level 5.1 (1.2.840.10008.1.2.4.107, .108), only where the browser and the computer support HEVC decoding (usually with hardware acceleration; verified on Windows in Chrome and Edge, where some hardware decoders do not accept pictures smaller than 320 by 240). Otherwise the viewer shows why the image cannot be displayed.
+  \end{itemize}
+
   \item \textbf{Retired and Private Transfer Syntaxes} (decoding only; verified with the same suite):
   \begin{itemize}
     \item Papyrus 3 Implicit VR Little Endian, retired (1.2.840.10008.1.20)
@@ -88,6 +94,8 @@ Large files are read in ranges: only the Data Set up to the Pixel Data element i
   \begin{itemize}
     \item Grayscale pipeline: Rescale Slope/Intercept (linear Modality LUT), VOI (Window Center/Width with the LINEAR, LINEAR\_EXACT and SIGMOID functions, or a VOI LUT), and presentation (MONOCHROME1 and Presentation LUT Shape INVERSE are inverted).
     \item When the file defines several windows, the user can select any of them; the first one is used by default. Without a window or VOI LUT, images of up to 8 bits are displayed over their full range and deeper images use the minimum and maximum of the frame.
+    \item The user can adjust the window interactively (dragging with the mouse, or with two fingers on touch screens: horizontal movement changes the width and vertical movement the center, as a LINEAR function applied to the output of the Modality LUT) and, for CT, choose predefined windows (brain, soft tissue, mediastinum, lung and bone). A user window replaces the window, VOI LUT or automatic window of the file until it is reset.
+    \item On touch screens, one finger steps through images or frames, two fingers zoom and pan, and a double tap fits the image again.
     \item Pixel Padding Value / Range Limit: padding is shown in black and excluded from the automatic window.
     \item Supplemental Palette Color Lookup Tables (MONOCHROME2 with Pixel Presentation COLOR or MIXED).
     \item Multi-frame images are displayed frame by frame and played as a cine loop using Frame Time.
@@ -134,7 +142,7 @@ MR & Magnetic Resonance (if uploaded) \\
 \section*{6. Limitations}
 
 \begin{itemize}
-  \item Not supported: JPEG 2000 Part 2 array-based multi-component transformations, hierarchical JPEG (processes 16--29), JPEG XL, MPEG-2, MPEG-4 AVC/H.264 and HEVC/H.265 video, JPIP referenced pixel data, Float and Double Float Pixel Data, and ICC profile color management.
+  \item Not supported: JPEG 2000 Part 2 array-based multi-component transformations, hierarchical JPEG (processes 16--29), JPEG XL, MPEG-2 video (no browser decodes it), HEVC/H.265 video on browsers or computers without HEVC decoding, JPIP referenced pixel data, Float and Double Float Pixel Data, and ICC profile color management.
   \item JPEG Lossless with arithmetic coding (Process 15, 1.2.840.10008.1.2.4.58) is decoded on a best-effort basis for 8-bit images and has not been verified.
   \item Non-linear Modality LUT Sequences and per-frame functional group windows of enhanced multi-frame images are not applied.
   \item No support for DICOM C-FIND, C-MOVE, or other DICOM services.

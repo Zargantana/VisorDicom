@@ -5,7 +5,7 @@ generados con pydicom, y compara el RGBA resultante con la "verdad" calculada co
 PS3.3 C.11 (Modality LUT → VOI → Presentation).
 
 ```bash
-pip install pydicom numpy pillow pyjpegls imagecodecs   # pyjpegls (t22) e imagecodecs (t24-t36) son opcionales
+pip install pydicom numpy pillow pyjpegls imagecodecs av   # pyjpegls (t22), imagecodecs (t24-t36) y av (t96-t99) son opcionales
 npm ci                                                  # esbuild viene con @angular-devkit; Node 20+ (fs.openAsBlob)
 
 python3 tools/dicom-test/gen_test_dicoms.py   # → tools/dicom-test/out/*.dcm + expected.json
@@ -21,7 +21,7 @@ bloques hasta el Pixel Data y cada frame por rangos (`render.json` lo dice en `p
 | Variable | Qué hace |
 |---|---|
 | `DICOM_TEST_HEADER_CHUNK=600` | Primer bloque de cabecera de 600 bytes en vez de 256 KB. Los ficheros de la batería son pequeños y cabrían enteros en el primer bloque (en memoria); así se prueba de verdad la lectura por rangos del Pixel Data (índice de frames, BOT, EOT, fragmentos). Conviene pasarla con varios valores (512, 700, 1100…) tras tocar `DCM-file.class.ts` o `pixel-data-access.ts` |
-| `DICOM_TEST_INMEMORY=1` | El camino antiguo en memoria (string binario), el de los objetos antiguos en base64 del portal y la pantalla de test |
+| `DICOM_TEST_INMEMORY=1` | El camino antiguo en memoria (string binario), el de la pantalla de test |
 
 La decodificación va siempre en el hilo principal: en Node no hay `Worker` (el pool de Workers del visor, `DecodePool`,
 se prueba en el navegador; ver abajo).
@@ -33,6 +33,7 @@ se prueba en el navegador; ver abajo).
 | `pyjpegls` | t22 (JPEG-LS) | `pip install pyjpegls` (en Windows, Python 3.12) |
 | `imagecodecs` (libjpeg-turbo, OpenJPEG y OpenJPH nativos) | t24-t31 (HTJ2K, J2K RGB, JPEG lossless 12/16 bits, JPEG 12 bits) | `pip install imagecodecs` |
 | `cjpeg` de libjpeg-turbo | t32-t36 (JPEG aritmético, progresivo, *spectral selection*) | `apt install libjpeg-turbo-progs`; en Windows viene con libjpeg-turbo |
+| `av` (PyAV, con x264 y x265 dentro) | t96-t99 (vídeo H.264, H.264 fragmentable, HEVC y MPEG-2) y sus frames de referencia en `out/video_ref` | `pip install av` |
 | `gcc` + `libopenjp2-dev` | t27 (J2K Part 2 con MCT por matriz: **fallo esperado**) | `apt install gcc libopenjp2-7-dev`. Compila `j2k-part2/j2k_part2_mct.c`: el `opj_compress` de las distros no acepta `-m` |
 
 ## Piezas
@@ -41,10 +42,12 @@ se prueba en el navegador; ver abajo).
 |---|---|
 | `gen_test_dicoms.py` | Genera un caso por cada situación del estándar que ha dado guerra (ver la tabla) |
 | `harness-entry.ts` | Punto de entrada que se empaqueta con esbuild. `renderDicom()`: el fichero como `Blob` (o string con `DICOM_TEST_INMEMORY`), `ImageDCM.prepare(f)` y `renderFrameRGBA(f)` frame a frame |
-| `run_harness.mjs` | `print` para CharLS (`File` y `Blob` son los de Node 20+), carga los codecs globales de `src/libs`, registra los códecs bajo demanda de `src/assets/codecs` como globales (en Node no hay `<script>`) y renderiza cada fichero con cada ventana VOI (`#w1`, `#w2`…) |
+| `run_harness.mjs` | `print` para CharLS (`File` y `Blob` son los de Node 20+), carga los codecs globales de `src/libs`, registra los códecs bajo demanda de `src/assets/codecs` como globales (en Node no hay `<script>`) y renderiza cada fichero con cada ventana VOI (`#w1`, `#w2`…) y, si `expected.json` trae `"manual": [c, w]`, con esa ventana manual (`#m`: la del ratón o un preset; t01, t03, t07, t79) |
 | `check_render.py` | Verdad con pydicom (`pixel_array`, `apply_color_lut`, fórmula VOI LINEAR) y tolerancias (±3 lossless; más holgada para JPEG con pérdida). Si existe `out/ref/<fichero>.npy`, esa es la verdad (TS que pydicom no decodifica). `kind="expect_fail"`: pasa si el visor no decodifica ningún frame y no lanza (con `reason_contains`, además, el motivo que enseña el visor tiene que contenerlo). `decoded_by`: el códec que el visor tiene que reconocer por el contenido. `lossy`: tolerancia de compresión con pérdida |
 | `j2k-part2/j2k_part2_mct.c` | Genera un codestream J2K **Part 2** con MCT por matriz (`opj_set_MCT`) para t27 |
 | `browser-csp/run_browser_csp_test.mjs` | Prueba en Chromium del build de producción con la CSP de producción (ver abajo) |
+| `browser-ui/run_video_test.mjs` | Vídeo H.264/HEVC en el visor con un navegador que tenga esos códecs (Chrome o Edge: `CHROMIUM=<ruta>`; el Chromium de Playwright no trae H.264 ni HEVC). Compara cada frame con FFmpeg (`out/video_ref`), recorre el vídeo adelante, atrás (reinicio desde la IDR anterior) y dando la vuelta, y en cine. HEVC depende del equipo: si no lo decodifica, comprueba el cartel. En la nube se prueba con el Edge estable para Linux (`packages.microsoft.com`, extraído con `dpkg-deb -x`, sin instalar): H.264 sí, HEVC no |
+| `browser-ui/gen_navigation_series.py` + `browser-ui/run_navigation_test.mjs` | Navegación del visor en Chromium (build de producción): cambio de serie en la pila, de estudio en la lista y modalidad con varias series (fallos B0001, B0008 y B0010 de las notas), contraste con el ratón y presets de TC, y visor táctil en un móvil emulado (multitoque por CDP: `Emulation.setTouchEmulationEnabled` con `maxTouchPoints` y un `touchStart` por dedo). Series sintéticas en `out/navigation` |
 | `big-files/gen_big_files.py` + `big-files/measure_big_files.mjs` | Estudios sintéticos pesados y medidor en Chromium (en Windows, canal `chrome` y memoria por WMI). No forman parte de la batería (tardan y ocupan disco). Ver "Ficheros grandes" abajo |
 | `real/fetch_real_files.py` | Ficheros DICOM **reales** (ver abajo) |
 
@@ -151,6 +154,7 @@ crudo (403), hay que bajarlo a mano.
 | t80-t84 | **Specific Character Set** (0008,0005): UTF-8 (ISO_IR 192), Latin-1 (ISO_IR 100), japonés con ISO 2022 (`\ISO 2022 IR 87`, nombre con los tres grupos), coreano con ISO 2022 (`\ISO 2022 IR 149`) y griego (ISO_IR 126). Los textos se comparan con pydicom (`#text`) |
 | t85 | UTF-8 **sin declarar** (0008,0005): el visor lo lee como UTF-8 porque los bytes lo son |
 | t86-t88 | DICOM **sin preámbulo**: dataset crudo en Implicit VR LE sin grupo 0002 (ACR-NEMA 2.0, MESA); grupo 0002 sin los 128 bytes ni "DICM"; "DICM" al principio sin los 128 bytes. Forman una serie de tres cortes, para subirlos juntos al portal (`E2E_FILES`) |
+| t96-t99 | **Vídeo** (doc 06 V2): H.264 High con B y dos GOP cerrados de 8 frames en un fragmento (t96) y en fragmentos de 1000 bytes (t97, TS fragmentable), HEVC Main de 320×240 (t98; el decodificador por hardware de Chrome en Windows no admite menos) y MPEG-2 (t99, rechazo controlado). t96b y t98b: el mismo H.264 y el mismo HEVC dentro de **un .mp4 entero** en el Pixel Data, como hacen algunos equipos (t96b con `moov` al final; t98b con `moov` al principio y la etiqueta `hvc1`). En Node no hay WebCodecs: la batería comprueba el troceo del flujo en frames, las IDR y la cadena de códec (`kind: "video"`); los píxeles los compara `browser-ui/run_video_test.mjs` en Chrome o Edge con `out/video_ref` (FFmpeg) |
 | t91-t95 | **Cine de los multiframe** (`Images/cine.ts`, fila `#cine`): MR sin tiempos (cortes: sin play, el clic pasa de frame), XA sin tiempos (15 fps, los de su modalidad), US con solo Frame Time Vector, NM con Recommended Display Frame Rate (cine porque el fichero lo pide) y OT con solo Cine Rate |
 | t77 | JPEG Baseline con **bytes de relleno 0xFF** delante de SOS y EOI (ISO 10918-1 B.1.1.2; las miniaturas "DicomObjects" de las láminas 3DHISTECH): el decoder los quita antes de JpegImage/libjpeg-turbo |
 | t76 (×2) | **Mismo estudio con dos Study Date distintas** (pasa en CD reales): el clasificador agrupa por Study Instance UID. Lo comprueba `real/classify_corpus.mjs tools/dicom-test/out` (árbol del visor frente a pydicom), que conviene pasar tras tocar `classifier-DCM.class.ts` |

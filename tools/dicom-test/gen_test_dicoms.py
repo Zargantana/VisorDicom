@@ -106,7 +106,7 @@ for i in range(12):  # serie de 12 imagenes -> activa scroll viewer (CT > 10)
     ds.WindowCenterWidthExplanation = ["ABDOMEN", "PULMON"]
     ds.PixelData = stored.tobytes()
     save(ds, f"t01_ct_evle_2win_{i + 1:02d}.dcm", ExplicitVRLittleEndian)
-expect("t01_ct_evle_2win_01.dcm", rows=R, cols=C, frames=1, windows=2, kind="ct")
+expect("t01_ct_evle_2win_01.dcm", rows=R, cols=C, frames=1, windows=2, kind="ct", manual=[-600, 1500])  # #m: preset "pulmón"
 
 # --- t02: CT Implicit VR LE, 1 ventana (slider oculto), signed ---------------------------
 hu = ct_hu()
@@ -126,7 +126,7 @@ set_mono16(ds, mr, signed=False, slope=1.0, intercept=0.0)
 del ds.RescaleType
 ds.PixelData = mr.tobytes()
 save(ds, "t03_mr_ivle_nowin.dcm", ImplicitVRLittleEndian)
-expect("t03_mr_ivle_nowin.dcm", rows=R, cols=C, frames=1, windows=0, kind="mr_auto")
+expect("t03_mr_ivle_nowin.dcm", rows=R, cols=C, frames=1, windows=0, kind="mr_auto", manual=[1200, 900])  # #m: sin ventana en el fichero
 
 # --- t04: CT Deflated Explicit VR LE, 3 ventanas, slope fraccional ----------------------
 hu = ct_hu()
@@ -206,7 +206,7 @@ ds.WindowCenter = 2048
 ds.WindowWidth = 4096
 ds.PixelData = cr.tobytes()
 save(ds, "t07_cr_mono1.dcm", ExplicitVRLittleEndian)
-expect("t07_cr_mono1.dcm", rows=R, cols=C, frames=1, windows=1, kind="mono1_ramp")
+expect("t07_cr_mono1.dcm", rows=R, cols=C, frames=1, windows=1, kind="mono1_ramp", manual=[2000, 1000])  # #m: MONOCHROME1 sigue invertida
 
 
 def jpeg_bytes(img, mode):
@@ -438,7 +438,7 @@ ds.VOILUTSequence = Sequence([lut79])
 ds.VOILUTSequence.is_undefined_length = False
 ds.PixelData = stored79.tobytes()
 save(ds, "t79_voi_lut_sequence.dcm", ExplicitVRLittleEndian)
-expect("t79_voi_lut_sequence.dcm", rows=R, cols=C, frames=1, windows=0, kind="voi_lut")
+expect("t79_voi_lut_sequence.dcm", rows=R, cols=C, frames=1, windows=0, kind="voi_lut", manual=[1500, 800])  # #m: manda sobre la VOI LUT
 
 # --- t80-t86: Specific Character Set (0008,0005). El visor decodifica nombre, ID y descripciones con el juego
 #     declarado; check_render.py compara esos textos con pydicom (fila "<fichero>#text"). Nombres inventados.
@@ -1162,6 +1162,129 @@ for _name80, _tail in (("t90_deflate_big_padding.dcm", b"\x00"), ("t90b_deflate_
     with open(_p80, "wb") as fh:
         fh.write(_raw80[:_meta_end] + _stream + _tail)
     expect(_name80, rows=512, cols=512, frames=1, windows=1, kind="ct")
+
+# --- t96-t99: vídeo (PS3.5 8.2.5-8.2.8): el Pixel Data es UN flujo Annex B en fragmentos sin relación con los frames ----
+# H.264 en un fragmento (t96) y fragmentable en trozos de 1000 bytes (t97, dos GOP cerrados de 8 con B), HEVC (t98) y
+# MPEG-2 (t99, que ningún navegador decodifica: rechazo controlado). Los codifica PyAV (pip install av; trae x264 y
+# x265); en Node no hay WebCodecs y la batería solo comprueba el troceo en frames y el códec (kind "video"). Los
+# píxeles los compara tools/dicom-test/browser-ui/run_video_test.mjs en Chrome o Edge con out/video_ref/*.rgb, que
+# son los mismos frames decodificados por PyAV (BT.709, rango limitado).
+try:
+    import av  # noqa: F401
+    _have_av = True
+except ImportError:  # pragma: no cover
+    _have_av = False
+    print("PyAV no instalado: se omiten t96-t99 (vídeo H.264, HEVC y MPEG-2; pip install av)")
+
+if _have_av:
+    _VR, _VC, _REF = 120, 160, os.path.join(OUT, "video_ref")
+    os.makedirs(_REF, exist_ok=True)
+
+    def _video_frames(n, rows=_VR, cols=_VC):
+        """Degradado de color que se mueve y una barra blanca en x = 8·i: cada frame es distinto (índice bien puesto)."""
+        yy, xx = np.mgrid[0:rows, 0:cols]
+        out = []
+        for i in range(n):
+            rgb = np.zeros((rows, cols, 3), np.uint8)
+            rgb[..., 0] = (xx * 255 // cols + 6 * i) % 256
+            rgb[..., 1] = yy * 255 // rows
+            rgb[..., 2] = 128 + 60 * np.sin((xx + yy + 5 * i) / 25.0)
+            x0 = (8 * i) % (cols - 16)
+            rgb[20:100, x0:x0 + 16] = 235
+            out.append(rgb)
+        return out
+
+    def _encode(codec, fmt, n, options, rows=_VR, cols=_VC, container_options=None, tag=None):
+        # Con opciones del contenedor (faststart), a un fichero: FFmpeg relee la salida para mover moov y en memoria no puede
+        fd, path = tempfile.mkstemp(suffix="." + fmt) if container_options else (None, None)
+        if fd is not None:
+            os.close(fd)
+        buf = path or io.BytesIO()
+        try:
+            with av.open(buf, mode="w", format=fmt, container_options=container_options) as container:
+                st = container.add_stream(codec, rate=25, options=options)
+                st.width, st.height, st.pix_fmt = cols, rows, "yuv420p"
+                if tag:
+                    st.codec_context.codec_tag = tag
+                for i, rgb in enumerate(_video_frames(n, rows, cols)):
+                    frame = av.VideoFrame.from_ndarray(rgb, format="rgb24").reformat(
+                        format="yuv420p", dst_colorspace="ITU709", dst_color_range="MPEG")
+                    frame.pts = i
+                    for packet in st.encode(frame):
+                        container.mux(packet)
+                for packet in st.encode():
+                    container.mux(packet)
+            if path:
+                with open(path, "rb") as fh:
+                    return fh.read()
+            return buf.getvalue()
+        finally:
+            if path:
+                os.remove(path)
+
+    def _reference(name, stream, fmt):
+        """Frames de referencia: el mismo flujo decodificado por FFmpeg (orden de presentación), a RGB con BT.709.
+        fmt None: que FFmpeg lo reconozca (MP4)."""
+        with av.open(io.BytesIO(stream), format=fmt) as container:
+            frames = [f.reformat(format="rgb24", src_colorspace="ITU709", src_color_range="MPEG", dst_color_range="JPEG").to_ndarray()
+                      for f in container.decode(video=0)]
+        for i, rgb in enumerate(frames):
+            rgb.astype(np.uint8).tofile(os.path.join(_REF, f"{name}.f{i}.rgb"))
+        return len(frames)
+
+    def _video_dicom(name, ts, stream, frames, fragment=None, method="ISO_14496_10", rows=_VR, cols=_VC):
+        ds = base_ds("ES", sop_class="1.2.840.10008.5.1.4.1.1.77.1.1.1")
+        ds.SamplesPerPixel = 3
+        ds.PhotometricInterpretation = "YBR_PARTIAL_420"
+        ds.PlanarConfiguration = 0
+        ds.Rows, ds.Columns = rows, cols
+        ds.BitsAllocated, ds.BitsStored, ds.HighBit, ds.PixelRepresentation = 8, 8, 7, 0
+        ds.NumberOfFrames = frames
+        ds.FrameTime = 40
+        ds.CineRate = 25
+        ds.FrameIncrementPointer = 0x00181063
+        ds.LossyImageCompression = "01"
+        ds.LossyImageCompressionMethod = method
+        # Basic Offset Table vacía y el flujo en fragmentos de tamaño par (solo el último se rellena)
+        chunks = [stream] if fragment is None else [stream[k:k + fragment] for k in range(0, len(stream), fragment)]
+        ds.PixelData = b"\xfe\xff\x00\xe0\x00\x00\x00\x00" + b"".join(itemize_fragment(c) for c in chunks)
+        ds["PixelData"].VR = "OB"
+        ds["PixelData"].is_undefined_length = True
+        save(ds, name, ts)
+
+    _x264 = {"profile": "high", "x264-params": "keyint=8:min-keyint=8:scenecut=0:bframes=2:open-gop=0:"
+             "colormatrix=bt709:colorprim=bt709:transfer=bt709:range=tv:log-level=error"}
+    _h264 = _encode("libx264", "h264", 16, _x264)
+    _n = _reference("t96_video_h264.dcm", _h264, "h264")
+    _video_dicom("t96_video_h264.dcm", "1.2.840.10008.1.2.4.102", _h264, _n)
+    expect("t96_video_h264.dcm", kind="video", family="h264", units=16, keys=2, codec_prefix="avc1.64", frames=_n)
+    _n = _reference("t97_video_h264_fragmentable.dcm", _h264, "h264")
+    _video_dicom("t97_video_h264_fragmentable.dcm", "1.2.840.10008.1.2.4.102.1", _h264, _n, fragment=1000)
+    expect("t97_video_h264_fragmentable.dcm", kind="video", family="h264", units=16, keys=2, codec_prefix="avc1.64", frames=_n)
+
+    _x265 = {"x265-params": "keyint=4:min-keyint=4:scenecut=0:bframes=2:open-gop=0:colormatrix=bt709:colorprim=bt709:"
+             "transfer=bt709:range=limited:log-level=error"}
+    # HEVC a 320x240: el decodificador por hardware de Chrome en Windows no admite menos (un 160x120 lo rechaza)
+    _hevc = _encode("libx265", "hevc", 8, _x265, 240, 320)
+    _n = _reference("t98_video_hevc.dcm", _hevc, "hevc")
+    _video_dicom("t98_video_hevc.dcm", "1.2.840.10008.1.2.4.107", _hevc, _n, method="ISO_23008_2", rows=240, cols=320)
+    expect("t98_video_hevc.dcm", kind="video", family="hevc", units=8, keys=2, codec_prefix="hvc1.1.", frames=_n)
+
+    # t96b y t98b: el .mp4 ENTERO en el Pixel Data, como hacen algunos equipos, en vez del flujo elemental. t96b con
+    # moov al final (lo normal en FFmpeg) y t98b con moov al principio (faststart, lo habitual en esos equipos) y la
+    # etiqueta hvc1
+    _h264_mp4 = _encode("libx264", "mp4", 16, _x264)
+    _n = _reference("t96b_video_h264_mp4.dcm", _h264_mp4, None)
+    _video_dicom("t96b_video_h264_mp4.dcm", "1.2.840.10008.1.2.4.102", _h264_mp4, _n)
+    expect("t96b_video_h264_mp4.dcm", kind="video", family="h264", units=16, keys=2, codec_prefix="avc1.64", frames=_n)
+    _hevc_mp4 = _encode("libx265", "mp4", 8, _x265, 240, 320, container_options={"movflags": "faststart"}, tag="hvc1")
+    _n = _reference("t98b_video_hevc_mp4.dcm", _hevc_mp4, None)
+    _video_dicom("t98b_video_hevc_mp4.dcm", "1.2.840.10008.1.2.4.107", _hevc_mp4, _n, method="ISO_23008_2", rows=240, cols=320)
+    expect("t98b_video_hevc_mp4.dcm", kind="video", family="hevc", units=8, keys=2, codec_prefix="hvc1.1.", frames=_n)
+
+    _mpeg2 = _encode("mpeg2video", "mpeg2video", 8, {"g": "8", "bf": "2"})
+    _video_dicom("t99_video_mpeg2.dcm", "1.2.840.10008.1.2.4.100", _mpeg2, 8, method="ISO_13818_2")
+    expect("t99_video_mpeg2.dcm", kind="expect_fail", reason_contains="MPEG-2")
 
 with open(os.path.join(OUT, "expected.json"), "w") as fh:
     json.dump(EXPECTED, fh, indent=1)

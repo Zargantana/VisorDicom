@@ -147,6 +147,19 @@ export class PixelDataAccess {
         return this.nativeFrame(frame, info.valueOffset, info.length);
     }
 
+    /**
+     * Todo el Pixel Data encapsulado seguido (los fragmentos, sin la Basic Offset Table): el flujo de las Transfer
+     * Syntaxes de vídeo, que va repartido en fragmentos sin relación con los frames (PS3.5 8.2.5-8.2.8). Lee del fichero
+     * por rangos o de memoria.
+     */
+    public async getStream(): Promise<Uint8Array> {
+        const info = this.info;
+        if (!info || info.length !== null) {
+            throw new MissingFrameError(0);
+        }
+        return new EncapsulatedIndex(this.file, info.valueOffset, 1, false, null).frame(0);
+    }
+
     private async nativeFrame(frame: number, valueOffset: number, length: number): Promise<FrameBytes> {
         const frames = Math.max(1, this.reader.Frames || 1);
         if (frame < 0 || frame >= frames) {

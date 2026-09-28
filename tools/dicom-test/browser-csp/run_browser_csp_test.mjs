@@ -81,6 +81,9 @@ for (const name of files) {
   }
   if (!(await page.locator('input#file').count())) { await page.goto(origin + '/file-loader'); await page.waitForTimeout(600); }
   const expectFail = expected[name] ? expected[name].kind === 'expect_fail' : !!rendered[name] && !rendered[name].decodedFrames;
+  // Vídeo H.264/HEVC (doc 06 V2): lo decodifica WebCodecs si el navegador trae el códec (Chrome y Edge, H.264; HEVC según
+  // el equipo). Con él, el frame 0 se compara con el de FFmpeg (out/video_ref); sin él, vale el cartel que lo explica.
+  const expectVideo = expected[name]?.kind === 'video';
   let pixels = null;
   try {
     await page.setInputFiles('input#file', path.join(outDir, name), { timeout: 10000 });
@@ -98,7 +101,7 @@ for (const name of files) {
     // El visor pinta en un <canvas> (data-painted) desde 2026-09-27; antes, en un <img> con data: URL. Vale lo uno o lo otro.
     await page.waitForFunction(() => [...document.querySelectorAll('basic-image-viewer canvas, basic-image-viewer img')]
       .some((e) => e.tagName == 'CANVAS' ? e.hasAttribute('data-painted') : (e.src || '').startsWith('data:image') && !e.hasAttribute('data-unsupported')),
-      null, { timeout: expectFail ? 4000 : 20000 });
+      null, { timeout: expectFail ? 4000 : expectVideo ? 8000 : 20000 });
     pixels = await page.evaluate(async () => {
       const shown = [...document.querySelectorAll('basic-image-viewer canvas, basic-image-viewer img')]
         .find((e) => e.tagName == 'CANVAS' ? e.hasAttribute('data-painted') : (e.src || '').startsWith('data:image'));
@@ -119,6 +122,23 @@ for (const name of files) {
     const want = expected[name]?.reason_contains || '';
     verdict = reason && reason.includes(want) ? `PASS (cartel: ${reason.slice(0, 60)}…)`
       : `FAIL (se esperaba el cartel${want ? ' con "' + want + '"' : ''}; motivo: "${reason}")`;
+  } else if (expectVideo) {
+    const label = expected[name].family === 'hevc' ? 'HEVC' : 'H.264';
+    if (pixels) {
+      const ref = fs.readFileSync(path.join(outDir, 'video_ref', `${name}.f0.rgb`));
+      let sum = 0, max = 0;
+      for (let i = 0; i < ref.length; i++) { // ref RGB, canvas RGBA
+        const d = Math.abs(ref[i] - pixels.data[Math.floor(i / 3) * 4 + (i % 3)]);
+        sum += d;
+        max = Math.max(max, d);
+      }
+      const mean = sum / ref.length;
+      verdict = mean < 3 && max < 64 ? `PASS (vídeo ${label}: frame 0 = FFmpeg, media ${mean.toFixed(2)}, máx ${max})` : `FAIL (vídeo ${label}: media ${mean.toFixed(2)}, máx ${max})`;
+    } else {
+      const reason = await page.evaluate(() => [...document.querySelectorAll('basic-image-viewer canvas, basic-image-viewer img')]
+        .map((i) => i.getAttribute('data-unsupported')).find(Boolean) || '').catch(() => '');
+      verdict = reason.includes(label) ? `PASS (este navegador no decodifica ${label}; cartel: ${reason.slice(0, 50)}…)` : `FAIL (vídeo ${label} sin pintar ni cartel: "${reason}")`;
+    }
   } else if (!pixels) {
     verdict = 'FAIL (no se pintó)';
   } else {
